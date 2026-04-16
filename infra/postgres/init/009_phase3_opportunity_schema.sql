@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS model_opportunity (
+    id BIGSERIAL PRIMARY KEY,
+    model_selection_snapshot_id BIGINT REFERENCES model_selection_snapshot(id) ON DELETE SET NULL,
+    model_evaluation_snapshot_id BIGINT REFERENCES model_evaluation_snapshot(id) ON DELETE SET NULL,
+    feature_version_id BIGINT NOT NULL REFERENCES feature_version(id) ON DELETE CASCADE,
+    target_task VARCHAR(64) NOT NULL,
+    opportunity_key VARCHAR(255) NOT NULL UNIQUE,
+    team_code VARCHAR(16) NOT NULL,
+    opponent_code VARCHAR(16) NOT NULL,
+    season_label VARCHAR(32) NOT NULL,
+    canonical_game_id BIGINT NOT NULL,
+    game_date DATE NOT NULL,
+    policy_name VARCHAR(64) NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    prediction_value DOUBLE PRECISION NOT NULL,
+    signal_strength DOUBLE PRECISION NOT NULL,
+    evidence_rating VARCHAR(32),
+    recommendation_status VARCHAR(32),
+    payload_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

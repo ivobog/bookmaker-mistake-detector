@@ -15,6 +15,10 @@ from bookmaker_detector_api.services.ingestion_pipeline import (
 from bookmaker_detector_api.services.repository_factory import build_ingestion_repository
 
 
+def _utc_today() -> date:
+    return datetime.now(timezone.utc).date()
+
+
 def get_admin_diagnostics(
     *,
     repository_mode: str,
@@ -589,7 +593,7 @@ def resolve_started_window(
     started_to: date | None = None,
     days: int | None = None,
 ) -> tuple[datetime | None, datetime | None]:
-    resolved_started_to = started_to or date.today()
+    resolved_started_to = started_to or _utc_today()
     resolved_started_from = started_from
     if resolved_started_from is None and days is not None:
         resolved_started_from = resolved_started_to - timedelta(days=max(days - 1, 0))

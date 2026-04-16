@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from bookmaker_detector_api import demo as demo_module
 from bookmaker_detector_api.main import app
 from bookmaker_detector_api.repositories import InMemoryIngestionRepository
+from bookmaker_detector_api.services import models as models_module
 from bookmaker_detector_api.services.admin_diagnostics import get_admin_diagnostics
 from bookmaker_detector_api.services.fetch_ingestion_runner import run_fetch_and_ingest
 
@@ -141,6 +142,1044 @@ def test_phase_two_feature_demo_endpoint_exposes_feature_snapshot_summary() -> N
         == "baseline_team_features_v1"
     )
     assert len(payload["feature_result"]["feature_snapshots"]) == 3
+
+
+def test_phase_three_model_train_endpoint_returns_ranked_baseline_runs() -> None:
+    response = client.post(
+        "/api/v1/admin/models/train"
+        "?repository_mode=in_memory&seed_demo=true"
+        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["filters"]["target_task"] == "spread_error_regression"
+    assert payload["dataset_row_count"] > 0
+    assert len(payload["model_runs"]) == 2
+    assert payload["best_model"] is not None
+    assert payload["best_model"]["artifact"]["model_family"] == "linear_feature"
+    assert "selection_metrics" in payload["model_runs"][0]["artifact"]
+    assert "split_target_summary" in payload["model_runs"][0]["artifact"]
+
+
+def test_phase_three_model_registry_endpoint_returns_seeded_registry_rows() -> None:
+    response = client.get(
+        "/api/v1/admin/models/registry"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
+        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["filters"]["target_task"] == "spread_error_regression"
+    assert payload["model_registry_count"] == 2
+    assert {entry["model_family"] for entry in payload["model_registry"]} == {
+        "linear_feature",
+        "tree_stump",
+    }
+
+
+def test_phase_three_model_runs_endpoint_returns_persisted_training_runs() -> None:
+    response = client.get(
+        "/api/v1/admin/models/runs"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
+        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["filters"]["target_task"] == "spread_error_regression"
+    assert payload["model_run_count"] == 2
+    assert {run["artifact"]["model_family"] for run in payload["model_runs"]} == {
+        "linear_feature",
+        "tree_stump",
+    }
+    assert all("train" in run["metrics"] for run in payload["model_runs"])
+    assert all(
+        run["metrics"]["validation"]["prediction_count"] > 0
+        for run in payload["model_runs"]
+    )
+
+
+def test_phase_three_model_summary_endpoint_returns_best_and_latest_runs() -> None:
+    response = client.get(
+        "/api/v1/admin/models/summary"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
+        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["filters"]["target_task"] == "spread_error_regression"
+    assert payload["model_summary"]["run_count"] == 2
+    assert payload["model_summary"]["status_counts"] == {"COMPLETED": 2}
+    assert payload["model_summary"]["usable_run_count"] == 2
+    assert payload["model_summary"]["fallback_run_count"] == 1
+    assert payload["model_summary"]["best_overall"] is not None
+    assert payload["model_summary"]["best_overall"]["artifact"]["model_family"] == "linear_feature"
+    assert payload["model_summary"]["latest_run"] is not None
+    assert "linear_feature" in payload["model_summary"]["best_by_family"]
+    assert "tree_stump" in payload["model_summary"]["best_by_family"]
+
+
+def test_phase_three_model_history_endpoint_returns_rollup() -> None:
+    response = client.get(
+        "/api/v1/admin/models/history"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
+        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+        "&recent_limit=5"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["filters"]["target_task"] == "spread_error_regression"
+    assert payload["model_history"]["overview"]["run_count"] == 2
+    assert payload["model_history"]["overview"]["best_overall"]["artifact"]["model_family"] == (
+        "linear_feature"
+    )
+    assert payload["model_history"]["overview"]["fallback_run_count"] == 1
+    assert len(payload["model_history"]["daily_buckets"]) == 1
+    assert payload["model_history"]["daily_buckets"][0]["run_count"] == 2
+    assert len(payload["model_history"]["recent_runs"]) == 2
+
+
+def test_phase_three_model_evaluations_endpoint_returns_snapshots() -> None:
+    response = client.get(
+        "/api/v1/admin/models/evaluations"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
+        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["evaluation_snapshot_count"] == 2
+    assert {snapshot["model_family"] for snapshot in payload["evaluation_snapshots"]} == {
+        "linear_feature",
+        "tree_stump",
+    }
+
+
+def test_phase_three_model_evaluation_history_endpoint_returns_rollup() -> None:
+    response = client.get(
+        "/api/v1/admin/models/evaluations/history"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
+        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+        "&recent_limit=5"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["model_evaluation_history"]["overview"]["snapshot_count"] == 2
+    assert payload["model_evaluation_history"]["overview"]["fallback_strategy_counts"] == {
+        "constant_mean": 1
+    }
+    assert len(payload["model_evaluation_history"]["daily_buckets"]) == 1
+    assert len(payload["model_evaluation_history"]["recent_snapshots"]) == 2
+
+
+def test_phase_three_model_select_endpoint_promotes_linear_candidate() -> None:
+    response = client.post(
+        "/api/v1/admin/models/select"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
+        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["selection_policy_name"] == "validation_mae_candidate_v1"
+    assert payload["selected_snapshot"]["model_family"] == "linear_feature"
+    assert payload["active_selection"]["model_family"] == "linear_feature"
+    assert payload["selection_count"] == 1
+
+
+def test_phase_three_model_selections_endpoint_returns_active_selection() -> None:
+    response = client.get(
+        "/api/v1/admin/models/selections"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
+        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+        "&active_only=true"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["selection_count"] == 1
+    assert payload["selections"][0]["model_family"] == "linear_feature"
+    assert payload["selections"][0]["is_active"] is True
+
+
+def test_phase_three_model_selection_history_endpoint_returns_rollup() -> None:
+    response = client.get(
+        "/api/v1/admin/models/selections/history"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
+        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+        "&recent_limit=5"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["model_selection_history"]["overview"]["selection_count"] == 1
+    assert payload["model_selection_history"]["overview"]["active_selection_count"] == 1
+    assert payload["model_selection_history"]["overview"]["latest_selection"]["model_family"] == (
+        "linear_feature"
+    )
+    assert len(payload["model_selection_history"]["recent_selections"]) == 1
+
+
+def test_phase_three_model_score_preview_endpoint_returns_scored_predictions() -> None:
+    response = client.get(
+        "/api/v1/admin/models/score-preview"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true&auto_select_demo=true"
+        "&target_task=spread_error_regression&team_code=LAL&season_label=2024-2025"
+        "&canonical_game_id=3&train_ratio=0.5&validation_ratio=0.25&limit=5"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["filters"]["target_task"] == "spread_error_regression"
+    assert payload["filters"]["canonical_game_id"] == 3
+    assert payload["active_selection"] is not None
+    assert payload["active_selection"]["model_family"] == "linear_feature"
+    assert payload["active_evaluation_snapshot"] is not None
+    assert payload["scored_prediction_count"] == 1
+    assert payload["prediction_summary"]["prediction_count"] == 1
+    prediction = payload["predictions"][0]
+    assert prediction["team_code"] == "LAL"
+    assert prediction["model"]["model_family"] == "linear_feature"
+    assert prediction["evidence"]["summary"] is not None
+    assert prediction["evidence"]["recommendation"] is not None
+
+
+def test_phase_three_model_future_game_preview_endpoint_returns_scenario_predictions() -> None:
+    response = client.get(
+        "/api/v1/admin/models/future-game-preview"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true&auto_select_demo=true"
+        "&target_task=spread_error_regression&season_label=2025-2026&game_date=2026-04-20"
+        "&home_team_code=LAL&away_team_code=BOS&home_spread_line=-3.5&total_line=228.5"
+        "&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["scenario"]["home_team_code"] == "LAL"
+    assert payload["scenario"]["away_team_code"] == "BOS"
+    assert payload["scored_prediction_count"] == 2
+    assert len(payload["predictions"]) == 2
+    assert payload["predictions"][0]["market_context"]["total_line"] == 228.5
+    assert len(payload["opportunity_preview"]) >= 1
+
+
+def test_phase_three_model_future_game_preview_materialize_endpoint_returns_scoring_run() -> None:
+    response = client.post(
+        "/api/v1/admin/models/future-game-preview/materialize"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true&auto_select_demo=true"
+        "&target_task=spread_error_regression&season_label=2025-2026&game_date=2026-04-20"
+        "&home_team_code=LAL&away_team_code=BOS&home_spread_line=-3.5&total_line=228.5"
+        "&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["materialized_count"] == 1
+    assert payload["scoring_run"] is not None
+    assert payload["scoring_run"]["home_team_code"] == "LAL"
+    assert payload["scoring_run"]["away_team_code"] == "BOS"
+
+
+def test_phase_three_model_future_game_preview_runs_endpoint_returns_materialized_runs() -> None:
+    response = client.get(
+        "/api/v1/admin/models/future-game-preview/runs"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
+        "&auto_select_demo=true&auto_materialize_demo=true"
+        "&target_task=spread_error_regression&season_label=2025-2026&game_date=2026-04-20"
+        "&team_code=LAL&home_team_code=LAL&away_team_code=BOS&home_spread_line=-3.5"
+        "&total_line=228.5&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["scoring_run_count"] == 1
+    assert payload["scoring_runs"][0]["home_team_code"] == "LAL"
+
+
+def test_phase_three_model_future_game_preview_run_detail_endpoint_returns_payload() -> None:
+    response = client.get(
+        "/api/v1/admin/models/future-game-preview/runs/1"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
+        "&auto_select_demo=true&auto_materialize_demo=true"
+        "&target_task=spread_error_regression&season_label=2025-2026&game_date=2026-04-20"
+        "&home_team_code=LAL&away_team_code=BOS&home_spread_line=-3.5&total_line=228.5"
+        "&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["scoring_run"] is not None
+    assert payload["scoring_run"]["id"] == 1
+    assert payload["scoring_run"]["payload"]["scenario"]["away_team_code"] == "BOS"
+
+
+def test_phase_three_model_future_game_preview_history_endpoint_returns_rollup() -> None:
+    response = client.get(
+        "/api/v1/admin/models/future-game-preview/history"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
+        "&auto_select_demo=true&auto_materialize_demo=true"
+        "&target_task=spread_error_regression&season_label=2025-2026&game_date=2026-04-20"
+        "&team_code=LAL&home_team_code=LAL&away_team_code=BOS&home_spread_line=-3.5"
+        "&total_line=228.5&train_ratio=0.5&validation_ratio=0.25&recent_limit=5"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    overview = payload["model_scoring_history"]["overview"]
+    assert overview["scoring_run_count"] == 1
+    assert overview["prediction_count"] == 2
+    assert overview["latest_scoring_run"]["home_team_code"] == "LAL"
+    assert len(payload["model_scoring_history"]["recent_scoring_runs"]) == 1
+
+
+def test_phase_three_model_future_opportunity_materialize_endpoint_returns_future_rows() -> None:
+    response = client.post(
+        "/api/v1/admin/models/future-game-preview/opportunities/materialize"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true&auto_select_demo=true"
+        "&target_task=spread_error_regression&season_label=2025-2026&game_date=2026-04-20"
+        "&home_team_code=LAL&away_team_code=BOS&home_spread_line=-3.5&total_line=228.5"
+        "&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["scoring_run"] is not None
+    assert payload["opportunity_count"] >= 1
+    assert payload["opportunities"][0]["source_kind"] == "future_scenario"
+    assert payload["opportunities"][0]["scenario_key"] == "2025-2026:2026-04-20:LAL:BOS"
+    assert payload["opportunities"][0]["model_scoring_run_id"] == payload["scoring_run"]["id"]
+
+
+def test_phase_three_model_future_slate_preview_endpoint_returns_batch_summary() -> None:
+    response = client.post(
+        "/api/v1/admin/models/future-slate/preview"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true&auto_select_demo=true"
+        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25",
+        json={
+            "slate_label": "demo-slate",
+            "games": [
+                {
+                    "season_label": "2025-2026",
+                    "game_date": "2026-04-20",
+                    "home_team_code": "LAL",
+                    "away_team_code": "BOS",
+                    "home_spread_line": -3.5,
+                    "total_line": 228.5,
+                },
+                {
+                    "season_label": "2025-2026",
+                    "game_date": "2026-04-21",
+                    "home_team_code": "NYK",
+                    "away_team_code": "MIA",
+                    "home_spread_line": -1.5,
+                    "total_line": 219.5,
+                },
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["slate"]["slate_key"] == "spread_error_regression:demo-slate"
+    assert payload["slate"]["game_count"] == 2
+    assert payload["game_preview_count"] == 2
+    assert payload["scored_prediction_count"] == 4
+    assert len(payload["games"]) == 2
+
+
+def test_phase_three_model_future_slate_materialize_endpoint_persists_batch_results() -> None:
+    response = client.post(
+        "/api/v1/admin/models/future-slate/materialize"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true&auto_select_demo=true"
+        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25",
+        json={
+            "slate_label": "demo-slate",
+            "games": [
+                {
+                    "season_label": "2025-2026",
+                    "game_date": "2026-04-20",
+                    "home_team_code": "LAL",
+                    "away_team_code": "BOS",
+                    "home_spread_line": -3.5,
+                    "total_line": 228.5,
+                },
+                {
+                    "season_label": "2025-2026",
+                    "game_date": "2026-04-21",
+                    "home_team_code": "NYK",
+                    "away_team_code": "MIA",
+                    "home_spread_line": -1.5,
+                    "total_line": 219.5,
+                },
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["slate"]["slate_key"] == "spread_error_regression:demo-slate"
+    assert payload["materialized_scoring_run_count"] == 2
+    assert len(payload["scoring_runs"]) == 2
+    assert payload["materialized_opportunity_count"] >= 2
+    assert len(payload["opportunities"]) >= 2
+
+
+def test_phase_three_model_market_board_materialize_endpoint_persists_board() -> None:
+    response = client.post(
+        "/api/v1/admin/models/market-board/materialize"
+        "?repository_mode=in_memory&target_task=spread_error_regression",
+        json={
+            "slate_label": "demo-market-board",
+            "games": [
+                {
+                    "season_label": "2025-2026",
+                    "game_date": "2026-04-20",
+                    "home_team_code": "LAL",
+                    "away_team_code": "BOS",
+                    "home_spread_line": -3.5,
+                    "total_line": 228.5,
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["board"]["board_key"] == "spread_error_regression:demo-market-board"
+    assert payload["board"]["game_count"] == 1
+
+
+def test_phase_three_model_market_board_sources_endpoint_lists_builtin_sources() -> None:
+    response = client.get("/api/v1/admin/models/market-board/sources")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["sources"]
+    assert payload["sources"][0]["source_name"] == "demo_daily_lines_v1"
+    assert any(
+        source["source_name"] == "demo_source_failure_v1" for source in payload["sources"]
+    )
+    assert any(source["source_name"] == "file_market_board_v1" for source in payload["sources"])
+
+
+def test_phase_three_model_market_board_refresh_endpoint_persists_source_board() -> None:
+    response = client.post(
+        "/api/v1/admin/models/market-board/refresh"
+        "?repository_mode=in_memory&target_task=spread_error_regression"
+        "&source_name=demo_daily_lines_v1&season_label=2025-2026"
+        "&game_date=2026-04-20&slate_label=demo-refresh-board&game_count=2"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["source_name"] == "demo_daily_lines_v1"
+    assert payload["generated_game_count"] == 2
+    assert payload["board"]["board_key"] == "spread_error_regression:demo-refresh-board"
+    assert payload["board"]["payload"]["source"]["source_name"] == "demo_daily_lines_v1"
+    assert payload["board"]["freshness"]["freshness_status"] == "fresh"
+    assert payload["change_summary"]["added_game_count"] == 2
+    assert payload["source_payload_fingerprints"]["raw_game_count"] == 2
+
+
+def test_phase_three_model_market_board_refresh_endpoint_returns_source_failure() -> None:
+    response = client.post(
+        "/api/v1/admin/models/market-board/refresh"
+        "?repository_mode=in_memory&target_task=spread_error_regression"
+        "&source_name=demo_source_failure_v1&season_label=2025-2026"
+        "&game_date=2026-04-20&slate_label=demo-failing-refresh-board&game_count=2"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["status"] == "FAILED"
+    assert payload["error_message"]
+    assert payload["generated_game_count"] == 0
+    assert payload["board"] is None
+    assert payload["change_summary"] is None
+    assert payload["source_run"]["status"] == "FAILED"
+
+
+def test_phase_three_model_market_board_refresh_endpoint_normalizes_partial_source() -> None:
+    response = client.post(
+        "/api/v1/admin/models/market-board/refresh"
+        "?repository_mode=in_memory&target_task=spread_error_regression"
+        "&source_name=demo_partial_lines_v1&season_label=2025-2026"
+        "&game_date=2026-04-20&slate_label=demo-partial-refresh-board&game_count=3"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "SUCCESS_WITH_WARNINGS"
+    assert payload["generated_game_count"] == 1
+    assert payload["board"]["game_count"] == 1
+    assert payload["validation_summary"]["raw_row_count"] == 3
+    assert payload["validation_summary"]["invalid_row_count"] == 2
+    assert payload["source_run"]["payload"]["validation_summary"]["warning_count"] == 1
+    assert payload["source_payload_fingerprints"]["normalized_game_count"] == 1
+
+
+def test_phase_three_model_market_board_refresh_endpoint_supports_file_source() -> None:
+    response = client.post(
+        "/api/v1/admin/models/market-board/refresh"
+        "?repository_mode=in_memory&target_task=spread_error_regression"
+        "&source_name=file_market_board_v1&season_label=2025-2026"
+        "&game_date=2026-04-20&slate_label=demo-file-refresh-board"
+        "&source_path=fixture://demo_market_board_file_source.json"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "SUCCESS"
+    assert payload["source_path"] == "fixture://demo_market_board_file_source.json"
+    assert payload["generated_game_count"] == 2
+    assert payload["board"]["game_count"] == 2
+    assert payload["board"]["payload"]["source"]["source_path"] == (
+        "fixture://demo_market_board_file_source.json"
+    )
+
+
+def test_phase_three_model_market_board_refresh_endpoint_supports_external_odds_source(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(models_module.settings, "the_odds_api_key", "test-key")
+    monkeypatch.setattr(
+        models_module,
+        "_fetch_the_odds_api_games",
+        lambda: [
+            {
+                "home_team": "PHX",
+                "away_team": "DAL",
+                "commence_time": "2026-04-20T23:00:00Z",
+                "bookmakers": [
+                    {
+                        "markets": [
+                            {
+                                "key": "spreads",
+                                "outcomes": [
+                                    {"name": "PHX", "point": 1.5},
+                                    {"name": "DAL", "point": -1.5},
+                                ],
+                            },
+                            {
+                                "key": "totals",
+                                "outcomes": [
+                                    {"name": "Over", "point": 226.5},
+                                    {"name": "Under", "point": 226.5},
+                                ],
+                            },
+                        ]
+                    }
+                ],
+            }
+        ],
+    )
+
+    response = client.post(
+        "/api/v1/admin/models/market-board/refresh"
+        "?repository_mode=in_memory&target_task=spread_error_regression"
+        "&source_name=the_odds_api_v4_nba&season_label=2025-2026"
+        "&game_date=2026-04-20&slate_label=demo-odds-api-refresh-board"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "SUCCESS"
+    assert payload["generated_game_count"] == 1
+    assert payload["source_request_context"]["sport_key"] == "basketball_nba"
+    assert payload["generated_games"][0]["home_team_code"] == "PHX"
+
+
+def test_phase_three_model_market_board_history_endpoint_returns_refresh_rollup() -> None:
+    response = client.get(
+        "/api/v1/admin/models/market-board/history"
+        "?repository_mode=in_memory&auto_refresh_demo=true"
+        "&target_task=spread_error_regression&source_name=demo_daily_lines_v1"
+        "&season_label=2025-2026&game_date=2026-04-20&slate_label=demo-refresh-board"
+        "&game_count=2&recent_limit=5"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    overview = payload["market_board_refresh_history"]["overview"]
+    assert overview["refresh_event_count"] == 1
+    assert overview["status_counts"]["created"] == 1
+    assert overview["source_counts"]["demo_daily_lines_v1"] == 1
+    assert (
+        payload["market_board_refresh_history"]["recent_refresh_events"][0]["payload"][
+            "change_summary"
+        ]["added_game_count"]
+        == 2
+    )
+    assert payload["market_board_refresh_history"]["recent_refresh_events"]
+
+
+def test_phase_three_model_market_board_source_runs_endpoint_returns_source_history() -> None:
+    response = client.get(
+        "/api/v1/admin/models/market-board/source-runs"
+        "?repository_mode=in_memory&auto_refresh_demo=true"
+        "&target_task=spread_error_regression&source_name=demo_daily_lines_v1"
+        "&season_label=2025-2026&game_date=2026-04-20&slate_label=demo-refresh-board"
+        "&game_count=2&recent_limit=5"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    history = payload["market_board_source_run_history"]
+    assert history["overview"]["source_run_count"] == 1
+    assert history["overview"]["generated_game_count"] == 2
+    assert history["recent_source_runs"][0]["payload"]["request"]["requested_game_count"] == 2
+
+
+def test_phase_three_model_market_board_source_runs_endpoint_returns_failed_history() -> None:
+    response = client.get(
+        "/api/v1/admin/models/market-board/source-runs"
+        "?repository_mode=in_memory&auto_refresh_demo=true"
+        "&target_task=spread_error_regression&source_name=demo_source_failure_v1"
+        "&season_label=2025-2026&game_date=2026-04-20&slate_label=demo-failing-refresh-board"
+        "&game_count=2&recent_limit=5"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    history = payload["market_board_source_run_history"]
+    assert history["overview"]["source_run_count"] == 1
+    assert history["overview"]["generated_game_count"] == 0
+    assert history["overview"]["status_counts"]["FAILED"] == 1
+    assert history["recent_source_runs"][0]["payload"]["error_message"]
+
+
+def test_phase_three_model_market_board_source_runs_endpoint_returns_validation_history() -> None:
+    response = client.get(
+        "/api/v1/admin/models/market-board/source-runs"
+        "?repository_mode=in_memory&auto_refresh_demo=true"
+        "&target_task=spread_error_regression&source_name=demo_partial_lines_v1"
+        "&season_label=2025-2026&game_date=2026-04-20&slate_label=demo-partial-refresh-board"
+        "&game_count=3&recent_limit=5"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    history = payload["market_board_source_run_history"]
+    assert history["overview"]["source_run_count"] == 1
+    assert history["overview"]["generated_game_count"] == 1
+    assert history["overview"]["invalid_row_count"] == 2
+    assert history["overview"]["warning_count"] == 1
+    assert history["overview"]["status_counts"]["SUCCESS_WITH_WARNINGS"] == 1
+    assert (
+        history["recent_source_runs"][0]["payload"]["validation_summary"]["invalid_row_count"]
+        == 2
+    )
+
+
+def test_phase_three_model_market_board_refresh_queue_endpoint_returns_refreshable_board() -> None:
+    response = client.get(
+        "/api/v1/admin/models/market-board/refresh-queue"
+        "?repository_mode=in_memory&auto_refresh_demo=true"
+        "&target_task=spread_error_regression&source_name=demo_daily_lines_v1"
+        "&season_label=2025-2026&game_date=2026-04-20&slate_label=demo-refresh-board"
+        "&game_count=2&pending_only=false"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    queue = payload["market_board_refresh_queue"]
+    assert queue["overview"]["refreshable_board_count"] == 1
+    assert queue["queue_entries"][0]["queue_status"] == "up_to_date"
+    assert queue["queue_entries"][0]["refreshable"] is True
+    assert queue["queue_entries"][0]["freshness_status"] == "fresh"
+
+
+def test_phase_three_model_market_board_queue_endpoint_returns_pending_board() -> None:
+    response = client.get(
+        "/api/v1/admin/models/market-board/queue"
+        "?repository_mode=in_memory&auto_refresh_demo=true"
+        "&target_task=spread_error_regression&source_name=demo_daily_lines_v1"
+        "&season_label=2025-2026&game_date=2026-04-20&slate_label=demo-refresh-board"
+        "&game_count=2&freshness_status=fresh&pending_only=true"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    queue = payload["market_board_scoring_queue"]
+    assert queue["overview"]["pending_board_count"] == 1
+    assert queue["queue_entries"][0]["queue_status"] == "pending_score"
+    assert queue["queue_entries"][0]["freshness_status"] == "fresh"
+
+
+def test_phase_three_model_market_board_refresh_orchestrate_endpoint_refreshes_board() -> None:
+    response = client.post(
+        "/api/v1/admin/models/market-board/orchestrate-refresh"
+        "?repository_mode=in_memory&auto_refresh_demo=true"
+        "&target_task=spread_error_regression&source_name=demo_daily_lines_v1"
+        "&season_label=2025-2026&game_date=2026-04-20&slate_label=demo-refresh-board"
+        "&game_count=2&pending_only=false&recent_limit=5"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["candidate_board_count"] == 1
+    assert payload["refreshed_board_count"] == 1
+    assert payload["unchanged_board_count"] == 1
+    assert payload["refresh_batch"]["candidate_board_count"] == 1
+    assert payload["refresh_runs"][0]["refresh_result_status"] == "unchanged"
+
+
+def test_phase_three_model_market_board_orchestrate_endpoint_scores_pending_board() -> None:
+    response = client.post(
+        "/api/v1/admin/models/market-board/orchestrate-score"
+        "?repository_mode=in_memory&seed_demo=true&auto_refresh_demo=true"
+        "&auto_train_demo=true&auto_select_demo=true"
+        "&target_task=spread_error_regression&source_name=demo_daily_lines_v1"
+        "&season_label=2025-2026&game_date=2026-04-20&slate_label=demo-refresh-board"
+        "&game_count=2&freshness_status=fresh&pending_only=true"
+        "&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["candidate_board_count"] == 1
+    assert payload["scored_board_count"] == 1
+    assert payload["materialized_scoring_run_count"] == 2
+    assert payload["queue_before"]["overview"]["pending_board_count"] == 1
+    assert payload["queue_after"]["overview"]["pending_board_count"] == 0
+    assert payload["orchestration_batch"]["candidate_board_count"] == 1
+
+
+def test_phase_three_model_market_board_orchestrate_cadence_endpoint_runs_full_cycle() -> None:
+    response = client.post(
+        "/api/v1/admin/models/market-board/orchestrate-cadence"
+        "?repository_mode=in_memory&seed_demo=true&auto_refresh_demo=true"
+        "&auto_train_demo=true&auto_select_demo=true"
+        "&target_task=spread_error_regression&source_name=demo_daily_lines_v1"
+        "&season_label=2025-2026&game_date=2026-04-20&game_count=2"
+        "&refresh_pending_only=false"
+        "&scoring_freshness_status=fresh&scoring_pending_only=true"
+        "&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["refreshed_board_count"] == 1
+    assert payload["scored_board_count"] == 1
+    assert payload["materialized_scoring_run_count"] == 2
+    assert payload["cadence_batch"]["refreshed_board_count"] == 1
+
+
+def test_phase_three_model_market_board_refresh_orchestration_history_endpoint_returns_batches(
+) -> None:
+    response = client.get(
+        "/api/v1/admin/models/market-board/refresh-orchestration-history"
+        "?repository_mode=in_memory&auto_refresh_demo=true&auto_orchestrate_demo=true"
+        "&target_task=spread_error_regression&source_name=demo_daily_lines_v1"
+        "&season_label=2025-2026&game_date=2026-04-20&game_count=2"
+        "&pending_only=false&recent_limit=5"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    history = payload["market_board_refresh_orchestration_history"]
+    assert history["overview"]["batch_count"] == 1
+    assert history["overview"]["candidate_board_count"] == 1
+    assert history["overview"]["refreshed_board_count"] == 1
+    assert history["recent_batches"][0]["target_task"] == "spread_error_regression"
+
+
+def test_phase_three_model_market_board_cadence_history_endpoint_returns_batches() -> None:
+    response = client.get(
+        "/api/v1/admin/models/market-board/cadence-history"
+        "?repository_mode=in_memory&seed_demo=true&auto_refresh_demo=true"
+        "&auto_train_demo=true&auto_select_demo=true&auto_orchestrate_demo=true"
+        "&target_task=spread_error_regression&source_name=demo_daily_lines_v1"
+        "&season_label=2025-2026&game_date=2026-04-20&game_count=2"
+        "&refresh_pending_only=false"
+        "&scoring_freshness_status=fresh&scoring_pending_only=true"
+        "&train_ratio=0.5&validation_ratio=0.25&recent_limit=5"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    history = payload["market_board_cadence_history"]
+    assert history["overview"]["batch_count"] == 1
+    assert history["overview"]["refreshed_board_count"] == 1
+    assert history["overview"]["scored_board_count"] == 1
+    assert history["recent_batches"][0]["target_task"] == "spread_error_regression"
+
+
+def test_phase_three_model_market_board_orchestration_history_endpoint_returns_batches() -> None:
+    response = client.get(
+        "/api/v1/admin/models/market-board/orchestration-history"
+        "?repository_mode=in_memory&seed_demo=true&auto_refresh_demo=true"
+        "&auto_train_demo=true&auto_select_demo=true&auto_orchestrate_demo=true"
+        "&target_task=spread_error_regression&source_name=demo_daily_lines_v1"
+        "&season_label=2025-2026&game_date=2026-04-20&game_count=2"
+        "&freshness_status=fresh&pending_only=true&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    history = payload["market_board_orchestration_history"]
+    assert history["overview"]["batch_count"] == 1
+    assert history["overview"]["candidate_board_count"] == 1
+    assert history["overview"]["materialized_scoring_run_count"] == 2
+    assert history["recent_batches"][0]["target_task"] == "spread_error_regression"
+
+
+def test_phase_three_model_market_board_operations_endpoint_returns_summary() -> None:
+    response = client.get(
+        "/api/v1/admin/models/market-board/1/operations"
+        "?repository_mode=in_memory&seed_demo=true&auto_refresh_demo=true"
+        "&auto_train_demo=true&auto_select_demo=true&auto_orchestrate_demo=true"
+        "&target_task=spread_error_regression&source_name=demo_daily_lines_v1"
+        "&season_label=2025-2026&game_date=2026-04-20&game_count=2"
+        "&freshness_status=fresh&pending_only=true&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    operations = payload["operations"]
+    assert operations["board"]["id"] == 1
+    assert operations["queue_entry"]["scoring_status"] == "current"
+    assert operations["source_runs"]["source_run_count"] == 1
+    assert operations["scoring"]["scoring_run_count"] == 2
+    assert operations["opportunities"]["opportunity_count"] == 2
+    assert operations["refresh_orchestration"]["batch_count"] == 0
+    assert operations["cadence"]["batch_count"] == 0
+    assert operations["orchestration"]["batch_count"] == 1
+    assert operations["refresh"]["latest_refresh_event"]["payload"]["change_summary"] is not None
+
+
+def test_phase_three_model_market_board_cadence_endpoint_returns_dashboard() -> None:
+    response = client.get(
+        "/api/v1/admin/models/market-board/cadence"
+        "?repository_mode=in_memory&seed_demo=true&auto_refresh_demo=true"
+        "&auto_train_demo=true&auto_select_demo=true&auto_orchestrate_demo=true"
+        "&target_task=spread_error_regression&source_name=demo_daily_lines_v1"
+        "&season_label=2025-2026&game_date=2026-04-20&game_count=2"
+        "&freshness_status=fresh&pending_only=true&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    dashboard = payload["market_board_cadence"]
+    assert dashboard["overview"]["board_count"] == 1
+    assert dashboard["overview"]["cadence_status_counts"]["recently_scored"] == 1
+    assert dashboard["cadence_entries"][0]["priority"] == "low"
+
+
+def test_phase_three_model_market_board_list_and_detail_endpoints_return_board() -> None:
+    list_response = client.get(
+        "/api/v1/admin/models/market-board"
+        "?repository_mode=in_memory&target_task=spread_error_regression"
+        "&season_label=2025-2026&auto_materialize_demo=true&slate_label=demo-market-board"
+        "&game_date=2026-04-20&home_team_code=LAL&away_team_code=BOS"
+        "&home_spread_line=-3.5&total_line=228.5"
+    )
+
+    assert list_response.status_code == 200
+    list_payload = list_response.json()
+    assert list_payload["repository_mode"] == "in_memory"
+    assert list_payload["board_count"] == 1
+    assert list_payload["boards"][0]["board_key"] == "spread_error_regression:demo-market-board"
+
+    detail_response = client.get(
+        "/api/v1/admin/models/market-board/1"
+        "?repository_mode=in_memory&auto_materialize_demo=true"
+        "&target_task=spread_error_regression&season_label=2025-2026"
+        "&slate_label=demo-market-board&game_date=2026-04-20"
+        "&home_team_code=LAL&away_team_code=BOS&home_spread_line=-3.5&total_line=228.5"
+    )
+
+    assert detail_response.status_code == 200
+    detail_payload = detail_response.json()
+    assert detail_payload["repository_mode"] == "in_memory"
+    assert detail_payload["board"]["id"] == 1
+    assert detail_payload["board"]["payload"]["games"][0]["away_team_code"] == "BOS"
+
+
+def test_phase_three_model_market_board_score_endpoint_materializes_slate() -> None:
+    response = client.post(
+        "/api/v1/admin/models/market-board/1/score"
+        "?repository_mode=in_memory&seed_demo=true&auto_materialize_demo=true"
+        "&auto_train_demo=true&auto_select_demo=true"
+        "&target_task=spread_error_regression&season_label=2025-2026"
+        "&slate_label=demo-market-board&game_date=2026-04-20"
+        "&home_team_code=LAL&away_team_code=BOS&home_spread_line=-3.5&total_line=228.5"
+        "&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["board"]["id"] == 1
+    assert payload["slate_result"]["materialized_scoring_run_count"] == 1
+    assert payload["slate_result"]["materialized_opportunity_count"] >= 1
+
+
+def test_phase_three_model_opportunity_materialize_endpoint_returns_opportunities() -> None:
+    response = client.post(
+        "/api/v1/admin/models/opportunities/materialize"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true&auto_select_demo=true"
+        "&target_task=spread_error_regression&team_code=LAL&season_label=2024-2025"
+        "&canonical_game_id=3&train_ratio=0.5&validation_ratio=0.25&limit=5"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["materialized_count"] == 1
+    assert payload["opportunity_count"] == 1
+    assert payload["opportunities"][0]["team_code"] == "LAL"
+    assert payload["opportunities"][0]["status"] == "review_manually"
+
+
+def test_phase_three_model_opportunities_endpoint_returns_materialized_rows() -> None:
+    response = client.get(
+        "/api/v1/admin/models/opportunities"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
+        "&auto_select_demo=true&auto_materialize_demo=true"
+        "&target_task=spread_error_regression&team_code=LAL&season_label=2024-2025"
+        "&canonical_game_id=3&train_ratio=0.5&validation_ratio=0.25&status=review_manually"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["opportunity_count"] == 1
+    assert payload["opportunities"][0]["status"] == "review_manually"
+    assert payload["opportunities"][0]["team_code"] == "LAL"
+
+
+def test_phase_three_model_opportunities_endpoint_returns_future_materialized_rows() -> None:
+    response = client.get(
+        "/api/v1/admin/models/opportunities"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
+        "&auto_select_demo=true&auto_materialize_demo=true"
+        "&target_task=spread_error_regression&season_label=2025-2026"
+        "&source_kind=future_scenario&team_code=LAL&game_date=2026-04-20"
+        "&home_team_code=LAL&away_team_code=BOS&home_spread_line=-3.5&total_line=228.5"
+        "&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["opportunity_count"] >= 1
+    assert payload["opportunities"][0]["source_kind"] == "future_scenario"
+    assert payload["opportunities"][0]["canonical_game_id"] is None
+
+
+def test_phase_three_model_opportunity_detail_endpoint_returns_payload() -> None:
+    response = client.get(
+        "/api/v1/admin/models/opportunities/1"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
+        "&auto_select_demo=true&auto_materialize_demo=true"
+        "&target_task=spread_error_regression&team_code=LAL&season_label=2024-2025"
+        "&canonical_game_id=3&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["opportunity"] is not None
+    assert payload["opportunity"]["id"] == 1
+    assert payload["opportunity"]["payload"]["prediction"]["team_code"] == "LAL"
+
+
+def test_phase_three_model_opportunity_detail_endpoint_returns_future_payload() -> None:
+    response = client.get(
+        "/api/v1/admin/models/opportunities/1"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
+        "&auto_select_demo=true&auto_materialize_demo=true"
+        "&target_task=spread_error_regression&season_label=2025-2026"
+        "&source_kind=future_scenario&game_date=2026-04-20"
+        "&home_team_code=LAL&away_team_code=BOS&home_spread_line=-3.5&total_line=228.5"
+        "&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["opportunity"] is not None
+    assert payload["opportunity"]["source_kind"] == "future_scenario"
+    assert payload["opportunity"]["payload"]["scenario"]["home_team_code"] == "LAL"
+
+
+def test_phase_three_model_opportunity_history_endpoint_returns_rollup() -> None:
+    response = client.get(
+        "/api/v1/admin/models/opportunities/history"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
+        "&auto_select_demo=true&auto_materialize_demo=true"
+        "&target_task=spread_error_regression&team_code=LAL&season_label=2024-2025"
+        "&canonical_game_id=3&train_ratio=0.5&validation_ratio=0.25&recent_limit=5"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    overview = payload["model_opportunity_history"]["overview"]
+    assert overview["opportunity_count"] == 1
+    assert overview["status_counts"] == {"review_manually": 1}
+    assert overview["latest_opportunity"]["team_code"] == "LAL"
+    assert len(payload["model_opportunity_history"]["recent_opportunities"]) == 1
+
+
+def test_phase_three_model_opportunity_history_endpoint_returns_future_rollup() -> None:
+    response = client.get(
+        "/api/v1/admin/models/opportunities/history"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
+        "&auto_select_demo=true&auto_materialize_demo=true"
+        "&target_task=spread_error_regression&season_label=2025-2026"
+        "&source_kind=future_scenario&team_code=LAL&game_date=2026-04-20"
+        "&home_team_code=LAL&away_team_code=BOS&home_spread_line=-3.5&total_line=228.5"
+        "&train_ratio=0.5&validation_ratio=0.25&recent_limit=5"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    overview = payload["model_opportunity_history"]["overview"]
+    assert overview["opportunity_count"] >= 1
+    assert overview["source_kind_counts"]["future_scenario"] >= 1
+    assert overview["latest_opportunity"]["scenario_key"] == "2025-2026:2026-04-20:LAL:BOS"
 
 
 def test_feature_snapshots_endpoint_returns_filtered_phase_two_snapshots() -> None:

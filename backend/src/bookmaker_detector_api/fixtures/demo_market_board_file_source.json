@@ -1,0 +1,18 @@
+[
+  {
+    "season_label": "2025-2026",
+    "game_date": "2026-04-20",
+    "home_team_code": "MIL",
+    "away_team_code": "CLE",
+    "home_spread_line": -2.5,
+    "total_line": 222.5
+  },
+  {
+    "season_label": "2025-2026",
+    "game_date": "2026-04-20",
+    "home_team_code": "SAC",
+    "away_team_code": "MIN",
+    "home_spread_line": 1.0,
+    "total_line": 229.0
+  }
+]

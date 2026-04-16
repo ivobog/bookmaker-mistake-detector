@@ -395,6 +395,88 @@ def build_feature_snapshots(
     return snapshots
 
 
+def build_future_feature_dataset_rows(
+    canonical_games: list[CanonicalGameMetricRecord],
+    *,
+    feature_version_id: int,
+    season_label: str,
+    game_date: date,
+    home_team_code: str,
+    away_team_code: str,
+    windows: tuple[int, ...] = DEFAULT_FEATURE_WINDOWS,
+    home_spread_line: float | None = None,
+    total_line: float | None = None,
+) -> list[dict[str, Any]]:
+    prior_games = sorted(
+        [
+            game
+            for game in canonical_games
+            if game.game_date < game_date
+        ],
+        key=lambda game: (game.game_date, game.canonical_game_id),
+    )
+    team_history: dict[str, list[TeamPerspectiveGame]] = {}
+    matchup_history: dict[tuple[str, str], list[CanonicalGameMetricRecord]] = {}
+    for game in prior_games:
+        matchup_key = tuple(sorted((game.home_team_code, game.away_team_code)))
+        team_history.setdefault(game.home_team_code, []).append(
+            _to_team_perspective_game(game, team_code=game.home_team_code)
+        )
+        team_history.setdefault(game.away_team_code, []).append(
+            _to_team_perspective_game(game, team_code=game.away_team_code)
+        )
+        matchup_history.setdefault(matchup_key, []).append(game)
+
+    matchup_key = tuple(sorted((home_team_code, away_team_code)))
+    prior_matchups = matchup_history.get(matchup_key, [])
+    home_payload = _build_team_feature_payload(
+        team_code=home_team_code,
+        prior_games=team_history.get(home_team_code, []),
+        current_game_date=game_date,
+        current_season_label=season_label,
+        windows=windows,
+    )
+    away_payload = _build_team_feature_payload(
+        team_code=away_team_code,
+        prior_games=team_history.get(away_team_code, []),
+        current_game_date=game_date,
+        current_season_label=season_label,
+        windows=windows,
+    )
+    away_spread_line = round(-float(home_spread_line), 4) if home_spread_line is not None else None
+    scenario_key = f"{season_label}:{game_date.isoformat()}:{home_team_code}:{away_team_code}"
+    return [
+        _build_future_feature_dataset_row(
+            feature_version_id=feature_version_id,
+            scenario_key=scenario_key,
+            season_label=season_label,
+            game_date=game_date,
+            team_code=home_team_code,
+            opponent_code=away_team_code,
+            venue="home",
+            payload=home_payload,
+            prior_matchups=prior_matchups,
+            team_spread_line=home_spread_line,
+            opponent_spread_line=away_spread_line,
+            total_line=total_line,
+        ),
+        _build_future_feature_dataset_row(
+            feature_version_id=feature_version_id,
+            scenario_key=scenario_key,
+            season_label=season_label,
+            game_date=game_date,
+            team_code=away_team_code,
+            opponent_code=home_team_code,
+            venue="away",
+            payload=away_payload,
+            prior_matchups=prior_matchups,
+            team_spread_line=away_spread_line,
+            opponent_spread_line=home_spread_line,
+            total_line=total_line,
+        ),
+    ]
+
+
 def ensure_feature_version_in_memory(
     repository: InMemoryIngestionRepository,
     *,
@@ -3034,6 +3116,14 @@ def build_feature_evidence_bundle(
     }
 
 
+def resolve_feature_condition_values_for_row(
+    row: dict[str, Any],
+    *,
+    dimensions: tuple[str, ...],
+) -> tuple[str, ...]:
+    return tuple(str(_pattern_dimension_value(row, dimension)) for dimension in dimensions)
+
+
 def _materialize_feature_analysis_artifacts(
     *,
     dataset_rows: list[dict[str, Any]],
@@ -4094,6 +4184,96 @@ def _build_feature_dataset_row(
         "total_error_actual": round(game.total_error, 4) if game.total_error is not None else None,
         "went_over_actual": game.went_over,
         "total_points_actual": float(game.final_total_points),
+    }
+
+
+def _build_future_feature_dataset_row(
+    *,
+    feature_version_id: int,
+    scenario_key: str,
+    season_label: str,
+    game_date: date,
+    team_code: str,
+    opponent_code: str,
+    venue: str,
+    payload: dict[str, Any],
+    prior_matchups: list[CanonicalGameMetricRecord],
+    team_spread_line: float | None,
+    opponent_spread_line: float | None,
+    total_line: float | None,
+) -> dict[str, Any]:
+    rolling_3 = payload["rolling_windows"]["3"]
+    rolling_5 = payload["rolling_windows"]["5"]
+    rolling_10 = payload["rolling_windows"]["10"]
+    return {
+        "canonical_game_id": 0,
+        "feature_version_id": feature_version_id,
+        "scenario_key": scenario_key,
+        "is_future_scenario": True,
+        "season_label": season_label,
+        "game_date": game_date,
+        "team_code": team_code,
+        "opponent_code": opponent_code,
+        "venue": venue,
+        "games_played_prior": payload["games_played_prior"],
+        "season_games_played_prior": payload["season_games_played_prior"],
+        "home_games_played_prior": payload["home_games_played_prior"],
+        "away_games_played_prior": payload["away_games_played_prior"],
+        "days_rest": payload["days_rest"],
+        "is_back_to_back": payload["is_back_to_back"],
+        "prior_matchup_count": len(prior_matchups),
+        "season_prior_matchup_count": sum(
+            1 for prior in prior_matchups if prior.season_label == season_label
+        ),
+        "rolling_3_avg_point_margin": rolling_3["avg_point_margin"],
+        "rolling_3_avg_total_points": rolling_3["avg_total_points"],
+        "rolling_3_avg_spread_error": rolling_3["avg_spread_error"],
+        "rolling_3_avg_total_error": rolling_3["avg_total_error"],
+        "rolling_3_cover_rate": rolling_3["cover_rate"],
+        "rolling_3_over_rate": rolling_3["over_rate"],
+        "rolling_5_avg_point_margin": rolling_5["avg_point_margin"],
+        "rolling_5_avg_total_points": rolling_5["avg_total_points"],
+        "rolling_5_avg_spread_error": rolling_5["avg_spread_error"],
+        "rolling_5_avg_total_error": rolling_5["avg_total_error"],
+        "rolling_5_cover_rate": rolling_5["cover_rate"],
+        "rolling_5_over_rate": rolling_5["over_rate"],
+        "rolling_10_avg_point_margin": rolling_10["avg_point_margin"],
+        "rolling_10_avg_total_points": rolling_10["avg_total_points"],
+        "rolling_10_avg_spread_error": rolling_10["avg_spread_error"],
+        "rolling_10_avg_total_error": rolling_10["avg_total_error"],
+        "rolling_10_cover_rate": rolling_10["cover_rate"],
+        "rolling_10_over_rate": rolling_10["over_rate"],
+        "point_margin_stddev": payload["volatility"]["point_margin_stddev"],
+        "total_points_stddev": payload["volatility"]["total_points_stddev"],
+        "spread_error_stddev": payload["volatility"]["spread_error_stddev"],
+        "total_error_stddev": payload["volatility"]["total_error_stddev"],
+        "current_cover_streak": payload["trend_signals"]["current_cover_streak"],
+        "current_non_cover_streak": payload["trend_signals"]["current_non_cover_streak"],
+        "current_over_streak": payload["trend_signals"]["current_over_streak"],
+        "current_under_streak": payload["trend_signals"]["current_under_streak"],
+        "recent_point_margin_delta_3_vs_10": payload["trend_signals"][
+            "recent_point_margin_delta_3_vs_10"
+        ],
+        "recent_total_points_delta_3_vs_10": payload["trend_signals"][
+            "recent_total_points_delta_3_vs_10"
+        ],
+        "recent_spread_error_delta_3_vs_10": payload["trend_signals"][
+            "recent_spread_error_delta_3_vs_10"
+        ],
+        "recent_total_error_delta_3_vs_10": payload["trend_signals"][
+            "recent_total_error_delta_3_vs_10"
+        ],
+        "team_spread_line": round(team_spread_line, 4) if team_spread_line is not None else None,
+        "opponent_spread_line": round(opponent_spread_line, 4)
+        if opponent_spread_line is not None
+        else None,
+        "total_line": round(total_line, 4) if total_line is not None else None,
+        "point_margin_actual": None,
+        "spread_error_actual": None,
+        "covered_actual": None,
+        "total_error_actual": None,
+        "went_over_actual": None,
+        "total_points_actual": None,
     }
 
 

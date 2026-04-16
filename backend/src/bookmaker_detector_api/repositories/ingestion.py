@@ -315,6 +315,18 @@ class InMemoryIngestionRepository:
         self.feature_versions: list[dict[str, Any]] = []
         self.feature_snapshots: list[dict[str, Any]] = []
         self.feature_analysis_artifacts: list[dict[str, Any]] = []
+        self.model_registries: list[dict[str, Any]] = []
+        self.model_training_runs: list[dict[str, Any]] = []
+        self.model_evaluation_snapshots: list[dict[str, Any]] = []
+        self.model_selection_snapshots: list[dict[str, Any]] = []
+        self.model_market_boards: list[dict[str, Any]] = []
+        self.model_market_board_source_runs: list[dict[str, Any]] = []
+        self.model_market_board_refresh_events: list[dict[str, Any]] = []
+        self.model_market_board_refresh_batches: list[dict[str, Any]] = []
+        self.model_market_board_scoring_batches: list[dict[str, Any]] = []
+        self.model_market_board_cadence_batches: list[dict[str, Any]] = []
+        self.model_scoring_runs: list[dict[str, Any]] = []
+        self.model_opportunities: list[dict[str, Any]] = []
 
     def create_job_run(self, *, job_name: str, requested_by: str, payload: dict[str, Any]) -> int:
         job_id = len(self.job_runs) + 1

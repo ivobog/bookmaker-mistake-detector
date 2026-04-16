@@ -150,6 +150,7 @@ Completion notes:
 
 ### Phase 3: Predictive and Opportunity Layer
 Duration: 2 weeks
+Status: In progress
 
 Objectives:
 - convert analytics into restrained, explainable recommendations
@@ -175,6 +176,11 @@ Exit criteria:
 - model runs are versioned and reproducible
 - opportunities are created only when thresholds are met
 - each opportunity includes explanation summary and supporting evidence
+
+Progress notes:
+- the first Phase 3 slice is in place with model registry metadata and persisted training runs
+- lightweight regression baselines (`linear_feature` and `tree_stump`) train against versioned Phase 2 feature datasets
+- admin APIs now support training runs plus registry and run inspection for the initial predictive layer
 
 ### Phase 4: Backtesting, UX, and Operations Hardening
 Duration: 2 weeks
@@ -379,20 +385,21 @@ Mitigation:
 ### Completed
 - Phase 0: Foundation and Project Setup
 - Phase 1: Historical Data Spine
+- Phase 2: Analytical Core
 
 ### Active recommendation
-- start Phase 2: Analytical Core
+- continue Phase 3: Predictive and Opportunity Layer
 
-### Deferred polish from Phase 1
-- finalize Phase 1 closeout language in product-facing docs as Phase 2 begins
-- expand operator UX in the frontend when admin UI work starts in later phases
+### Phase 3 current focus
+- baseline model registry and reproducible training runs are implemented
+- next slices should add artifact persistence depth, future-game scoring inputs, and opportunity generation rules
 
 ## 11. Immediate Next Steps
-1. Start Phase 2 by defining feature versioning and feature snapshot schema.
-2. Implement time-safe team, opponent, and matchup feature generation from canonical games.
-3. Add rolling-window feature computation for 3, 5, and 10 game windows.
-4. Persist feature outputs with reproducible version metadata.
-5. Expose initial analytical APIs for pattern and comparable-game exploration.
+1. Expand Phase 3 model training from baseline runs into richer artifact/version management.
+2. Add future schedule and market-line ingestion needed for upcoming-game scoring.
+3. Build future-game scoring services that combine model output with Phase 2 evidence.
+4. Implement opportunity-threshold policies and persisted opportunity artifacts.
+5. Expose opportunity list and detail APIs for the first analyst-facing scoring workflow.
 
 ## 12. Recommendation
 The best execution approach is to treat the product as a data-quality-first analytics system, not a model-first betting app. If Phase 1 is weak, everything downstream becomes misleading; if Phase 1 is strong, the rest of the roadmap becomes much safer and faster.

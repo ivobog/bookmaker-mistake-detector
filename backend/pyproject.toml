@@ -30,7 +30,7 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
-bookmaker_detector_api = ["fixtures/*.html"]
+bookmaker_detector_api = ["fixtures/*.html", "fixtures/*.json", "fixtures/*.csv"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
