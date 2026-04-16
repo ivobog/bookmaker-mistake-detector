@@ -391,6 +391,26 @@ class ModelOpportunityRecord:
     updated_at: datetime | None = None
 
 
+@dataclass(slots=True)
+class ModelBacktestRunRecord:
+    id: int
+    feature_version_id: int
+    target_task: str
+    team_code: str | None
+    season_label: str | None
+    status: str
+    selection_policy_name: str
+    strategy_name: str
+    minimum_train_games: int
+    test_window_games: int
+    train_ratio: float
+    validation_ratio: float
+    fold_count: int
+    payload: dict[str, Any]
+    created_at: datetime | None = None
+    completed_at: datetime | None = None
+
+
 def train_phase_three_models_in_memory(
     repository: InMemoryIngestionRepository,
     *,
@@ -520,6 +540,21 @@ def list_model_training_runs_in_memory(
             entry.id,
         ),
         reverse=True,
+    )
+
+
+def get_model_training_run_detail_in_memory(
+    repository: InMemoryIngestionRepository,
+    *,
+    run_id: int,
+) -> ModelTrainingRunRecord | None:
+    return next(
+        (
+            run
+            for run in list_model_training_runs_in_memory(repository)
+            if int(run.id) == int(run_id)
+        ),
+        None,
     )
 
 
@@ -844,6 +879,28 @@ def ensure_model_tables(connection: Any) -> None:
             ALTER COLUMN canonical_game_id DROP NOT NULL
             """
         )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS model_backtest_run (
+                id BIGSERIAL PRIMARY KEY,
+                feature_version_id BIGINT NOT NULL REFERENCES feature_version(id) ON DELETE CASCADE,
+                target_task VARCHAR(64) NOT NULL,
+                scope_team_code VARCHAR(16) NOT NULL DEFAULT '',
+                scope_season_label VARCHAR(32) NOT NULL DEFAULT '',
+                status VARCHAR(32) NOT NULL,
+                selection_policy_name VARCHAR(64) NOT NULL,
+                strategy_name VARCHAR(64) NOT NULL,
+                minimum_train_games INTEGER NOT NULL,
+                test_window_games INTEGER NOT NULL,
+                train_ratio DOUBLE PRECISION NOT NULL,
+                validation_ratio DOUBLE PRECISION NOT NULL,
+                fold_count INTEGER NOT NULL DEFAULT 0,
+                payload_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                completed_at TIMESTAMPTZ
+            )
+            """
+        )
     connection.commit()
 
 
@@ -1070,6 +1127,21 @@ def list_model_training_runs_postgres(
     ]
 
 
+def get_model_training_run_detail_postgres(
+    connection: Any,
+    *,
+    run_id: int,
+) -> ModelTrainingRunRecord | None:
+    return next(
+        (
+            run
+            for run in list_model_training_runs_postgres(connection)
+            if int(run.id) == int(run_id)
+        ),
+        None,
+    )
+
+
 def list_model_evaluation_snapshots_in_memory(
     repository: InMemoryIngestionRepository,
     *,
@@ -1089,6 +1161,21 @@ def list_model_evaluation_snapshots_in_memory(
             entry.id,
         ),
         reverse=True,
+    )
+
+
+def get_model_evaluation_snapshot_detail_in_memory(
+    repository: InMemoryIngestionRepository,
+    *,
+    snapshot_id: int,
+) -> ModelEvaluationSnapshotRecord | None:
+    return next(
+        (
+            snapshot
+            for snapshot in list_model_evaluation_snapshots_in_memory(repository)
+            if int(snapshot.id) == int(snapshot_id)
+        ),
+        None,
     )
 
 
@@ -1150,6 +1237,21 @@ def list_model_evaluation_snapshots_postgres(
         )
         for row in rows
     ]
+
+
+def get_model_evaluation_snapshot_detail_postgres(
+    connection: Any,
+    *,
+    snapshot_id: int,
+) -> ModelEvaluationSnapshotRecord | None:
+    return next(
+        (
+            snapshot
+            for snapshot in list_model_evaluation_snapshots_postgres(connection)
+            if int(snapshot.id) == int(snapshot_id)
+        ),
+        None,
+    )
 
 
 def get_model_training_summary_in_memory(
@@ -1270,6 +1372,21 @@ def list_model_selection_snapshots_in_memory(
     )
 
 
+def get_model_selection_snapshot_detail_in_memory(
+    repository: InMemoryIngestionRepository,
+    *,
+    selection_id: int,
+) -> ModelSelectionSnapshotRecord | None:
+    return next(
+        (
+            selection
+            for selection in list_model_selection_snapshots_in_memory(repository)
+            if int(selection.id) == int(selection_id)
+        ),
+        None,
+    )
+
+
 def list_model_selection_snapshots_postgres(
     connection: Any,
     *,
@@ -1319,6 +1436,21 @@ def list_model_selection_snapshots_postgres(
         )
         for row in rows
     ]
+
+
+def get_model_selection_snapshot_detail_postgres(
+    connection: Any,
+    *,
+    selection_id: int,
+) -> ModelSelectionSnapshotRecord | None:
+    return next(
+        (
+            selection
+            for selection in list_model_selection_snapshots_postgres(connection)
+            if int(selection.id) == int(selection_id)
+        ),
+        None,
+    )
 
 
 def promote_best_model_in_memory(
@@ -5155,6 +5287,266 @@ def get_model_opportunity_history_postgres(
     return _summarize_model_opportunity_history(opportunities, recent_limit=recent_limit)
 
 
+def run_model_backtest_in_memory(
+    repository: InMemoryIngestionRepository,
+    *,
+    feature_key: str = DEFAULT_FEATURE_KEY,
+    target_task: str,
+    team_code: str | None = None,
+    season_label: str | None = None,
+    selection_policy_name: str = "validation_mae_candidate_v1",
+    minimum_train_games: int = 1,
+    test_window_games: int = 1,
+    train_ratio: float = 0.7,
+    validation_ratio: float = 0.15,
+) -> dict[str, Any]:
+    feature_version = get_feature_version_in_memory(repository, feature_key=feature_key)
+    if feature_version is None:
+        return {
+            "feature_version": None,
+            "backtest_run": None,
+            "summary": _empty_backtest_summary(
+                target_task=target_task,
+                selection_policy_name=selection_policy_name,
+                strategy_name=_backtest_strategy_name(target_task),
+                minimum_train_games=minimum_train_games,
+                test_window_games=test_window_games,
+            ),
+        }
+    dataset_rows = _load_training_dataset_rows_in_memory(
+        repository,
+        feature_version_id=feature_version.id,
+        team_code=team_code,
+        season_label=season_label,
+    )
+    result = _run_walk_forward_backtest(
+        dataset_rows=dataset_rows,
+        feature_version=feature_version,
+        target_task=target_task,
+        team_code=team_code,
+        season_label=season_label,
+        selection_policy_name=selection_policy_name,
+        minimum_train_games=minimum_train_games,
+        test_window_games=test_window_games,
+        train_ratio=train_ratio,
+        validation_ratio=validation_ratio,
+    )
+    backtest_run = save_model_backtest_run_in_memory(repository, result["record"])
+    return {
+        "feature_version": asdict(feature_version),
+        "backtest_run": _serialize_model_backtest_run(backtest_run),
+        "summary": result["summary"],
+    }
+
+
+def run_model_backtest_postgres(
+    connection: Any,
+    *,
+    feature_key: str = DEFAULT_FEATURE_KEY,
+    target_task: str,
+    team_code: str | None = None,
+    season_label: str | None = None,
+    selection_policy_name: str = "validation_mae_candidate_v1",
+    minimum_train_games: int = 1,
+    test_window_games: int = 1,
+    train_ratio: float = 0.7,
+    validation_ratio: float = 0.15,
+) -> dict[str, Any]:
+    feature_version = get_feature_version_postgres(connection, feature_key=feature_key)
+    if feature_version is None:
+        return {
+            "feature_version": None,
+            "backtest_run": None,
+            "summary": _empty_backtest_summary(
+                target_task=target_task,
+                selection_policy_name=selection_policy_name,
+                strategy_name=_backtest_strategy_name(target_task),
+                minimum_train_games=minimum_train_games,
+                test_window_games=test_window_games,
+            ),
+        }
+    dataset_rows = _load_training_dataset_rows_postgres(
+        connection,
+        feature_version_id=feature_version.id,
+        team_code=team_code,
+        season_label=season_label,
+    )
+    result = _run_walk_forward_backtest(
+        dataset_rows=dataset_rows,
+        feature_version=feature_version,
+        target_task=target_task,
+        team_code=team_code,
+        season_label=season_label,
+        selection_policy_name=selection_policy_name,
+        minimum_train_games=minimum_train_games,
+        test_window_games=test_window_games,
+        train_ratio=train_ratio,
+        validation_ratio=validation_ratio,
+    )
+    backtest_run = save_model_backtest_run_postgres(connection, result["record"])
+    return {
+        "feature_version": asdict(feature_version),
+        "backtest_run": _serialize_model_backtest_run(backtest_run),
+        "summary": result["summary"],
+    }
+
+
+def list_model_backtest_runs_in_memory(
+    repository: InMemoryIngestionRepository,
+    *,
+    target_task: str | None = None,
+    team_code: str | None = None,
+    season_label: str | None = None,
+) -> list[ModelBacktestRunRecord]:
+    selected = [
+        ModelBacktestRunRecord(**entry)
+        for entry in repository.model_backtest_runs
+        if (target_task is None or entry["target_task"] == target_task)
+        and (team_code is None or entry.get("team_code") == team_code)
+        and (season_label is None or entry.get("season_label") == season_label)
+    ]
+    return sorted(
+        selected,
+        key=lambda entry: (
+            entry.completed_at or entry.created_at or datetime.min.replace(tzinfo=timezone.utc),
+            entry.id,
+        ),
+        reverse=True,
+    )
+
+
+def list_model_backtest_runs_postgres(
+    connection: Any,
+    *,
+    target_task: str | None = None,
+    team_code: str | None = None,
+    season_label: str | None = None,
+) -> list[ModelBacktestRunRecord]:
+    ensure_model_tables(connection)
+    query = """
+        SELECT
+            id,
+            feature_version_id,
+            target_task,
+            scope_team_code,
+            scope_season_label,
+            status,
+            selection_policy_name,
+            strategy_name,
+            minimum_train_games,
+            test_window_games,
+            train_ratio,
+            validation_ratio,
+            fold_count,
+            payload_json,
+            created_at,
+            completed_at
+        FROM model_backtest_run
+        WHERE 1=1
+    """
+    params: list[Any] = []
+    if target_task is not None:
+        query += " AND target_task = %s"
+        params.append(target_task)
+    if team_code is not None:
+        query += " AND scope_team_code = %s"
+        params.append(team_code)
+    if season_label is not None:
+        query += " AND scope_season_label = %s"
+        params.append(season_label)
+    query += " ORDER BY completed_at DESC NULLS LAST, created_at DESC, id DESC"
+    with connection.cursor() as cursor:
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+    return [
+        ModelBacktestRunRecord(
+            id=int(row[0]),
+            feature_version_id=int(row[1]),
+            target_task=row[2],
+            team_code=row[3] or None,
+            season_label=row[4] or None,
+            status=row[5],
+            selection_policy_name=row[6],
+            strategy_name=row[7],
+            minimum_train_games=int(row[8]),
+            test_window_games=int(row[9]),
+            train_ratio=float(row[10]),
+            validation_ratio=float(row[11]),
+            fold_count=int(row[12]),
+            payload=row[13],
+            created_at=row[14],
+            completed_at=row[15],
+        )
+        for row in rows
+    ]
+
+
+def get_model_backtest_history_in_memory(
+    repository: InMemoryIngestionRepository,
+    *,
+    target_task: str | None = None,
+    team_code: str | None = None,
+    season_label: str | None = None,
+    recent_limit: int = 10,
+) -> dict[str, Any]:
+    runs = list_model_backtest_runs_in_memory(
+        repository,
+        target_task=target_task,
+        team_code=team_code,
+        season_label=season_label,
+    )
+    return _summarize_model_backtest_history(runs, recent_limit=recent_limit)
+
+
+def get_model_backtest_history_postgres(
+    connection: Any,
+    *,
+    target_task: str | None = None,
+    team_code: str | None = None,
+    season_label: str | None = None,
+    recent_limit: int = 10,
+) -> dict[str, Any]:
+    runs = list_model_backtest_runs_postgres(
+        connection,
+        target_task=target_task,
+        team_code=team_code,
+        season_label=season_label,
+    )
+    return _summarize_model_backtest_history(runs, recent_limit=recent_limit)
+
+
+def get_model_backtest_detail_in_memory(
+    repository: InMemoryIngestionRepository,
+    *,
+    backtest_run_id: int,
+) -> dict[str, Any] | None:
+    run = next(
+        (
+            entry
+            for entry in list_model_backtest_runs_in_memory(repository)
+            if entry.id == backtest_run_id
+        ),
+        None,
+    )
+    return _serialize_model_backtest_run(run)
+
+
+def get_model_backtest_detail_postgres(
+    connection: Any,
+    *,
+    backtest_run_id: int,
+) -> dict[str, Any] | None:
+    run = next(
+        (
+            entry
+            for entry in list_model_backtest_runs_postgres(connection)
+            if entry.id == backtest_run_id
+        ),
+        None,
+    )
+    return _serialize_model_backtest_run(run)
+
+
 def _train_phase_three_models(
     *,
     dataset_rows: list[dict[str, Any]],
@@ -5239,6 +5631,536 @@ def _train_phase_three_models(
         "model_runs": [asdict(run) for run in ranked_runs],
         "best_model": asdict(ranked_runs[0]) if ranked_runs else None,
         "persisted_run_count": len(list_runs()),
+    }
+
+
+def _run_walk_forward_backtest(
+    *,
+    dataset_rows: list[dict[str, Any]],
+    feature_version: FeatureVersionRecord,
+    target_task: str,
+    team_code: str | None,
+    season_label: str | None,
+    selection_policy_name: str,
+    minimum_train_games: int,
+    test_window_games: int,
+    train_ratio: float,
+    validation_ratio: float,
+) -> dict[str, Any]:
+    if target_task not in {"spread_error_regression", "total_error_regression"}:
+        raise ValueError(
+            "Phase 4 walk-forward backtesting currently supports spread and total regression "
+            f"targets only: {target_task}"
+        )
+    ordered_game_ids = _ordered_dataset_game_ids(dataset_rows)
+    if len(ordered_game_ids) <= minimum_train_games:
+        summary = _empty_backtest_summary(
+            target_task=target_task,
+            selection_policy_name=selection_policy_name,
+            strategy_name=_backtest_strategy_name(target_task),
+            minimum_train_games=minimum_train_games,
+            test_window_games=test_window_games,
+        )
+        summary["dataset_game_count"] = len(ordered_game_ids)
+        summary["dataset_row_count"] = len(dataset_rows)
+        return {
+            "record": ModelBacktestRunRecord(
+                id=0,
+                feature_version_id=feature_version.id,
+                target_task=target_task,
+                team_code=team_code,
+                season_label=season_label,
+                status="COMPLETED",
+                selection_policy_name=selection_policy_name,
+                strategy_name=_backtest_strategy_name(target_task),
+                minimum_train_games=minimum_train_games,
+                test_window_games=test_window_games,
+                train_ratio=train_ratio,
+                validation_ratio=validation_ratio,
+                fold_count=0,
+                payload=summary,
+            ),
+            "summary": summary,
+        }
+
+    rows_by_game: dict[int, list[dict[str, Any]]] = {}
+    for row in dataset_rows:
+        rows_by_game.setdefault(int(row["canonical_game_id"]), []).append(row)
+
+    fold_summaries: list[dict[str, Any]] = []
+    all_predictions: list[dict[str, Any]] = []
+    for fold_index, train_end in enumerate(
+        range(minimum_train_games, len(ordered_game_ids), test_window_games),
+        start=1,
+    ):
+        train_game_ids = ordered_game_ids[:train_end]
+        test_game_ids = ordered_game_ids[train_end : train_end + test_window_games]
+        if not test_game_ids:
+            continue
+        train_dataset_rows = [
+            row for game_id in train_game_ids for row in rows_by_game.get(game_id, [])
+        ]
+        test_dataset_rows = [
+            row for game_id in test_game_ids for row in rows_by_game.get(game_id, [])
+        ]
+        selected_snapshot = _train_walk_forward_snapshot(
+            dataset_rows=train_dataset_rows,
+            feature_version=feature_version,
+            target_task=target_task,
+            selection_policy_name=selection_policy_name,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+        if selected_snapshot is None:
+            continue
+        predictions = _score_dataset_rows_with_active_selection(
+            test_dataset_rows,
+            target_task=target_task,
+            active_snapshot=selected_snapshot,
+            full_dataset_rows=train_dataset_rows,
+            include_evidence=False,
+            evidence_dimensions=("venue", "days_rest_bucket"),
+            comparable_limit=5,
+            min_pattern_sample_size=1,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            drop_null_targets=True,
+        )
+        fold_summary = _build_backtest_fold_summary(
+            fold_index=fold_index,
+            target_task=target_task,
+            train_game_ids=train_game_ids,
+            test_game_ids=test_game_ids,
+            selected_snapshot=selected_snapshot,
+            predictions=predictions,
+        )
+        fold_summaries.append(fold_summary)
+        all_predictions.extend(predictions)
+
+    summary = _summarize_walk_forward_backtest(
+        target_task=target_task,
+        selection_policy_name=selection_policy_name,
+        minimum_train_games=minimum_train_games,
+        test_window_games=test_window_games,
+        dataset_row_count=len(dataset_rows),
+        dataset_game_count=len(ordered_game_ids),
+        fold_summaries=fold_summaries,
+        predictions=all_predictions,
+    )
+    record = ModelBacktestRunRecord(
+        id=0,
+        feature_version_id=feature_version.id,
+        target_task=target_task,
+        team_code=team_code,
+        season_label=season_label,
+        status="COMPLETED",
+        selection_policy_name=selection_policy_name,
+        strategy_name=summary["strategy_name"],
+        minimum_train_games=minimum_train_games,
+        test_window_games=test_window_games,
+        train_ratio=train_ratio,
+        validation_ratio=validation_ratio,
+        fold_count=len(fold_summaries),
+        payload=summary,
+    )
+    return {"record": record, "summary": summary}
+
+
+def _ordered_dataset_game_ids(dataset_rows: list[dict[str, Any]]) -> list[int]:
+    seen: set[int] = set()
+    ordered_game_ids: list[int] = []
+    for row in sorted(
+        dataset_rows,
+        key=lambda entry: (entry["game_date"], int(entry["canonical_game_id"]), entry["team_code"]),
+    ):
+        canonical_game_id = int(row["canonical_game_id"])
+        if canonical_game_id in seen:
+            continue
+        seen.add(canonical_game_id)
+        ordered_game_ids.append(canonical_game_id)
+    return ordered_game_ids
+
+
+def _train_walk_forward_snapshot(
+    *,
+    dataset_rows: list[dict[str, Any]],
+    feature_version: FeatureVersionRecord,
+    target_task: str,
+    selection_policy_name: str,
+    train_ratio: float,
+    validation_ratio: float,
+) -> ModelEvaluationSnapshotRecord | None:
+    split_rows = _partition_feature_dataset_rows(
+        dataset_rows,
+        train_ratio=train_ratio,
+        validation_ratio=validation_ratio,
+    )
+    split_training_rows = {
+        split_name: build_feature_training_view(
+            rows,
+            target_task=target_task,
+            drop_null_targets=True,
+        )["training_rows"]
+        for split_name, rows in split_rows.items()
+    }
+    candidate_snapshots: list[ModelEvaluationSnapshotRecord] = []
+    for index, (model_family, trainer) in enumerate(
+        (("linear_feature", _train_linear_feature_model), ("tree_stump", _train_tree_stump_model)),
+        start=1,
+    ):
+        model_result = trainer(
+            train_rows=split_training_rows["train"],
+            validation_rows=split_training_rows["validation"],
+            test_rows=split_training_rows["test"],
+        )
+        candidate_snapshots.append(
+            ModelEvaluationSnapshotRecord(
+                id=index,
+                model_training_run_id=0,
+                model_registry_id=0,
+                feature_version_id=feature_version.id,
+                target_task=target_task,
+                model_family=model_family,
+                selected_feature=model_result["artifact"].get("selected_feature"),
+                fallback_strategy=model_result["artifact"].get("fallback_strategy"),
+                primary_metric_name="mae",
+                validation_metric_value=model_result["metrics"]["validation"].get("mae"),
+                test_metric_value=model_result["metrics"]["test"].get("mae"),
+                validation_prediction_count=int(
+                    model_result["metrics"]["validation"].get("prediction_count", 0)
+                ),
+                test_prediction_count=int(
+                    model_result["metrics"]["test"].get("prediction_count", 0)
+                ),
+                snapshot=model_result,
+            )
+        )
+    return _select_best_evaluation_snapshot(
+        candidate_snapshots,
+        selection_policy_name=selection_policy_name,
+    )
+
+
+def _build_backtest_fold_summary(
+    *,
+    fold_index: int,
+    target_task: str,
+    train_game_ids: list[int],
+    test_game_ids: list[int],
+    selected_snapshot: ModelEvaluationSnapshotRecord,
+    predictions: list[dict[str, Any]],
+) -> dict[str, Any]:
+    candidate_strategy = _evaluate_backtest_strategy(
+        predictions=predictions,
+        target_task=target_task,
+        threshold=float(
+            OPPORTUNITY_POLICY_CONFIGS[target_task]["candidate_min_signal_strength"]
+        ),
+        strategy_name="candidate_threshold",
+    )
+    review_strategy = _evaluate_backtest_strategy(
+        predictions=predictions,
+        target_task=target_task,
+        threshold=float(OPPORTUNITY_POLICY_CONFIGS[target_task]["review_min_signal_strength"]),
+        strategy_name="review_threshold",
+    )
+    return {
+        "fold_index": fold_index,
+        "train_game_count": len(train_game_ids),
+        "test_game_count": len(test_game_ids),
+        "train_game_ids": train_game_ids,
+        "test_game_ids": test_game_ids,
+        "selected_model": {
+            "evaluation_snapshot_id": selected_snapshot.id,
+            "model_training_run_id": selected_snapshot.model_training_run_id,
+            "model_family": selected_snapshot.model_family,
+            "selected_feature": selected_snapshot.selected_feature,
+            "fallback_strategy": selected_snapshot.fallback_strategy,
+            "validation_metric_value": selected_snapshot.validation_metric_value,
+            "test_metric_value": selected_snapshot.test_metric_value,
+        },
+        "prediction_metrics": _summarize_backtest_prediction_metrics(predictions),
+        "strategies": {
+            "candidate_threshold": candidate_strategy,
+            "review_threshold": review_strategy,
+        },
+    }
+
+
+def _summarize_walk_forward_backtest(
+    *,
+    target_task: str,
+    selection_policy_name: str,
+    minimum_train_games: int,
+    test_window_games: int,
+    dataset_row_count: int,
+    dataset_game_count: int,
+    fold_summaries: list[dict[str, Any]],
+    predictions: list[dict[str, Any]],
+) -> dict[str, Any]:
+    candidate_bets = [
+        bet
+        for fold in fold_summaries
+        for bet in fold["strategies"]["candidate_threshold"]["bets"]
+    ]
+    review_bets = [
+        bet
+        for fold in fold_summaries
+        for bet in fold["strategies"]["review_threshold"]["bets"]
+    ]
+    selected_family_counts: dict[str, int] = {}
+    for fold in fold_summaries:
+        family = fold["selected_model"]["model_family"]
+        selected_family_counts[family] = selected_family_counts.get(family, 0) + 1
+    return {
+        "target_task": target_task,
+        "selection_policy_name": selection_policy_name,
+        "strategy_name": _backtest_strategy_name(target_task),
+        "minimum_train_games": minimum_train_games,
+        "test_window_games": test_window_games,
+        "dataset_row_count": dataset_row_count,
+        "dataset_game_count": dataset_game_count,
+        "fold_count": len(fold_summaries),
+        "selected_model_family_counts": selected_family_counts,
+        "prediction_metrics": _summarize_backtest_prediction_metrics(predictions),
+        "strategy_results": {
+            "candidate_threshold": _summarize_backtest_bets(
+                candidate_bets,
+                strategy_name="candidate_threshold",
+            ),
+            "review_threshold": _summarize_backtest_bets(
+                review_bets,
+                strategy_name="review_threshold",
+            ),
+        },
+        "folds": fold_summaries,
+    }
+
+
+def _empty_backtest_summary(
+    *,
+    target_task: str,
+    selection_policy_name: str,
+    strategy_name: str,
+    minimum_train_games: int,
+    test_window_games: int,
+) -> dict[str, Any]:
+    return {
+        "target_task": target_task,
+        "selection_policy_name": selection_policy_name,
+        "strategy_name": strategy_name,
+        "minimum_train_games": minimum_train_games,
+        "test_window_games": test_window_games,
+        "dataset_row_count": 0,
+        "dataset_game_count": 0,
+        "fold_count": 0,
+        "selected_model_family_counts": {},
+        "prediction_metrics": _summarize_backtest_prediction_metrics([]),
+        "strategy_results": {
+            "candidate_threshold": _summarize_backtest_bets(
+                [],
+                strategy_name="candidate_threshold",
+            ),
+            "review_threshold": _summarize_backtest_bets(
+                [],
+                strategy_name="review_threshold",
+            ),
+        },
+        "folds": [],
+    }
+
+
+def _backtest_strategy_name(target_task: str) -> str:
+    return f"{target_task}_walk_forward_v1"
+
+
+def _summarize_backtest_prediction_metrics(predictions: list[dict[str, Any]]) -> dict[str, Any]:
+    realized_residuals = [
+        float(entry["realized_residual"])
+        for entry in predictions
+        if entry.get("realized_residual") is not None
+    ]
+    actual_targets = [
+        float(entry["actual_target_value"])
+        for entry in predictions
+        if entry.get("actual_target_value") is not None
+    ]
+    mae = None
+    rmse = None
+    if predictions and actual_targets:
+        absolute_errors = [
+            abs(float(entry["prediction_value"]) - float(entry["actual_target_value"]))
+            for entry in predictions
+            if entry.get("actual_target_value") is not None
+        ]
+        squared_errors = [
+            (float(entry["prediction_value"]) - float(entry["actual_target_value"])) ** 2
+            for entry in predictions
+            if entry.get("actual_target_value") is not None
+        ]
+        mae = round(float(mean(absolute_errors)), 4) if absolute_errors else None
+        rmse = round(float(mean(squared_errors) ** 0.5), 4) if squared_errors else None
+    return {
+        "prediction_count": len(predictions),
+        "mae": mae,
+        "rmse": rmse,
+        "average_prediction_value": (
+            round(float(mean(float(entry["prediction_value"]) for entry in predictions)), 4)
+            if predictions
+            else None
+        ),
+        "average_realized_residual": (
+            round(float(mean(realized_residuals)), 4) if realized_residuals else None
+        ),
+    }
+
+
+def _evaluate_backtest_strategy(
+    *,
+    predictions: list[dict[str, Any]],
+    target_task: str,
+    threshold: float,
+    strategy_name: str,
+) -> dict[str, Any]:
+    bets = []
+    for prediction in predictions:
+        signal_strength = float(prediction["signal_strength"])
+        if signal_strength < threshold:
+            continue
+        bet = _build_backtest_bet(
+            prediction=prediction,
+            target_task=target_task,
+            strategy_name=strategy_name,
+            threshold=threshold,
+        )
+        if bet is not None:
+            bets.append(bet)
+    summary = _summarize_backtest_bets(bets, strategy_name=strategy_name)
+    summary["threshold"] = threshold
+    summary["bets"] = bets
+    return summary
+
+
+def _build_backtest_bet(
+    *,
+    prediction: dict[str, Any],
+    target_task: str,
+    strategy_name: str,
+    threshold: float,
+) -> dict[str, Any] | None:
+    prediction_value = float(prediction["prediction_value"])
+    result = None
+    edge_direction = None
+    actual_target_value = _float_or_none(prediction.get("actual_target_value"))
+    if actual_target_value is None:
+        return None
+    if target_task == "spread_error_regression":
+        edge_direction = "team_cover_edge" if prediction_value > 0 else "opponent_cover_edge"
+        if actual_target_value == 0:
+            result = "push"
+        elif prediction_value > 0:
+            result = "win" if actual_target_value > 0 else "loss"
+        elif prediction_value < 0:
+            result = "win" if actual_target_value < 0 else "loss"
+        else:
+            return None
+    elif target_task == "total_error_regression":
+        if actual_target_value == 0:
+            result = "push"
+        elif prediction_value > 0:
+            edge_direction = "over_edge"
+            result = "win" if actual_target_value > 0 else "loss"
+        elif prediction_value < 0:
+            edge_direction = "under_edge"
+            result = "win" if actual_target_value < 0 else "loss"
+        else:
+            return None
+    else:
+        return None
+    profit_units = 0.0
+    if result == "win":
+        profit_units = 0.9091
+    elif result == "loss":
+        profit_units = -1.0
+    edge_bucket = _backtest_edge_bucket(abs(prediction_value))
+    return {
+        "canonical_game_id": prediction["canonical_game_id"],
+        "game_date": prediction["game_date"],
+        "team_code": prediction["team_code"],
+        "opponent_code": prediction["opponent_code"],
+        "strategy_name": strategy_name,
+        "threshold": threshold,
+        "edge_direction": edge_direction,
+        "signal_strength": round(abs(prediction_value), 4),
+        "prediction_value": round(prediction_value, 4),
+        "result": result,
+        "profit_units": round(profit_units, 4),
+        "edge_bucket": edge_bucket,
+    }
+
+
+def _backtest_edge_bucket(signal_strength: float) -> str:
+    if signal_strength < 1:
+        return "0_to_1"
+    if signal_strength < 2:
+        return "1_to_2"
+    if signal_strength < 3:
+        return "2_to_3"
+    return "3_plus"
+
+
+def _summarize_backtest_bets(
+    bets: list[dict[str, Any]],
+    *,
+    strategy_name: str,
+) -> dict[str, Any]:
+    win_count = sum(1 for bet in bets if bet["result"] == "win")
+    loss_count = sum(1 for bet in bets if bet["result"] == "loss")
+    push_count = sum(1 for bet in bets if bet["result"] == "push")
+    settled_bet_count = win_count + loss_count
+    total_profit_units = round(float(sum(float(bet["profit_units"]) for bet in bets)), 4)
+    edge_bucket_performance: dict[str, dict[str, Any]] = {}
+    for bet in bets:
+        bucket = edge_bucket_performance.setdefault(
+            bet["edge_bucket"],
+            {
+                "bet_count": 0,
+                "win_count": 0,
+                "loss_count": 0,
+                "push_count": 0,
+                "profit_units": 0.0,
+            },
+        )
+        bucket["bet_count"] += 1
+        bucket[f"{bet['result']}_count"] += 1
+        bucket["profit_units"] = round(
+            float(bucket["profit_units"]) + float(bet["profit_units"]),
+            4,
+        )
+    for bucket in edge_bucket_performance.values():
+        settled = int(bucket["win_count"]) + int(bucket["loss_count"])
+        bucket["hit_rate"] = round(int(bucket["win_count"]) / settled, 4) if settled else None
+        bucket["push_rate"] = (
+            round(int(bucket["push_count"]) / int(bucket["bet_count"]), 4)
+            if bucket["bet_count"]
+            else None
+        )
+        bucket["roi"] = (
+            round(float(bucket["profit_units"]) / int(bucket["bet_count"]), 4)
+            if bucket["bet_count"]
+            else None
+        )
+    return {
+        "strategy_name": strategy_name,
+        "bet_count": len(bets),
+        "win_count": win_count,
+        "loss_count": loss_count,
+        "push_count": push_count,
+        "hit_rate": round(win_count / settled_bet_count, 4) if settled_bet_count else None,
+        "push_rate": round(push_count / len(bets), 4) if bets else None,
+        "roi": round(total_profit_units / len(bets), 4) if bets else None,
+        "profit_units": total_profit_units,
+        "edge_bucket_performance": edge_bucket_performance,
     }
 
 
@@ -7598,6 +8520,112 @@ def save_model_opportunities_postgres(
     return persisted
 
 
+def save_model_backtest_run_in_memory(
+    repository: InMemoryIngestionRepository,
+    backtest_run: ModelBacktestRunRecord,
+) -> ModelBacktestRunRecord:
+    payload = asdict(backtest_run)
+    payload["id"] = len(repository.model_backtest_runs) + 1
+    payload["created_at"] = datetime.now(timezone.utc)
+    payload["completed_at"] = payload["created_at"]
+    repository.model_backtest_runs.append(payload)
+    return ModelBacktestRunRecord(**payload)
+
+
+def save_model_backtest_run_postgres(
+    connection: Any,
+    backtest_run: ModelBacktestRunRecord,
+) -> ModelBacktestRunRecord:
+    ensure_model_tables(connection)
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO model_backtest_run (
+                feature_version_id,
+                target_task,
+                scope_team_code,
+                scope_season_label,
+                status,
+                selection_policy_name,
+                strategy_name,
+                minimum_train_games,
+                test_window_games,
+                train_ratio,
+                validation_ratio,
+                fold_count,
+                payload_json,
+                completed_at
+            )
+            VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, NOW()
+            )
+            RETURNING id, created_at, completed_at
+            """,
+            (
+                backtest_run.feature_version_id,
+                backtest_run.target_task,
+                backtest_run.team_code or "",
+                backtest_run.season_label or "",
+                backtest_run.status,
+                backtest_run.selection_policy_name,
+                backtest_run.strategy_name,
+                backtest_run.minimum_train_games,
+                backtest_run.test_window_games,
+                backtest_run.train_ratio,
+                backtest_run.validation_ratio,
+                backtest_run.fold_count,
+                _json_dumps(backtest_run.payload),
+            ),
+        )
+        row = cursor.fetchone()
+    connection.commit()
+    return ModelBacktestRunRecord(
+        id=int(row[0]),
+        feature_version_id=backtest_run.feature_version_id,
+        target_task=backtest_run.target_task,
+        team_code=backtest_run.team_code,
+        season_label=backtest_run.season_label,
+        status=backtest_run.status,
+        selection_policy_name=backtest_run.selection_policy_name,
+        strategy_name=backtest_run.strategy_name,
+        minimum_train_games=backtest_run.minimum_train_games,
+        test_window_games=backtest_run.test_window_games,
+        train_ratio=backtest_run.train_ratio,
+        validation_ratio=backtest_run.validation_ratio,
+        fold_count=backtest_run.fold_count,
+        payload=backtest_run.payload,
+        created_at=row[1],
+        completed_at=row[2],
+    )
+
+
+def _serialize_model_backtest_run(
+    backtest_run: ModelBacktestRunRecord | None,
+) -> dict[str, Any] | None:
+    if backtest_run is None:
+        return None
+    return {
+        "id": backtest_run.id,
+        "feature_version_id": backtest_run.feature_version_id,
+        "target_task": backtest_run.target_task,
+        "team_code": backtest_run.team_code,
+        "season_label": backtest_run.season_label,
+        "status": backtest_run.status,
+        "selection_policy_name": backtest_run.selection_policy_name,
+        "strategy_name": backtest_run.strategy_name,
+        "minimum_train_games": backtest_run.minimum_train_games,
+        "test_window_games": backtest_run.test_window_games,
+        "train_ratio": backtest_run.train_ratio,
+        "validation_ratio": backtest_run.validation_ratio,
+        "fold_count": backtest_run.fold_count,
+        "payload": backtest_run.payload,
+        "created_at": backtest_run.created_at.isoformat() if backtest_run.created_at else None,
+        "completed_at": (
+            backtest_run.completed_at.isoformat() if backtest_run.completed_at else None
+        ),
+    }
+
+
 def _serialize_model_scoring_run(
     scoring_run: ModelScoringRunRecord | None,
 ) -> dict[str, Any] | None:
@@ -8534,6 +9562,73 @@ def _summarize_model_opportunity_history(
         "recent_opportunities": [
             _serialize_model_opportunity(entry) for entry in opportunities[:recent_limit]
         ],
+    }
+
+
+def _summarize_model_backtest_history(
+    runs: list[ModelBacktestRunRecord],
+    *,
+    recent_limit: int,
+) -> dict[str, Any]:
+    status_counts: dict[str, int] = {}
+    target_task_counts: dict[str, int] = {}
+    strategy_counts: dict[str, int] = {}
+    daily_buckets: dict[str, dict[str, Any]] = {}
+    best_run = None
+    best_roi = None
+    for run in runs:
+        status_counts[run.status] = status_counts.get(run.status, 0) + 1
+        target_task_counts[run.target_task] = target_task_counts.get(run.target_task, 0) + 1
+        strategy_counts[run.strategy_name] = strategy_counts.get(run.strategy_name, 0) + 1
+        candidate_roi = _nested_get(
+            run.payload,
+            "strategy_results",
+            "candidate_threshold",
+            "roi",
+        )
+        if candidate_roi is not None and (
+            best_roi is None or float(candidate_roi) > float(best_roi)
+        ):
+            best_roi = candidate_roi
+            best_run = run
+        created_at = run.completed_at or run.created_at
+        if created_at is None:
+            continue
+        day_key = created_at.date().isoformat()
+        bucket = daily_buckets.setdefault(
+            day_key,
+            {
+                "date": day_key,
+                "run_count": 0,
+                "fold_count": 0,
+                "bet_count": 0,
+                "profit_units": 0.0,
+            },
+        )
+        bucket["run_count"] += 1
+        bucket["fold_count"] += int(run.fold_count)
+        bucket["bet_count"] += int(
+            _nested_get(run.payload, "strategy_results", "candidate_threshold", "bet_count") or 0
+        )
+        bucket["profit_units"] = round(
+            float(bucket["profit_units"])
+            + float(
+                _nested_get(run.payload, "strategy_results", "candidate_threshold", "profit_units")
+                or 0.0
+            ),
+            4,
+        )
+    return {
+        "overview": {
+            "run_count": len(runs),
+            "status_counts": status_counts,
+            "target_task_counts": target_task_counts,
+            "strategy_counts": strategy_counts,
+            "best_candidate_threshold_run": _serialize_model_backtest_run(best_run),
+            "latest_run": _serialize_model_backtest_run(runs[0] if runs else None),
+        },
+        "daily_buckets": [daily_buckets[key] for key in sorted(daily_buckets.keys())],
+        "recent_runs": [_serialize_model_backtest_run(entry) for entry in runs[:recent_limit]],
     }
 
 

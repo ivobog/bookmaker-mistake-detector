@@ -204,6 +204,25 @@ def test_phase_three_model_runs_endpoint_returns_persisted_training_runs() -> No
     )
 
 
+def test_phase_three_model_run_detail_endpoint_returns_payload() -> None:
+    response = client.get(
+        "/api/v1/admin/models/runs/1"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
+        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["model_run"] is not None
+    assert payload["model_run"]["id"] == 1
+    assert payload["model_run"]["artifact"]["model_family"] in {
+        "linear_feature",
+        "tree_stump",
+    }
+    assert payload["model_run"]["metrics"]["validation"]["prediction_count"] > 0
+
+
 def test_phase_three_model_summary_endpoint_returns_best_and_latest_runs() -> None:
     response = client.get(
         "/api/v1/admin/models/summary"
@@ -265,6 +284,25 @@ def test_phase_three_model_evaluations_endpoint_returns_snapshots() -> None:
     }
 
 
+def test_phase_three_model_evaluation_detail_endpoint_returns_payload() -> None:
+    response = client.get(
+        "/api/v1/admin/models/evaluations/1"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
+        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["evaluation_snapshot"] is not None
+    assert payload["evaluation_snapshot"]["id"] == 1
+    assert payload["evaluation_snapshot"]["model_family"] in {
+        "linear_feature",
+        "tree_stump",
+    }
+    assert payload["evaluation_snapshot"]["validation_prediction_count"] > 0
+
+
 def test_phase_three_model_evaluation_history_endpoint_returns_rollup() -> None:
     response = client.get(
         "/api/v1/admin/models/evaluations/history"
@@ -314,6 +352,22 @@ def test_phase_three_model_selections_endpoint_returns_active_selection() -> Non
     assert payload["selection_count"] == 1
     assert payload["selections"][0]["model_family"] == "linear_feature"
     assert payload["selections"][0]["is_active"] is True
+
+
+def test_phase_three_model_selection_detail_endpoint_returns_payload() -> None:
+    response = client.get(
+        "/api/v1/admin/models/selections/1"
+        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
+        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["selection"] is not None
+    assert payload["selection"]["id"] == 1
+    assert payload["selection"]["model_family"] == "linear_feature"
+    assert payload["selection"]["is_active"] is True
 
 
 def test_phase_three_model_selection_history_endpoint_returns_rollup() -> None:
@@ -2224,3 +2278,50 @@ def test_normalize_data_quality_issue_taxonomy_endpoint_returns_summary(monkeypa
     assert payload["filters"]["team_code"] == "LAL"
     assert payload["filters"]["season_label"] == "2024-2025"
     assert payload["normalization"]["updated_rows"] == 3
+
+
+def test_phase_four_model_backtest_run_endpoint_returns_walk_forward_summary() -> None:
+    response = client.post(
+        "/api/v1/admin/models/backtests/run",
+        params={
+            "repository_mode": "in_memory",
+            "seed_demo": True,
+            "target_task": "spread_error_regression",
+            "minimum_train_games": 1,
+            "test_window_games": 1,
+            "train_ratio": 0.5,
+            "validation_ratio": 0.25,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["backtest_run"] is not None
+    assert payload["summary"]["fold_count"] >= 1
+    assert (
+        payload["summary"]["strategy_results"]["candidate_threshold"]["strategy_name"]
+        == "candidate_threshold"
+    )
+
+
+def test_phase_four_model_backtest_history_endpoint_returns_recent_runs() -> None:
+    response = client.get(
+        "/api/v1/admin/models/backtests/history",
+        params={
+            "repository_mode": "in_memory",
+            "seed_demo": True,
+            "auto_run_demo": True,
+            "target_task": "spread_error_regression",
+            "minimum_train_games": 1,
+            "test_window_games": 1,
+            "train_ratio": 0.5,
+            "validation_ratio": 0.25,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["model_backtest_history"]["overview"]["run_count"] >= 1
+    assert payload["model_backtest_history"]["overview"]["latest_run"]["target_task"] == (
+        "spread_error_regression"
+    )

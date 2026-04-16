@@ -5,6 +5,8 @@ import pytest
 from bookmaker_detector_api.demo import seed_phase_two_feature_in_memory
 from bookmaker_detector_api.services import models as models_module
 from bookmaker_detector_api.services.models import (
+    get_model_backtest_detail_in_memory,
+    get_model_backtest_history_in_memory,
     get_model_evaluation_history_in_memory,
     get_model_future_game_preview_in_memory,
     get_model_future_slate_preview_in_memory,
@@ -26,6 +28,7 @@ from bookmaker_detector_api.services.models import (
     get_model_selection_history_in_memory,
     get_model_training_history_in_memory,
     get_model_training_summary_in_memory,
+    list_model_backtest_runs_in_memory,
     list_model_evaluation_snapshots_in_memory,
     list_model_market_board_sources,
     list_model_market_boards_in_memory,
@@ -44,6 +47,7 @@ from bookmaker_detector_api.services.models import (
     orchestrate_model_market_board_scoring_in_memory,
     promote_best_model_in_memory,
     refresh_model_market_board_in_memory,
+    run_model_backtest_in_memory,
     score_model_market_board_in_memory,
     train_phase_three_models_in_memory,
 )
@@ -108,6 +112,59 @@ def test_train_phase_three_models_in_memory_persists_baseline_runs() -> None:
         "linear_feature",
         "tree_stump",
     }
+
+
+def test_run_model_backtest_in_memory_persists_walk_forward_summary() -> None:
+    repository, _, _ = seed_phase_two_feature_in_memory()
+
+    result = run_model_backtest_in_memory(
+        repository,
+        target_task="spread_error_regression",
+        minimum_train_games=1,
+        test_window_games=1,
+        train_ratio=0.5,
+        validation_ratio=0.25,
+    )
+
+    assert result["feature_version"]["feature_key"] == "baseline_team_features_v1"
+    assert result["backtest_run"] is not None
+    assert result["summary"]["fold_count"] >= 1
+    assert result["summary"]["strategy_results"]["candidate_threshold"]["bet_count"] >= 0
+    assert result["summary"]["folds"][0]["selected_model"]["evaluation_snapshot_id"] >= 1
+    assert "model_training_run_id" in result["summary"]["folds"][0]["selected_model"]
+
+    runs = list_model_backtest_runs_in_memory(
+        repository,
+        target_task="spread_error_regression",
+    )
+    assert len(runs) == 1
+    assert runs[0].fold_count == result["summary"]["fold_count"]
+
+
+def test_model_backtest_history_and_detail_in_memory_return_recent_runs() -> None:
+    repository, _, _ = seed_phase_two_feature_in_memory()
+
+    run_model_backtest_in_memory(
+        repository,
+        target_task="spread_error_regression",
+        minimum_train_games=1,
+        test_window_games=1,
+        train_ratio=0.5,
+        validation_ratio=0.25,
+    )
+
+    history = get_model_backtest_history_in_memory(
+        repository,
+        target_task="spread_error_regression",
+        recent_limit=5,
+    )
+    detail = get_model_backtest_detail_in_memory(repository, backtest_run_id=1)
+
+    assert history["overview"]["run_count"] == 1
+    assert history["overview"]["latest_run"]["id"] == 1
+    assert detail is not None
+    assert detail["id"] == 1
+    assert detail["payload"]["target_task"] == "spread_error_regression"
 
 
 def test_get_model_training_summary_in_memory_returns_best_and_latest_views() -> None:

@@ -327,6 +327,7 @@ class InMemoryIngestionRepository:
         self.model_market_board_cadence_batches: list[dict[str, Any]] = []
         self.model_scoring_runs: list[dict[str, Any]] = []
         self.model_opportunities: list[dict[str, Any]] = []
+        self.model_backtest_runs: list[dict[str, Any]] = []
 
     def create_job_run(self, *, job_name: str, requested_by: str, payload: dict[str, Any]) -> int:
         job_id = len(self.job_runs) + 1

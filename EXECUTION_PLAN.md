@@ -150,7 +150,7 @@ Completion notes:
 
 ### Phase 3: Predictive and Opportunity Layer
 Duration: 2 weeks
-Status: In progress
+Status: Complete for backend MVP
 
 Objectives:
 - convert analytics into restrained, explainable recommendations
@@ -177,13 +177,14 @@ Exit criteria:
 - opportunities are created only when thresholds are met
 - each opportunity includes explanation summary and supporting evidence
 
-Progress notes:
-- the first Phase 3 slice is in place with model registry metadata and persisted training runs
-- lightweight regression baselines (`linear_feature` and `tree_stump`) train against versioned Phase 2 feature datasets
-- admin APIs now support training runs plus registry and run inspection for the initial predictive layer
+Completion notes:
+- lightweight regression baselines, evaluation snapshots, selection history, scoring previews, opportunities, market boards, refresh queues, scoring queues, cadence runs, source runs, and external-source refresh providers are implemented
+- the backend can refresh, score, and materialize explainable opportunities for upcoming boards through persisted operational workflows
+- Phase 3 backend verification is currently backed by a passing test suite and live Docker smoke tests across the predictive and market-board surfaces
 
 ### Phase 4: Backtesting, UX, and Operations Hardening
 Duration: 2 weeks
+Status: Complete for MVP
 
 Objectives:
 - validate signal quality
@@ -206,6 +207,12 @@ Deliverables:
 - analyst UI MVP
 - admin UI MVP
 - production-like job flow and observability
+
+Completion notes:
+- persisted walk-forward backtests, fold summaries, and history views are implemented
+- the frontend now supports analyst backtest inspection, opportunity review, provenance drill-through, and artifact comparison workflows
+- the compare route includes alignment checks, mismatch summaries, and analyst guidance for fold-vs-opportunity review
+- Phase 4 verification is backed by passing frontend typecheck, lint, and build checks
 
 Exit criteria:
 - walk-forward evaluation runs without leakage
@@ -386,20 +393,23 @@ Mitigation:
 - Phase 0: Foundation and Project Setup
 - Phase 1: Historical Data Spine
 - Phase 2: Analytical Core
+- Phase 3: Predictive and Opportunity Layer
+- Phase 4: Backtesting, UX, and Operations Hardening
 
 ### Active recommendation
-- continue Phase 3: Predictive and Opportunity Layer
+- begin Phase 5: Release Candidate
 
-### Phase 3 current focus
-- baseline model registry and reproducible training runs are implemented
-- next slices should add artifact persistence depth, future-game scoring inputs, and opportunity generation rules
+### Phase 5 current focus
+- run a full regression pass across ingestion, scoring, backtesting, and UI workflows
+- tighten documentation, runbooks, and known-issues handling for internal MVP use
+- harden operational edges around cadence orchestration, retries, and alerting
 
 ## 11. Immediate Next Steps
-1. Expand Phase 3 model training from baseline runs into richer artifact/version management.
-2. Add future schedule and market-line ingestion needed for upcoming-game scoring.
-3. Build future-game scoring services that combine model output with Phase 2 evidence.
-4. Implement opportunity-threshold policies and persisted opportunity artifacts.
-5. Expose opportunity list and detail APIs for the first analyst-facing scoring workflow.
+1. Run a full regression pass across Docker, backend APIs, worker flows, and the frontend analyst workspace.
+2. Add release-oriented documentation and runbooks for local setup, external source configuration, and operational cadence.
+3. Harden retries, audit logging, and failure handling around ingestion, market-board refresh, and scoring cadence flows.
+4. Review acceptance criteria from the SRS against the delivered MVP surfaces and capture any remaining gaps.
+5. Produce a known-issues and internal rollout checklist for the release candidate.
 
 ## 12. Recommendation
 The best execution approach is to treat the product as a data-quality-first analytics system, not a model-first betting app. If Phase 1 is weak, everything downstream becomes misleading; if Phase 1 is strong, the rest of the roadmap becomes much safer and faster.

@@ -1,6 +1,6 @@
 # Bookmaker Mistake Detector
 
-Phase 0, Phase 1, and the Phase 2 backend analytical core are complete, and Phase 3 has started with the first backend model-training slice.
+Phase 0, Phase 1, and Phase 2 are complete. Phase 3 is complete for the backend MVP predictive workflow, and Phase 4 is complete for the MVP backtesting and analyst review layer.
 
 ## Stack
 - `backend/`: FastAPI API service
@@ -92,6 +92,9 @@ Compare the latest labeled validation runs at `http://localhost:8000/api/v1/admi
 68. Inspect market-board orchestration history at `http://localhost:8000/api/v1/admin/models/market-board/orchestration-history?repository_mode=in_memory&seed_demo=true&auto_refresh_demo=true&auto_train_demo=true&auto_select_demo=true&auto_orchestrate_demo=true&target_task=spread_error_regression&source_name=demo_daily_lines_v1&season_label=2025-2026&game_date=2026-04-20&game_count=2&freshness_status=fresh&pending_only=true&train_ratio=0.5&validation_ratio=0.25&recent_limit=5`. The response summarizes persisted orchestration batches, daily rollups, and the latest scoring cadence across queued boards.
 69. Inspect one board’s operational summary at `http://localhost:8000/api/v1/admin/models/market-board/1/operations?repository_mode=in_memory&seed_demo=true&auto_refresh_demo=true&auto_train_demo=true&auto_select_demo=true&auto_orchestrate_demo=true&target_task=spread_error_regression&source_name=demo_daily_lines_v1&season_label=2025-2026&game_date=2026-04-20&game_count=2&freshness_status=fresh&pending_only=true&train_ratio=0.5&validation_ratio=0.25&recent_limit=5`. The response combines refresh, queue, scoring, opportunity, and orchestration state for one persisted board.
 70. Inspect the market-board cadence dashboard at `http://localhost:8000/api/v1/admin/models/market-board/cadence?repository_mode=in_memory&seed_demo=true&auto_refresh_demo=true&auto_train_demo=true&auto_select_demo=true&auto_orchestrate_demo=true&target_task=spread_error_regression&source_name=demo_daily_lines_v1&season_label=2025-2026&game_date=2026-04-20&game_count=2&freshness_status=fresh&pending_only=true&train_ratio=0.5&validation_ratio=0.25&recent_limit=5`. The response classifies boards into actionable cadence states like `ready_to_score`, `needs_refresh`, and `recently_scored`.
+71. Run the first Phase 4 walk-forward backtest at `http://localhost:8000/api/v1/admin/models/backtests/run?repository_mode=in_memory&seed_demo=true&target_task=spread_error_regression&minimum_train_games=1&test_window_games=1&train_ratio=0.5&validation_ratio=0.25` using `POST`. The response materializes a leakage-safe walk-forward run with fold summaries, prediction metrics, and threshold-strategy ROI/hit-rate stats.
+72. Inspect persisted Phase 4 backtest runs at `http://localhost:8000/api/v1/admin/models/backtests?repository_mode=in_memory&seed_demo=true&auto_run_demo=true&target_task=spread_error_regression&minimum_train_games=1&test_window_games=1&train_ratio=0.5&validation_ratio=0.25`.
+73. Inspect Phase 4 backtest history at `http://localhost:8000/api/v1/admin/models/backtests/history?repository_mode=in_memory&seed_demo=true&auto_run_demo=true&target_task=spread_error_regression&minimum_train_games=1&test_window_games=1&train_ratio=0.5&validation_ratio=0.25`.
 
 ## Phase 0 Outcome
 This scaffold gives us:
@@ -104,7 +107,8 @@ This scaffold gives us:
 Phase 0 is complete.
 Phase 1 is complete for the backend MVP data spine.
 Phase 2 is complete for the backend analytical core.
-Phase 3 is in progress, now covering baseline training, evaluation, and explicit model selection.
+Phase 3 is complete for the backend MVP predictive workflow.
+Phase 4 is complete for the MVP backtesting, analyst review, and provenance UX layer.
 
 ## Phase 2 Outcome
 The repo now includes:
@@ -117,8 +121,8 @@ The repo now includes:
 - persisted Phase 2 analysis artifacts for pattern summaries and evidence bundles
 - artifact catalog and artifact history rollups for persisted analytical outputs
 
-## Phase 3 Progress
-The repo now includes the first predictive-layer slice:
+## Phase 3 Outcome
+The repo now includes:
 - baseline model registry metadata for reproducible model families
 - persisted model training runs linked to feature versions
 - lightweight regression-first baselines for `linear_feature` and `tree_stump`
@@ -149,6 +153,18 @@ The repo now includes the first predictive-layer slice:
 - opportunity list, detail, and history APIs for the first analyst-facing scoring workflow
 - admin APIs to train models, inspect the model registry, review persisted model runs, promote active selections, preview scored cases, and materialize opportunities
 - Phase 3 verification backed by a passing backend test suite
+
+## Phase 4 Outcome
+The repo now includes:
+- a persisted walk-forward backtest engine with run, detail, and history APIs
+- leakage-safe fold summaries with stored strategy results, ROI, hit rate, push rate, and prediction metrics
+- a frontend backtest dashboard with dedicated routes for runs and folds
+- an analyst opportunity queue with deep-dive detail pages for recommendation, evidence, comparables, benchmarks, and market/model context
+- drill-through provenance routes for training runs, evaluation snapshots, selection snapshots, and scoring runs
+- a shared compare workflow that puts backtest fold validation beside live opportunity artifacts
+- explicit artifact alignment checks, metric deltas, mismatch callouts, and analyst decision guidance in the compare route
+- a linkable hash-route flow that connects backtests, opportunities, comparable cases, and provenance artifacts without adding a heavy routing dependency
+- Phase 4 verification backed by passing frontend typecheck, lint, and production build checks
 
 ## Phase 1 Outcome
 The repo now includes:
@@ -182,4 +198,4 @@ The repo now includes:
 - a worker entry point that can execute the same fixture-backed ingestion flow in `in_memory` or `postgres` mode
 
 ## Next Phase
-Continue Phase 3 by expanding from built-in market-board refresh and queue orchestration into true external schedule and line ingestion, plus stronger recurring scoring cadence on top of the current predictive workflow.
+Start Phase 5 by treating the current stack as an MVP release candidate: run a full regression pass, harden documentation and runbooks, and close the remaining operational gaps before internal use.

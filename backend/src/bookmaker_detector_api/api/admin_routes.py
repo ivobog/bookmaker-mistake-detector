@@ -62,8 +62,14 @@ from bookmaker_detector_api.services.features import (
     materialize_feature_analysis_artifacts_postgres,
 )
 from bookmaker_detector_api.services.models import (
+    get_model_backtest_detail_in_memory,
+    get_model_backtest_detail_postgres,
+    get_model_backtest_history_in_memory,
+    get_model_backtest_history_postgres,
     get_model_evaluation_history_in_memory,
     get_model_evaluation_history_postgres,
+    get_model_evaluation_snapshot_detail_in_memory,
+    get_model_evaluation_snapshot_detail_postgres,
     get_model_future_game_preview_in_memory,
     get_model_future_game_preview_postgres,
     get_model_future_slate_preview_in_memory,
@@ -100,10 +106,16 @@ from bookmaker_detector_api.services.models import (
     get_model_scoring_run_detail_postgres,
     get_model_selection_history_in_memory,
     get_model_selection_history_postgres,
+    get_model_selection_snapshot_detail_in_memory,
+    get_model_selection_snapshot_detail_postgres,
     get_model_training_history_in_memory,
     get_model_training_history_postgres,
+    get_model_training_run_detail_in_memory,
+    get_model_training_run_detail_postgres,
     get_model_training_summary_in_memory,
     get_model_training_summary_postgres,
+    list_model_backtest_runs_in_memory,
+    list_model_backtest_runs_postgres,
     list_model_evaluation_snapshots_in_memory,
     list_model_evaluation_snapshots_postgres,
     list_model_market_board_sources,
@@ -139,6 +151,8 @@ from bookmaker_detector_api.services.models import (
     promote_best_model_postgres,
     refresh_model_market_board_in_memory,
     refresh_model_market_board_postgres,
+    run_model_backtest_in_memory,
+    run_model_backtest_postgres,
     score_model_market_board_in_memory,
     score_model_market_board_postgres,
     train_phase_three_models_in_memory,
@@ -265,6 +279,289 @@ def phase_three_model_train(
             "validation_ratio": validation_ratio,
         },
         **training_result,
+    }
+
+
+@router.post("/models/backtests/run")
+def phase_four_model_backtest_run(
+    repository_mode: str = Query(default="in_memory"),
+    seed_demo: bool = Query(default=True),
+    feature_key: str = Query(default="baseline_team_features_v1"),
+    target_task: str = Query(default="spread_error_regression"),
+    team_code: str | None = Query(default=None),
+    season_label: str | None = Query(default=None),
+    selection_policy_name: str = Query(default="validation_mae_candidate_v1"),
+    minimum_train_games: int = Query(default=1, ge=1),
+    test_window_games: int = Query(default=1, ge=1),
+    train_ratio: float = Query(default=0.7, gt=0, lt=1),
+    validation_ratio: float = Query(default=0.15, ge=0, lt=1),
+) -> dict[str, object]:
+    if repository_mode == "in_memory":
+        repository = InMemoryIngestionRepository()
+        if seed_demo:
+            repository, _, _ = seed_phase_two_feature_in_memory()
+        result = run_model_backtest_in_memory(
+            repository,
+            feature_key=feature_key,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            selection_policy_name=selection_policy_name,
+            minimum_train_games=minimum_train_games,
+            test_window_games=test_window_games,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+    elif repository_mode == "postgres":
+        with postgres_connection() as connection:
+            if seed_demo:
+                seed_phase_two_feature_postgres(connection)
+            result = run_model_backtest_postgres(
+                connection,
+                feature_key=feature_key,
+                target_task=target_task,
+                team_code=team_code,
+                season_label=season_label,
+                selection_policy_name=selection_policy_name,
+                minimum_train_games=minimum_train_games,
+                test_window_games=test_window_games,
+                train_ratio=train_ratio,
+                validation_ratio=validation_ratio,
+            )
+    else:
+        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+
+    return {
+        "repository_mode": repository_mode,
+        "filters": {
+            "feature_key": feature_key,
+            "target_task": target_task,
+            "team_code": team_code,
+            "season_label": season_label,
+            "selection_policy_name": selection_policy_name,
+            "minimum_train_games": minimum_train_games,
+            "test_window_games": test_window_games,
+            "train_ratio": train_ratio,
+            "validation_ratio": validation_ratio,
+        },
+        **result,
+    }
+
+
+@router.get("/models/backtests")
+def phase_four_model_backtests(
+    repository_mode: str = Query(default="in_memory"),
+    seed_demo: bool = Query(default=True),
+    auto_run_demo: bool = Query(default=True),
+    feature_key: str = Query(default="baseline_team_features_v1"),
+    target_task: str = Query(default="spread_error_regression"),
+    team_code: str | None = Query(default=None),
+    season_label: str | None = Query(default=None),
+    selection_policy_name: str = Query(default="validation_mae_candidate_v1"),
+    minimum_train_games: int = Query(default=1, ge=1),
+    test_window_games: int = Query(default=1, ge=1),
+    train_ratio: float = Query(default=0.7, gt=0, lt=1),
+    validation_ratio: float = Query(default=0.15, ge=0, lt=1),
+) -> dict[str, object]:
+    if repository_mode == "in_memory":
+        repository = InMemoryIngestionRepository()
+        if seed_demo:
+            repository, _, _ = seed_phase_two_feature_in_memory()
+        if auto_run_demo:
+            run_model_backtest_in_memory(
+                repository,
+                feature_key=feature_key,
+                target_task=target_task,
+                team_code=team_code,
+                season_label=season_label,
+                selection_policy_name=selection_policy_name,
+                minimum_train_games=minimum_train_games,
+                test_window_games=test_window_games,
+                train_ratio=train_ratio,
+                validation_ratio=validation_ratio,
+            )
+        runs = list_model_backtest_runs_in_memory(
+            repository,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+        )
+    elif repository_mode == "postgres":
+        with postgres_connection() as connection:
+            if seed_demo:
+                seed_phase_two_feature_postgres(connection)
+            if auto_run_demo:
+                run_model_backtest_postgres(
+                    connection,
+                    feature_key=feature_key,
+                    target_task=target_task,
+                    team_code=team_code,
+                    season_label=season_label,
+                    selection_policy_name=selection_policy_name,
+                    minimum_train_games=minimum_train_games,
+                    test_window_games=test_window_games,
+                    train_ratio=train_ratio,
+                    validation_ratio=validation_ratio,
+                )
+            runs = list_model_backtest_runs_postgres(
+                connection,
+                target_task=target_task,
+                team_code=team_code,
+                season_label=season_label,
+            )
+    else:
+        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+
+    return {
+        "repository_mode": repository_mode,
+        "backtest_run_count": len(runs),
+        "backtest_runs": [run.payload | {"id": run.id} for run in runs],
+    }
+
+
+@router.get("/models/backtests/history")
+def phase_four_model_backtest_history(
+    repository_mode: str = Query(default="in_memory"),
+    seed_demo: bool = Query(default=True),
+    auto_run_demo: bool = Query(default=True),
+    feature_key: str = Query(default="baseline_team_features_v1"),
+    target_task: str = Query(default="spread_error_regression"),
+    team_code: str | None = Query(default=None),
+    season_label: str | None = Query(default=None),
+    selection_policy_name: str = Query(default="validation_mae_candidate_v1"),
+    minimum_train_games: int = Query(default=1, ge=1),
+    test_window_games: int = Query(default=1, ge=1),
+    train_ratio: float = Query(default=0.7, gt=0, lt=1),
+    validation_ratio: float = Query(default=0.15, ge=0, lt=1),
+    recent_limit: int = Query(default=10, ge=1, le=50),
+) -> dict[str, object]:
+    if repository_mode == "in_memory":
+        repository = InMemoryIngestionRepository()
+        if seed_demo:
+            repository, _, _ = seed_phase_two_feature_in_memory()
+        if auto_run_demo:
+            run_model_backtest_in_memory(
+                repository,
+                feature_key=feature_key,
+                target_task=target_task,
+                team_code=team_code,
+                season_label=season_label,
+                selection_policy_name=selection_policy_name,
+                minimum_train_games=minimum_train_games,
+                test_window_games=test_window_games,
+                train_ratio=train_ratio,
+                validation_ratio=validation_ratio,
+            )
+        history = get_model_backtest_history_in_memory(
+            repository,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            recent_limit=recent_limit,
+        )
+    elif repository_mode == "postgres":
+        with postgres_connection() as connection:
+            if seed_demo:
+                seed_phase_two_feature_postgres(connection)
+            if auto_run_demo:
+                run_model_backtest_postgres(
+                    connection,
+                    feature_key=feature_key,
+                    target_task=target_task,
+                    team_code=team_code,
+                    season_label=season_label,
+                    selection_policy_name=selection_policy_name,
+                    minimum_train_games=minimum_train_games,
+                    test_window_games=test_window_games,
+                    train_ratio=train_ratio,
+                    validation_ratio=validation_ratio,
+                )
+            history = get_model_backtest_history_postgres(
+                connection,
+                target_task=target_task,
+                team_code=team_code,
+                season_label=season_label,
+                recent_limit=recent_limit,
+            )
+    else:
+        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+
+    return {
+        "repository_mode": repository_mode,
+        "filters": {
+            "target_task": target_task,
+            "team_code": team_code,
+            "season_label": season_label,
+            "recent_limit": recent_limit,
+        },
+        "model_backtest_history": history,
+    }
+
+
+@router.get("/models/backtests/{backtest_run_id}")
+def phase_four_model_backtest_detail(
+    backtest_run_id: int,
+    repository_mode: str = Query(default="in_memory"),
+    seed_demo: bool = Query(default=True),
+    auto_run_demo: bool = Query(default=True),
+    feature_key: str = Query(default="baseline_team_features_v1"),
+    target_task: str = Query(default="spread_error_regression"),
+    team_code: str | None = Query(default=None),
+    season_label: str | None = Query(default=None),
+    selection_policy_name: str = Query(default="validation_mae_candidate_v1"),
+    minimum_train_games: int = Query(default=1, ge=1),
+    test_window_games: int = Query(default=1, ge=1),
+    train_ratio: float = Query(default=0.7, gt=0, lt=1),
+    validation_ratio: float = Query(default=0.15, ge=0, lt=1),
+) -> dict[str, object]:
+    if repository_mode == "in_memory":
+        repository = InMemoryIngestionRepository()
+        if seed_demo:
+            repository, _, _ = seed_phase_two_feature_in_memory()
+        if auto_run_demo:
+            run_model_backtest_in_memory(
+                repository,
+                feature_key=feature_key,
+                target_task=target_task,
+                team_code=team_code,
+                season_label=season_label,
+                selection_policy_name=selection_policy_name,
+                minimum_train_games=minimum_train_games,
+                test_window_games=test_window_games,
+                train_ratio=train_ratio,
+                validation_ratio=validation_ratio,
+            )
+        backtest_run = get_model_backtest_detail_in_memory(
+            repository,
+            backtest_run_id=backtest_run_id,
+        )
+    elif repository_mode == "postgres":
+        with postgres_connection() as connection:
+            if seed_demo:
+                seed_phase_two_feature_postgres(connection)
+            if auto_run_demo:
+                run_model_backtest_postgres(
+                    connection,
+                    feature_key=feature_key,
+                    target_task=target_task,
+                    team_code=team_code,
+                    season_label=season_label,
+                    selection_policy_name=selection_policy_name,
+                    minimum_train_games=minimum_train_games,
+                    test_window_games=test_window_games,
+                    train_ratio=train_ratio,
+                    validation_ratio=validation_ratio,
+                )
+            backtest_run = get_model_backtest_detail_postgres(
+                connection,
+                backtest_run_id=backtest_run_id,
+            )
+    else:
+        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+
+    return {
+        "repository_mode": repository_mode,
+        "backtest_run": backtest_run,
     }
 
 
@@ -430,6 +727,84 @@ def phase_three_model_runs(
             }
             for run in runs
         ],
+    }
+
+
+@router.get("/models/runs/{run_id}")
+def phase_three_model_run_detail(
+    run_id: int,
+    repository_mode: str = Query(default="in_memory"),
+    seed_demo: bool = Query(default=True),
+    auto_train_demo: bool = Query(default=True),
+    feature_key: str = Query(default="baseline_team_features_v1"),
+    target_task: str | None = Query(default="spread_error_regression"),
+    team_code: str | None = Query(default=None),
+    season_label: str | None = Query(default=None),
+    train_ratio: float = Query(default=0.7, gt=0, lt=1),
+    validation_ratio: float = Query(default=0.15, ge=0, lt=1),
+) -> dict[str, object]:
+    if repository_mode == "in_memory":
+        repository = InMemoryIngestionRepository()
+        if seed_demo:
+            repository, _, _ = seed_phase_two_feature_in_memory()
+        if auto_train_demo and target_task is not None:
+            train_phase_three_models_in_memory(
+                repository,
+                feature_key=feature_key,
+                target_task=target_task,
+                team_code=team_code,
+                season_label=season_label,
+                train_ratio=train_ratio,
+                validation_ratio=validation_ratio,
+            )
+        run = get_model_training_run_detail_in_memory(repository, run_id=run_id)
+    elif repository_mode == "postgres":
+        with postgres_connection() as connection:
+            if seed_demo:
+                seed_phase_two_feature_postgres(connection)
+            if auto_train_demo and target_task is not None:
+                train_phase_three_models_postgres(
+                    connection,
+                    feature_key=feature_key,
+                    target_task=target_task,
+                    team_code=team_code,
+                    season_label=season_label,
+                    train_ratio=train_ratio,
+                    validation_ratio=validation_ratio,
+                )
+            run = get_model_training_run_detail_postgres(connection, run_id=run_id)
+    else:
+        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+
+    return {
+        "repository_mode": repository_mode,
+        "filters": {
+            "feature_key": feature_key,
+            "target_task": target_task,
+            "team_code": team_code,
+            "season_label": season_label,
+            "auto_train_demo": auto_train_demo,
+            "run_id": run_id,
+        },
+        "model_run": (
+            {
+                "id": run.id,
+                "model_registry_id": run.model_registry_id,
+                "feature_version_id": run.feature_version_id,
+                "target_task": run.target_task,
+                "team_code": run.team_code,
+                "season_label": run.season_label,
+                "status": run.status,
+                "train_ratio": run.train_ratio,
+                "validation_ratio": run.validation_ratio,
+                "artifact": run.artifact,
+                "metrics": run.metrics,
+                "created_at": run.created_at.isoformat() if run.created_at else None,
+                "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+            }
+            if run is not None
+            else None
+        ),
     }
 
 
@@ -733,6 +1108,96 @@ def phase_three_model_evaluation_history(
     }
 
 
+@router.get("/models/evaluations/{snapshot_id}")
+def phase_three_model_evaluation_detail(
+    snapshot_id: int,
+    repository_mode: str = Query(default="in_memory"),
+    seed_demo: bool = Query(default=True),
+    auto_train_demo: bool = Query(default=True),
+    feature_key: str = Query(default="baseline_team_features_v1"),
+    target_task: str | None = Query(default="spread_error_regression"),
+    model_family: str | None = Query(default=None),
+    team_code: str | None = Query(default=None),
+    season_label: str | None = Query(default=None),
+    train_ratio: float = Query(default=0.7, gt=0, lt=1),
+    validation_ratio: float = Query(default=0.15, ge=0, lt=1),
+) -> dict[str, object]:
+    if repository_mode == "in_memory":
+        repository = InMemoryIngestionRepository()
+        if seed_demo:
+            repository, _, _ = seed_phase_two_feature_in_memory()
+        if auto_train_demo and target_task is not None:
+            train_phase_three_models_in_memory(
+                repository,
+                feature_key=feature_key,
+                target_task=target_task,
+                team_code=team_code,
+                season_label=season_label,
+                train_ratio=train_ratio,
+                validation_ratio=validation_ratio,
+            )
+        snapshot = get_model_evaluation_snapshot_detail_in_memory(
+            repository,
+            snapshot_id=snapshot_id,
+        )
+    elif repository_mode == "postgres":
+        with postgres_connection() as connection:
+            if seed_demo:
+                seed_phase_two_feature_postgres(connection)
+            if auto_train_demo and target_task is not None:
+                train_phase_three_models_postgres(
+                    connection,
+                    feature_key=feature_key,
+                    target_task=target_task,
+                    team_code=team_code,
+                    season_label=season_label,
+                    train_ratio=train_ratio,
+                    validation_ratio=validation_ratio,
+                )
+            snapshot = get_model_evaluation_snapshot_detail_postgres(
+                connection,
+                snapshot_id=snapshot_id,
+            )
+    else:
+        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+
+    return {
+        "repository_mode": repository_mode,
+        "filters": {
+            "feature_key": feature_key,
+            "target_task": target_task,
+            "model_family": model_family,
+            "team_code": team_code,
+            "season_label": season_label,
+            "auto_train_demo": auto_train_demo,
+            "snapshot_id": snapshot_id,
+        },
+        "evaluation_snapshot": (
+            {
+                "id": snapshot.id,
+                "model_training_run_id": snapshot.model_training_run_id,
+                "model_registry_id": snapshot.model_registry_id,
+                "feature_version_id": snapshot.feature_version_id,
+                "target_task": snapshot.target_task,
+                "model_family": snapshot.model_family,
+                "selected_feature": snapshot.selected_feature,
+                "fallback_strategy": snapshot.fallback_strategy,
+                "primary_metric_name": snapshot.primary_metric_name,
+                "validation_metric_value": snapshot.validation_metric_value,
+                "test_metric_value": snapshot.test_metric_value,
+                "validation_prediction_count": snapshot.validation_prediction_count,
+                "test_prediction_count": snapshot.test_prediction_count,
+                "snapshot": snapshot.snapshot,
+                "created_at": snapshot.created_at.isoformat()
+                if snapshot.created_at
+                else None,
+            }
+            if snapshot is not None
+            else None
+        ),
+    }
+
+
 @router.post("/models/select")
 def phase_three_model_select(
     repository_mode: str = Query(default="in_memory"),
@@ -956,6 +1421,92 @@ def phase_three_model_selection_history(
             "recent_limit": recent_limit,
         },
         "model_selection_history": history,
+    }
+
+
+@router.get("/models/selections/{selection_id}")
+def phase_three_model_selection_detail(
+    selection_id: int,
+    repository_mode: str = Query(default="in_memory"),
+    seed_demo: bool = Query(default=True),
+    auto_train_demo: bool = Query(default=True),
+    feature_key: str = Query(default="baseline_team_features_v1"),
+    target_task: str | None = Query(default="spread_error_regression"),
+    team_code: str | None = Query(default=None),
+    season_label: str | None = Query(default=None),
+    train_ratio: float = Query(default=0.7, gt=0, lt=1),
+    validation_ratio: float = Query(default=0.15, ge=0, lt=1),
+) -> dict[str, object]:
+    if repository_mode == "in_memory":
+        repository = InMemoryIngestionRepository()
+        if seed_demo:
+            repository, _, _ = seed_phase_two_feature_in_memory()
+        if auto_train_demo and target_task is not None:
+            train_phase_three_models_in_memory(
+                repository,
+                feature_key=feature_key,
+                target_task=target_task,
+                team_code=team_code,
+                season_label=season_label,
+                train_ratio=train_ratio,
+                validation_ratio=validation_ratio,
+            )
+            promote_best_model_in_memory(repository, target_task=target_task)
+        selection = get_model_selection_snapshot_detail_in_memory(
+            repository,
+            selection_id=selection_id,
+        )
+    elif repository_mode == "postgres":
+        with postgres_connection() as connection:
+            if seed_demo:
+                seed_phase_two_feature_postgres(connection)
+            if auto_train_demo and target_task is not None:
+                train_phase_three_models_postgres(
+                    connection,
+                    feature_key=feature_key,
+                    target_task=target_task,
+                    team_code=team_code,
+                    season_label=season_label,
+                    train_ratio=train_ratio,
+                    validation_ratio=validation_ratio,
+                )
+                promote_best_model_postgres(connection, target_task=target_task)
+            selection = get_model_selection_snapshot_detail_postgres(
+                connection,
+                selection_id=selection_id,
+            )
+    else:
+        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+
+    return {
+        "repository_mode": repository_mode,
+        "filters": {
+            "feature_key": feature_key,
+            "target_task": target_task,
+            "team_code": team_code,
+            "season_label": season_label,
+            "auto_train_demo": auto_train_demo,
+            "selection_id": selection_id,
+        },
+        "selection": (
+            {
+                "id": selection.id,
+                "model_evaluation_snapshot_id": selection.model_evaluation_snapshot_id,
+                "model_training_run_id": selection.model_training_run_id,
+                "model_registry_id": selection.model_registry_id,
+                "feature_version_id": selection.feature_version_id,
+                "target_task": selection.target_task,
+                "model_family": selection.model_family,
+                "selection_policy_name": selection.selection_policy_name,
+                "rationale": selection.rationale,
+                "is_active": selection.is_active,
+                "created_at": selection.created_at.isoformat()
+                if selection.created_at
+                else None,
+            }
+            if selection is not None
+            else None
+        ),
     }
 
 
