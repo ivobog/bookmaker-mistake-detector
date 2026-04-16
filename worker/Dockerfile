@@ -1,0 +1,15 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY worker/pyproject.toml ./pyproject.toml
+COPY worker/README.md ./README.md
+COPY worker/src ./src
+COPY backend/src ./backend/src
+
+ENV PYTHONPATH=/app/backend/src
+
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir .
+
+CMD ["python", "-m", "bookmaker_detector_worker.main"]

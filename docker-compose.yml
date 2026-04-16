@@ -1,0 +1,68 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bookmaker-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+    container_name: bookmaker-backend
+    environment:
+      API_ENV: ${API_ENV}
+      API_HOST: ${API_HOST}
+      API_PORT: ${API_PORT}
+      DATABASE_URL: ${DATABASE_URL}
+      RAW_PAYLOAD_DIR: ${RAW_PAYLOAD_DIR}
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: ./worker/Dockerfile
+    container_name: bookmaker-worker
+    environment:
+      WORKER_ENV: ${WORKER_ENV}
+      DATABASE_URL: ${DATABASE_URL}
+      RAW_PAYLOAD_DIR: ${RAW_PAYLOAD_DIR}
+      WORKER_POLL_INTERVAL_SECONDS: ${WORKER_POLL_INTERVAL_SECONDS}
+      WORKER_JOB_MODE: ${WORKER_JOB_MODE}
+      WORKER_REPOSITORY_MODE: ${WORKER_REPOSITORY_MODE}
+      WORKER_TEAM_CODE: ${WORKER_TEAM_CODE}
+      WORKER_SEASON_LABEL: ${WORKER_SEASON_LABEL}
+      WORKER_SOURCE_URL: ${WORKER_SOURCE_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: bookmaker-frontend
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    depends_on:
+      backend:
+        condition: service_started
+
+volumes:
+  postgres_data:
