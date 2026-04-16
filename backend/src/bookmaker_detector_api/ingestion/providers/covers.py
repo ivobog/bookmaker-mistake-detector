@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime
-from pathlib import Path
 import re
 import xml.etree.ElementTree as ET
+from datetime import datetime
+from pathlib import Path
 
 from bookmaker_detector_api.ingestion.models import ParseStatus, RawGameRow
-
 
 ATS_PATTERN = re.compile(r"^(?P<result>[WLP])\s+(?P<line>[+-]?\d+(?:\.\d+)?)$")
 OU_PATTERN = re.compile(r"^(?P<result>[OU])\s+(?P<line>\d+(?:\.\d+)?)$")

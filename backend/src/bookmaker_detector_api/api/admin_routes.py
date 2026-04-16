@@ -6,12 +6,16 @@ from bookmaker_detector_api.demo import (
     run_phase_one_demo,
     run_phase_one_fetch_demo,
     run_phase_one_fetch_failure_demo,
-    run_phase_one_fetch_reporting_demo as run_phase_one_fetch_reporting_demo_job,
     run_phase_one_persistence_demo,
     run_phase_one_worker_demo,
 )
-from bookmaker_detector_api.services.admin_diagnostics import get_admin_diagnostics
-from bookmaker_detector_api.services.admin_diagnostics import resolve_started_window
+from bookmaker_detector_api.demo import (
+    run_phase_one_fetch_reporting_demo as run_phase_one_fetch_reporting_demo_job,
+)
+from bookmaker_detector_api.services.admin_diagnostics import (
+    get_admin_diagnostics,
+    resolve_started_window,
+)
 from bookmaker_detector_api.services.data_quality_maintenance import (
     normalize_data_quality_taxonomy,
 )

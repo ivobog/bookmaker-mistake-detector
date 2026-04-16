@@ -945,7 +945,10 @@ class InMemoryIngestionRepository:
             and (season_label is None or row["season_label"] == season_label)
             and (
                 run_label is None
-                or self._page_retrieval_has_run_label(row.get("page_retrieval_id"), run_label=run_label)
+                or self._page_retrieval_has_run_label(
+                    row.get("page_retrieval_id"),
+                    run_label=run_label,
+                )
             )
         )
 
@@ -995,7 +998,10 @@ class InMemoryIngestionRepository:
             row["season_label"] == game["season_label"]
             and row["team_code"] in relevant_teams
             and row["source_row_index"] in relevant_row_indexes
-            and self._page_retrieval_has_run_label(row.get("page_retrieval_id"), run_label=run_label)
+            and self._page_retrieval_has_run_label(
+                row.get("page_retrieval_id"),
+                run_label=run_label,
+            )
             for row in self.raw_rows
         )
 
@@ -1630,14 +1636,62 @@ class PostgresIngestionRepository:
                     jr.completed_at,
                     COALESCE((jr.summary_json -> 'parse_status_counts' ->> 'VALID')::int, 0),
                     COALESCE((jr.summary_json -> 'parse_status_counts' ->> 'INVALID')::int, 0),
-                    COALESCE((jr.summary_json -> 'parse_status_counts' ->> 'VALID_WITH_WARNINGS')::int, 0),
-                    COALESCE((jr.summary_json -> 'reconciliation_status_counts' ->> 'FULL_MATCH')::int, 0),
-                    COALESCE((jr.summary_json -> 'reconciliation_status_counts' ->> 'PARTIAL_SINGLE_ROW')::int, 0),
-                    COALESCE((jr.summary_json -> 'reconciliation_status_counts' ->> 'CONFLICT_SCORE')::int, 0),
-                    COALESCE((jr.summary_json -> 'reconciliation_status_counts' ->> 'CONFLICT_TOTAL_LINE')::int, 0),
-                    COALESCE((jr.summary_json -> 'reconciliation_status_counts' ->> 'CONFLICT_SPREAD_LINE')::int, 0),
-                    COALESCE((jr.summary_json -> 'data_quality_issue_severity_counts' ->> 'warning')::int, 0),
-                    COALESCE((jr.summary_json -> 'data_quality_issue_severity_counts' ->> 'error')::int, 0),
+                    COALESCE(
+                        (jr.summary_json -> 'parse_status_counts' ->> 'VALID_WITH_WARNINGS')::int,
+                        0
+                    ),
+                    COALESCE(
+                        (jr.summary_json -> 'reconciliation_status_counts' ->> 'FULL_MATCH')::int,
+                        0
+                    ),
+                    COALESCE(
+                        (
+                            jr.summary_json
+                            -> 'reconciliation_status_counts'
+                            ->> 'PARTIAL_SINGLE_ROW'
+                        )::int,
+                        0
+                    ),
+                    COALESCE(
+                        (
+                            jr.summary_json
+                            -> 'reconciliation_status_counts'
+                            ->> 'CONFLICT_SCORE'
+                        )::int,
+                        0
+                    ),
+                    COALESCE(
+                        (
+                            jr.summary_json
+                            -> 'reconciliation_status_counts'
+                            ->> 'CONFLICT_TOTAL_LINE'
+                        )::int,
+                        0
+                    ),
+                    COALESCE(
+                        (
+                            jr.summary_json
+                            -> 'reconciliation_status_counts'
+                            ->> 'CONFLICT_SPREAD_LINE'
+                        )::int,
+                        0
+                    ),
+                    COALESCE(
+                        (
+                            jr.summary_json
+                            -> 'data_quality_issue_severity_counts'
+                            ->> 'warning'
+                        )::int,
+                        0
+                    ),
+                    COALESCE(
+                        (
+                            jr.summary_json
+                            -> 'data_quality_issue_severity_counts'
+                            ->> 'error'
+                        )::int,
+                        0
+                    ),
                     NOW()
                 FROM job_run jr
                 WHERE jr.id = %s
@@ -1653,11 +1707,21 @@ class PostgresIngestionRepository:
                     parse_valid_count = EXCLUDED.parse_valid_count,
                     parse_invalid_count = EXCLUDED.parse_invalid_count,
                     parse_warning_count = EXCLUDED.parse_warning_count,
-                    reconciliation_full_match_count = EXCLUDED.reconciliation_full_match_count,
-                    reconciliation_partial_single_row_count = EXCLUDED.reconciliation_partial_single_row_count,
-                    reconciliation_conflict_score_count = EXCLUDED.reconciliation_conflict_score_count,
-                    reconciliation_conflict_total_line_count = EXCLUDED.reconciliation_conflict_total_line_count,
-                    reconciliation_conflict_spread_line_count = EXCLUDED.reconciliation_conflict_spread_line_count,
+                    reconciliation_full_match_count = (
+                        EXCLUDED.reconciliation_full_match_count
+                    ),
+                    reconciliation_partial_single_row_count = (
+                        EXCLUDED.reconciliation_partial_single_row_count
+                    ),
+                    reconciliation_conflict_score_count = (
+                        EXCLUDED.reconciliation_conflict_score_count
+                    ),
+                    reconciliation_conflict_total_line_count = (
+                        EXCLUDED.reconciliation_conflict_total_line_count
+                    ),
+                    reconciliation_conflict_spread_line_count = (
+                        EXCLUDED.reconciliation_conflict_spread_line_count
+                    ),
                     quality_issue_warning_count = EXCLUDED.quality_issue_warning_count,
                     quality_issue_error_count = EXCLUDED.quality_issue_error_count,
                     updated_at = NOW()
@@ -1680,7 +1744,15 @@ class PostgresIngestionRepository:
         started_to: datetime | None = None,
     ) -> list[JobRunRecord]:
         query = """
-            SELECT id, job_name, status, requested_by, payload_json, summary_json, started_at, completed_at
+            SELECT
+                id,
+                job_name,
+                status,
+                requested_by,
+                payload_json,
+                summary_json,
+                started_at,
+                completed_at
             FROM job_run
         """
         params: list[Any] = []
@@ -1816,7 +1888,9 @@ class PostgresIngestionRepository:
                 COUNT(*) AS retrieval_count,
                 SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) AS successful_retrievals,
                 SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) AS failed_retrievals,
-                SUM(CASE WHEN payload_storage_path IS NOT NULL THEN 1 ELSE 0 END) AS payload_saved_count,
+                SUM(
+                    CASE WHEN payload_storage_path IS NOT NULL THEN 1 ELSE 0 END
+                ) AS payload_saved_count,
                 SUM(CASE WHEN http_status IS NULL THEN 1 ELSE 0 END) AS missing_http_status_count
             FROM page_retrieval_reporting_snapshot
         """
@@ -1881,10 +1955,16 @@ class PostgresIngestionRepository:
                 SUM(parse_invalid_count) AS parse_invalid_count,
                 SUM(parse_warning_count) AS parse_warning_count,
                 SUM(reconciliation_full_match_count) AS reconciliation_full_match_count,
-                SUM(reconciliation_partial_single_row_count) AS reconciliation_partial_single_row_count,
+                SUM(
+                    reconciliation_partial_single_row_count
+                ) AS reconciliation_partial_single_row_count,
                 SUM(reconciliation_conflict_score_count) AS reconciliation_conflict_score_count,
-                SUM(reconciliation_conflict_total_line_count) AS reconciliation_conflict_total_line_count,
-                SUM(reconciliation_conflict_spread_line_count) AS reconciliation_conflict_spread_line_count,
+                SUM(
+                    reconciliation_conflict_total_line_count
+                ) AS reconciliation_conflict_total_line_count,
+                SUM(
+                    reconciliation_conflict_spread_line_count
+                ) AS reconciliation_conflict_spread_line_count,
                 SUM(quality_issue_warning_count) AS quality_issue_warning_count,
                 SUM(quality_issue_error_count) AS quality_issue_error_count
             FROM job_run_quality_snapshot
@@ -1894,7 +1974,8 @@ class PostgresIngestionRepository:
             "("
             "parse_valid_count > 0 OR parse_invalid_count > 0 OR parse_warning_count > 0 OR "
             "reconciliation_full_match_count > 0 OR reconciliation_partial_single_row_count > 0 OR "
-            "reconciliation_conflict_score_count > 0 OR reconciliation_conflict_total_line_count > 0 OR "
+            "reconciliation_conflict_score_count > 0 OR "
+            "reconciliation_conflict_total_line_count > 0 OR "
             "reconciliation_conflict_spread_line_count > 0 OR quality_issue_warning_count > 0 OR "
             "quality_issue_error_count > 0"
             ")"
@@ -1969,7 +2050,10 @@ class PostgresIngestionRepository:
                 """
             )
             cursor.execute(
-                "ALTER TABLE job_run_reporting_snapshot ADD COLUMN IF NOT EXISTS run_label VARCHAR(64)"
+                """
+                ALTER TABLE job_run_reporting_snapshot
+                ADD COLUMN IF NOT EXISTS run_label VARCHAR(64)
+                """
             )
         self.connection.commit()
         self._reporting_snapshot_table_ready = True
@@ -1982,7 +2066,8 @@ class PostgresIngestionRepository:
                 """
                 CREATE TABLE IF NOT EXISTS page_retrieval_reporting_snapshot (
                     id BIGSERIAL PRIMARY KEY,
-                    page_retrieval_id BIGINT NOT NULL UNIQUE REFERENCES page_retrieval(id) ON DELETE CASCADE,
+                    page_retrieval_id BIGINT NOT NULL UNIQUE
+                        REFERENCES page_retrieval(id) ON DELETE CASCADE,
                     job_run_id BIGINT REFERENCES job_run(id) ON DELETE CASCADE,
                     run_label VARCHAR(64),
                     provider_name VARCHAR(64),
@@ -2000,7 +2085,10 @@ class PostgresIngestionRepository:
                 """
             )
             cursor.execute(
-                "ALTER TABLE page_retrieval_reporting_snapshot ADD COLUMN IF NOT EXISTS run_label VARCHAR(64)"
+                """
+                ALTER TABLE page_retrieval_reporting_snapshot
+                ADD COLUMN IF NOT EXISTS run_label VARCHAR(64)
+                """
             )
         self.connection.commit()
         self._retrieval_reporting_snapshot_table_ready = True
@@ -2037,7 +2125,10 @@ class PostgresIngestionRepository:
                 """
             )
             cursor.execute(
-                "ALTER TABLE job_run_quality_snapshot ADD COLUMN IF NOT EXISTS run_label VARCHAR(64)"
+                """
+                ALTER TABLE job_run_quality_snapshot
+                ADD COLUMN IF NOT EXISTS run_label VARCHAR(64)
+                """
             )
         self.connection.commit()
         self._quality_snapshot_table_ready = True
@@ -2479,7 +2570,12 @@ class PostgresIngestionRepository:
             params.extend([provider_name, provider_name])
         if team_code is not None:
             where_clauses.append(
-                "((rr.id IS NOT NULL AND tr.code = %s) OR (cg.id IS NOT NULL AND (th.code = %s OR ta.code = %s)))"
+                """
+                (
+                    (rr.id IS NOT NULL AND tr.code = %s)
+                    OR (cg.id IS NOT NULL AND (th.code = %s OR ta.code = %s))
+                )
+                """.strip()
             )
             params.extend([team_code, team_code, team_code])
         if season_label is not None:

@@ -163,11 +163,13 @@ def get_admin_diagnostics(
                     season_label=season_label,
                     run_label=run_label,
                 ),
-                "data_quality_issue_severity_counts": repository.get_data_quality_issue_severity_counts(
-                    provider_name=provider_name,
-                    team_code=team_code,
-                    season_label=season_label,
-                    run_label=run_label,
+                "data_quality_issue_severity_counts": (
+                    repository.get_data_quality_issue_severity_counts(
+                        provider_name=provider_name,
+                        team_code=team_code,
+                        season_label=season_label,
+                        run_label=run_label,
+                    )
                 ),
             },
             "trends": _build_run_trends(
@@ -346,7 +348,11 @@ def _build_run_trends(*, trend_job_runs, trend_daily_summaries) -> dict[str, obj
     }
 
 
-def _build_validation_run_comparison(validation_compare_runs, *, run_label: str | None) -> dict[str, object]:
+def _build_validation_run_comparison(
+    validation_compare_runs,
+    *,
+    run_label: str | None,
+) -> dict[str, object]:
     recent_runs = [_build_recent_run_summary(job_run) for job_run in validation_compare_runs]
     latest_run = recent_runs[0] if recent_runs else None
     previous_run = recent_runs[1] if len(recent_runs) > 1 else None
@@ -508,13 +514,17 @@ def _build_run_delta(
             "previous_completed_at": previous_run["completed_at"],
         },
         "metric_deltas": {
-            "raw_rows_saved": int(latest_run["raw_rows_saved"]) - int(previous_run["raw_rows_saved"]),
+            "raw_rows_saved": (
+                int(latest_run["raw_rows_saved"])
+                - int(previous_run["raw_rows_saved"])
+            ),
             "canonical_games_saved": int(latest_run["canonical_games_saved"])
             - int(previous_run["canonical_games_saved"]),
             "metrics_saved": int(latest_run["metrics_saved"]) - int(previous_run["metrics_saved"]),
             "quality_issues_saved": int(latest_run["quality_issues_saved"])
             - int(previous_run["quality_issues_saved"]),
-            "warning_count": int(latest_run["warning_count"]) - int(previous_run["warning_count"]),
+            "warning_count": int(latest_run["warning_count"])
+            - int(previous_run["warning_count"]),
         },
         "parse_status_count_deltas": _build_count_delta(
             latest_run["parse_status_counts"],

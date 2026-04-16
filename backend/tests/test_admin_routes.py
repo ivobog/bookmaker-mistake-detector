@@ -2,12 +2,11 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from bookmaker_detector_api import demo as demo_module
 from bookmaker_detector_api.main import app
 from bookmaker_detector_api.repositories import InMemoryIngestionRepository
-from bookmaker_detector_api import demo as demo_module
 from bookmaker_detector_api.services.admin_diagnostics import get_admin_diagnostics
 from bookmaker_detector_api.services.fetch_ingestion_runner import run_fetch_and_ingest
-
 
 client = TestClient(app)
 
@@ -335,7 +334,11 @@ def test_recent_job_runs_endpoint_forwards_run_label_filter(monkeypatch) -> None
 
     def fake_get_admin_diagnostics(**kwargs):
         captured.update(kwargs)
-        return {"repository_mode": "in_memory", "filters": {"run_label": kwargs["run_label"]}, "job_runs": []}
+        return {
+            "repository_mode": "in_memory",
+            "filters": {"run_label": kwargs["run_label"]},
+            "job_runs": [],
+        }
 
     monkeypatch.setattr(
         "bookmaker_detector_api.api.admin_routes.get_admin_diagnostics",

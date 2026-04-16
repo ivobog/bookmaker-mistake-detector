@@ -6,15 +6,14 @@ from pathlib import Path
 from bookmaker_detector_api.ingestion.providers import CoversHistoricalTeamPageProvider
 from bookmaker_detector_api.repositories import InMemoryIngestionRepository
 from bookmaker_detector_api.services.admin_diagnostics import get_admin_diagnostics
+from bookmaker_detector_api.services.canonical import canonicalize_rows
 from bookmaker_detector_api.services.fetch_ingestion_runner import run_fetch_and_ingest
 from bookmaker_detector_api.services.fixture_ingestion_runner import run_fixture_ingestion
 from bookmaker_detector_api.services.ingestion_pipeline import (
     HistoricalIngestionRequest,
     ingest_historical_team_page,
 )
-from bookmaker_detector_api.services.canonical import canonicalize_rows
 from bookmaker_detector_api.services.metrics import calculate_game_metric
-
 
 FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures"
 

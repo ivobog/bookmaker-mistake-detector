@@ -73,7 +73,10 @@ def ingest_historical_team_page(
     canonical_source_rows = [row for row in raw_rows if row.parse_status != ParseStatus.INVALID]
     canonical_games = canonicalize_rows(canonical_source_rows)
 
-    persisted_raw_rows = repository.save_raw_rows(page_retrieval_id=page_retrieval_id, rows=raw_rows)
+    persisted_raw_rows = repository.save_raw_rows(
+        page_retrieval_id=page_retrieval_id,
+        rows=raw_rows,
+    )
     persisted_canonical_games = repository.save_canonical_games(canonical_games)
     metrics_saved = repository.save_game_metrics(
         [

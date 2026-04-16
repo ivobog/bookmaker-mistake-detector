@@ -38,7 +38,10 @@ def canonicalize_rows(rows: list[RawGameRow]) -> list[CanonicalGame]:
 
         if home_rows and away_rows:
             reconciliation_status = ReconciliationStatus.FULL_MATCH
-            if home_row.team_score != away_row.opponent_score or home_row.opponent_score != away_row.team_score:
+            if (
+                home_row.team_score != away_row.opponent_score
+                or home_row.opponent_score != away_row.team_score
+            ):
                 reconciliation_status = ReconciliationStatus.CONFLICT_SCORE
                 warnings.append("canonical.score_mismatch")
             elif (

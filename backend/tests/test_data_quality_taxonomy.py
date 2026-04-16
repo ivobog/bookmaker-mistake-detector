@@ -82,6 +82,9 @@ def test_in_memory_repository_normalizes_legacy_quality_issues_on_read_and_backf
     applied = repository.normalize_data_quality_issue_taxonomy(dry_run=False)
 
     assert applied == preview
-    assert repository.data_quality_issues[0]["issue_type"] == "canonical.single_team_perspective_only"
+    assert (
+        repository.data_quality_issues[0]["issue_type"]
+        == "canonical.single_team_perspective_only"
+    )
     assert repository.data_quality_issues[1]["issue_type"] == "canonical.score_mismatch"
     assert repository.data_quality_issues[1]["severity"] == "error"
