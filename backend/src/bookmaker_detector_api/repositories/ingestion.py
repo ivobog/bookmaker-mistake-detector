@@ -314,6 +314,7 @@ class InMemoryIngestionRepository:
         self.data_quality_issues: list[dict[str, Any]] = []
         self.feature_versions: list[dict[str, Any]] = []
         self.feature_snapshots: list[dict[str, Any]] = []
+        self.feature_analysis_artifacts: list[dict[str, Any]] = []
 
     def create_job_run(self, *, job_name: str, requested_by: str, payload: dict[str, Any]) -> int:
         job_id = len(self.job_runs) + 1

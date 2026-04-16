@@ -1,12 +1,20 @@
 from datetime import date
 
+from bookmaker_detector_api.demo import seed_phase_two_feature_in_memory
 from bookmaker_detector_api.services.features import (
     CanonicalGameMetricRecord,
+    build_feature_comparable_cases,
     build_feature_dataset_rows,
+    build_feature_evidence_bundle,
+    build_feature_pattern_catalog,
     build_feature_snapshots,
+    build_feature_training_benchmark,
     build_feature_training_bundle,
     build_feature_training_task_matrix,
     build_feature_training_view,
+    get_feature_analysis_artifact_catalog_in_memory,
+    get_feature_analysis_artifact_history_in_memory,
+    materialize_feature_analysis_artifacts_in_memory,
     profile_feature_dataset_rows,
     profile_feature_training_rows,
     split_feature_dataset_rows,
@@ -521,6 +529,697 @@ def test_profile_feature_dataset_rows_returns_coverage_and_label_balance() -> No
     )
 
 
+def test_build_feature_pattern_catalog_groups_bucketed_conditions() -> None:
+    canonical_games = [
+        CanonicalGameMetricRecord(
+            canonical_game_id=1,
+            season_label="2024-2025",
+            game_date=date(2024, 11, 1),
+            home_team_code="LAL",
+            away_team_code="BOS",
+            home_score=110,
+            away_score=100,
+            final_home_margin=10,
+            final_total_points=210,
+            total_line=205.5,
+            home_spread_line=-4.5,
+            away_spread_line=4.5,
+            reconciliation_status="PARTIAL_SINGLE_ROW",
+            source_row_indexes=[1],
+            warnings=["canonical.single_team_perspective_only"],
+            spread_error_home=5.5,
+            spread_error_away=-5.5,
+            total_error=4.5,
+            home_covered=True,
+            away_covered=False,
+            went_over=True,
+            went_under=False,
+        ),
+        CanonicalGameMetricRecord(
+            canonical_game_id=2,
+            season_label="2024-2025",
+            game_date=date(2024, 11, 3),
+            home_team_code="NYK",
+            away_team_code="LAL",
+            home_score=101,
+            away_score=105,
+            final_home_margin=-4,
+            final_total_points=206,
+            total_line=208.5,
+            home_spread_line=1.5,
+            away_spread_line=-1.5,
+            reconciliation_status="PARTIAL_SINGLE_ROW",
+            source_row_indexes=[2],
+            warnings=["canonical.single_team_perspective_only"],
+            spread_error_home=-2.5,
+            spread_error_away=2.5,
+            total_error=-2.5,
+            home_covered=False,
+            away_covered=True,
+            went_over=False,
+            went_under=True,
+        ),
+        CanonicalGameMetricRecord(
+            canonical_game_id=3,
+            season_label="2024-2025",
+            game_date=date(2024, 11, 4),
+            home_team_code="LAL",
+            away_team_code="MIA",
+            home_score=112,
+            away_score=106,
+            final_home_margin=6,
+            final_total_points=218,
+            total_line=214.5,
+            home_spread_line=-3.5,
+            away_spread_line=3.5,
+            reconciliation_status="PARTIAL_SINGLE_ROW",
+            source_row_indexes=[3],
+            warnings=["canonical.single_team_perspective_only"],
+            spread_error_home=2.5,
+            spread_error_away=-2.5,
+            total_error=3.5,
+            home_covered=True,
+            away_covered=False,
+            went_over=True,
+            went_under=False,
+        ),
+    ]
+
+    snapshots = build_feature_snapshots(canonical_games, feature_version_id=1)
+    dataset_rows = build_feature_dataset_rows(
+        snapshots=snapshots,
+        canonical_games=canonical_games,
+        team_code="LAL",
+    )
+    pattern_catalog = build_feature_pattern_catalog(
+        dataset_rows,
+        target_task="spread_error_regression",
+        dimensions=("venue", "days_rest_bucket"),
+        min_sample_size=1,
+        limit=10,
+    )
+
+    assert pattern_catalog["task"]["target_column"] == "spread_error_actual"
+    assert pattern_catalog["dimensions"] == ["venue", "days_rest_bucket"]
+    assert pattern_catalog["pattern_count"] >= 2
+    first_pattern = pattern_catalog["patterns"][0]
+    assert "pattern_key" in first_pattern
+    assert "comparable_lookup" in first_pattern
+    assert "conditions" in first_pattern
+    assert "sample_size" in first_pattern
+    assert "target_mean" in first_pattern
+    assert set(first_pattern["conditions"]) == {"venue", "days_rest_bucket"}
+
+
+def test_build_feature_comparable_cases_uses_anchor_row_conditions() -> None:
+    canonical_games = [
+        CanonicalGameMetricRecord(
+            canonical_game_id=1,
+            season_label="2024-2025",
+            game_date=date(2024, 11, 1),
+            home_team_code="LAL",
+            away_team_code="BOS",
+            home_score=110,
+            away_score=100,
+            final_home_margin=10,
+            final_total_points=210,
+            total_line=205.5,
+            home_spread_line=-4.5,
+            away_spread_line=4.5,
+            reconciliation_status="PARTIAL_SINGLE_ROW",
+            source_row_indexes=[1],
+            warnings=["canonical.single_team_perspective_only"],
+            spread_error_home=5.5,
+            spread_error_away=-5.5,
+            total_error=4.5,
+            home_covered=True,
+            away_covered=False,
+            went_over=True,
+            went_under=False,
+        ),
+        CanonicalGameMetricRecord(
+            canonical_game_id=2,
+            season_label="2024-2025",
+            game_date=date(2024, 11, 3),
+            home_team_code="NYK",
+            away_team_code="LAL",
+            home_score=101,
+            away_score=105,
+            final_home_margin=-4,
+            final_total_points=206,
+            total_line=208.5,
+            home_spread_line=1.5,
+            away_spread_line=-1.5,
+            reconciliation_status="PARTIAL_SINGLE_ROW",
+            source_row_indexes=[2],
+            warnings=["canonical.single_team_perspective_only"],
+            spread_error_home=-2.5,
+            spread_error_away=2.5,
+            total_error=-2.5,
+            home_covered=False,
+            away_covered=True,
+            went_over=False,
+            went_under=True,
+        ),
+        CanonicalGameMetricRecord(
+            canonical_game_id=3,
+            season_label="2024-2025",
+            game_date=date(2024, 11, 5),
+            home_team_code="LAL",
+            away_team_code="MIA",
+            home_score=112,
+            away_score=106,
+            final_home_margin=6,
+            final_total_points=218,
+            total_line=214.5,
+            home_spread_line=-3.5,
+            away_spread_line=3.5,
+            reconciliation_status="PARTIAL_SINGLE_ROW",
+            source_row_indexes=[3],
+            warnings=["canonical.single_team_perspective_only"],
+            spread_error_home=2.5,
+            spread_error_away=-2.5,
+            total_error=3.5,
+            home_covered=True,
+            away_covered=False,
+            went_over=True,
+            went_under=False,
+        ),
+    ]
+
+    snapshots = build_feature_snapshots(canonical_games, feature_version_id=1)
+    dataset_rows = build_feature_dataset_rows(
+        snapshots=snapshots,
+        canonical_games=canonical_games,
+        team_code="LAL",
+    )
+    comparables = build_feature_comparable_cases(
+        dataset_rows,
+        target_task="spread_error_regression",
+        dimensions=("venue", "days_rest_bucket"),
+        canonical_game_id=3,
+        team_code="LAL",
+        limit=10,
+    )
+
+    assert comparables["task"]["target_column"] == "spread_error_actual"
+    assert comparables["anchor_case"]["canonical_game_id"] == 3
+    assert comparables["anchor_case"]["matched_conditions"] == {
+        "venue": "home",
+        "days_rest_bucket": "2_days",
+    }
+    assert comparables["pattern_key"] == "venue=home|days_rest_bucket=2_days"
+    assert comparables["condition_values"] == ["home", "2_days"]
+    assert comparables["comparable_count"] == 0
+    assert comparables["comparables"] == []
+
+
+def test_build_feature_comparable_cases_accepts_pattern_key() -> None:
+    canonical_games = [
+        CanonicalGameMetricRecord(
+            canonical_game_id=1,
+            season_label="2024-2025",
+            game_date=date(2024, 11, 1),
+            home_team_code="LAL",
+            away_team_code="BOS",
+            home_score=110,
+            away_score=100,
+            final_home_margin=10,
+            final_total_points=210,
+            total_line=205.5,
+            home_spread_line=-4.5,
+            away_spread_line=4.5,
+            reconciliation_status="PARTIAL_SINGLE_ROW",
+            source_row_indexes=[1],
+            warnings=["canonical.single_team_perspective_only"],
+            spread_error_home=5.5,
+            spread_error_away=-5.5,
+            total_error=4.5,
+            home_covered=True,
+            away_covered=False,
+            went_over=True,
+            went_under=False,
+        ),
+        CanonicalGameMetricRecord(
+            canonical_game_id=2,
+            season_label="2024-2025",
+            game_date=date(2024, 11, 3),
+            home_team_code="NYK",
+            away_team_code="LAL",
+            home_score=101,
+            away_score=105,
+            final_home_margin=-4,
+            final_total_points=206,
+            total_line=208.5,
+            home_spread_line=1.5,
+            away_spread_line=-1.5,
+            reconciliation_status="PARTIAL_SINGLE_ROW",
+            source_row_indexes=[2],
+            warnings=["canonical.single_team_perspective_only"],
+            spread_error_home=-2.5,
+            spread_error_away=2.5,
+            total_error=-2.5,
+            home_covered=False,
+            away_covered=True,
+            went_over=False,
+            went_under=True,
+        ),
+        CanonicalGameMetricRecord(
+            canonical_game_id=3,
+            season_label="2024-2025",
+            game_date=date(2024, 11, 5),
+            home_team_code="LAL",
+            away_team_code="MIA",
+            home_score=112,
+            away_score=106,
+            final_home_margin=6,
+            final_total_points=218,
+            total_line=214.5,
+            home_spread_line=-3.5,
+            away_spread_line=3.5,
+            reconciliation_status="PARTIAL_SINGLE_ROW",
+            source_row_indexes=[3],
+            warnings=["canonical.single_team_perspective_only"],
+            spread_error_home=2.5,
+            spread_error_away=-2.5,
+            total_error=3.5,
+            home_covered=True,
+            away_covered=False,
+            went_over=True,
+            went_under=False,
+        ),
+    ]
+
+    snapshots = build_feature_snapshots(canonical_games, feature_version_id=1)
+    dataset_rows = build_feature_dataset_rows(
+        snapshots=snapshots,
+        canonical_games=canonical_games,
+    )
+    comparables = build_feature_comparable_cases(
+        dataset_rows,
+        target_task="spread_error_regression",
+        pattern_key="venue=home|days_rest_bucket=unknown_rest",
+        limit=10,
+    )
+
+    assert comparables["pattern_key"] == "venue=home|days_rest_bucket=unknown_rest"
+    assert comparables["comparable_count"] == 2
+
+
+def test_build_feature_comparable_cases_ranks_anchor_matches_by_similarity() -> None:
+    canonical_games = [
+        CanonicalGameMetricRecord(
+            canonical_game_id=1,
+            season_label="2024-2025",
+            game_date=date(2024, 11, 1),
+            home_team_code="LAL",
+            away_team_code="BOS",
+            home_score=110,
+            away_score=100,
+            final_home_margin=10,
+            final_total_points=210,
+            total_line=205.5,
+            home_spread_line=-4.5,
+            away_spread_line=4.5,
+            reconciliation_status="PARTIAL_SINGLE_ROW",
+            source_row_indexes=[1],
+            warnings=["canonical.single_team_perspective_only"],
+            spread_error_home=5.5,
+            spread_error_away=-5.5,
+            total_error=4.5,
+            home_covered=True,
+            away_covered=False,
+            went_over=True,
+            went_under=False,
+        ),
+        CanonicalGameMetricRecord(
+            canonical_game_id=2,
+            season_label="2024-2025",
+            game_date=date(2024, 11, 3),
+            home_team_code="LAL",
+            away_team_code="CHI",
+            home_score=108,
+            away_score=102,
+            final_home_margin=6,
+            final_total_points=210,
+            total_line=209.5,
+            home_spread_line=-2.5,
+            away_spread_line=2.5,
+            reconciliation_status="PARTIAL_SINGLE_ROW",
+            source_row_indexes=[2],
+            warnings=["canonical.single_team_perspective_only"],
+            spread_error_home=3.5,
+            spread_error_away=-3.5,
+            total_error=0.5,
+            home_covered=True,
+            away_covered=False,
+            went_over=True,
+            went_under=False,
+        ),
+        CanonicalGameMetricRecord(
+            canonical_game_id=3,
+            season_label="2024-2025",
+            game_date=date(2024, 11, 5),
+            home_team_code="LAL",
+            away_team_code="NYK",
+            home_score=112,
+            away_score=106,
+            final_home_margin=6,
+            final_total_points=218,
+            total_line=214.5,
+            home_spread_line=-3.5,
+            away_spread_line=3.5,
+            reconciliation_status="PARTIAL_SINGLE_ROW",
+            source_row_indexes=[3],
+            warnings=["canonical.single_team_perspective_only"],
+            spread_error_home=2.5,
+            spread_error_away=-2.5,
+            total_error=3.5,
+            home_covered=True,
+            away_covered=False,
+            went_over=True,
+            went_under=False,
+        ),
+    ]
+
+    snapshots = build_feature_snapshots(canonical_games, feature_version_id=1)
+    dataset_rows = build_feature_dataset_rows(
+        snapshots=snapshots,
+        canonical_games=canonical_games,
+        team_code="LAL",
+    )
+    comparables = build_feature_comparable_cases(
+        dataset_rows,
+        target_task="spread_error_regression",
+        dimensions=("venue",),
+        canonical_game_id=3,
+        team_code="LAL",
+        limit=10,
+    )
+
+    assert comparables["comparable_summary"]["ranking_mode"] == "anchor_similarity"
+    assert comparables["comparable_count"] == 2
+    assert comparables["comparables"][0]["canonical_game_id"] == 2
+    assert comparables["comparables"][1]["canonical_game_id"] == 1
+    assert comparables["comparables"][0]["similarity_score"] is not None
+    assert (
+        comparables["comparables"][0]["similarity_score"]
+        >= comparables["comparables"][1]["similarity_score"]
+    )
+
+
+def test_build_feature_evidence_bundle_combines_pattern_comparables_and_benchmarks() -> None:
+    canonical_games = [
+        CanonicalGameMetricRecord(
+            canonical_game_id=1,
+            season_label="2024-2025",
+            game_date=date(2024, 11, 1),
+            home_team_code="LAL",
+            away_team_code="BOS",
+            home_score=110,
+            away_score=100,
+            final_home_margin=10,
+            final_total_points=210,
+            total_line=205.5,
+            home_spread_line=-4.5,
+            away_spread_line=4.5,
+            reconciliation_status="PARTIAL_SINGLE_ROW",
+            source_row_indexes=[1],
+            warnings=["canonical.single_team_perspective_only"],
+            spread_error_home=5.5,
+            spread_error_away=-5.5,
+            total_error=4.5,
+            home_covered=True,
+            away_covered=False,
+            went_over=True,
+            went_under=False,
+        ),
+        CanonicalGameMetricRecord(
+            canonical_game_id=2,
+            season_label="2024-2025",
+            game_date=date(2024, 11, 3),
+            home_team_code="NYK",
+            away_team_code="LAL",
+            home_score=101,
+            away_score=105,
+            final_home_margin=-4,
+            final_total_points=206,
+            total_line=208.5,
+            home_spread_line=1.5,
+            away_spread_line=-1.5,
+            reconciliation_status="PARTIAL_SINGLE_ROW",
+            source_row_indexes=[2],
+            warnings=["canonical.single_team_perspective_only"],
+            spread_error_home=-2.5,
+            spread_error_away=2.5,
+            total_error=-2.5,
+            home_covered=False,
+            away_covered=True,
+            went_over=False,
+            went_under=True,
+        ),
+        CanonicalGameMetricRecord(
+            canonical_game_id=3,
+            season_label="2024-2025",
+            game_date=date(2024, 11, 5),
+            home_team_code="LAL",
+            away_team_code="MIA",
+            home_score=112,
+            away_score=106,
+            final_home_margin=6,
+            final_total_points=218,
+            total_line=214.5,
+            home_spread_line=-3.5,
+            away_spread_line=3.5,
+            reconciliation_status="PARTIAL_SINGLE_ROW",
+            source_row_indexes=[3],
+            warnings=["canonical.single_team_perspective_only"],
+            spread_error_home=2.5,
+            spread_error_away=-2.5,
+            total_error=3.5,
+            home_covered=True,
+            away_covered=False,
+            went_over=True,
+            went_under=False,
+        ),
+    ]
+
+    snapshots = build_feature_snapshots(canonical_games, feature_version_id=1)
+    dataset_rows = build_feature_dataset_rows(
+        snapshots=snapshots,
+        canonical_games=canonical_games,
+        team_code="LAL",
+    )
+    evidence_bundle = build_feature_evidence_bundle(
+        dataset_rows,
+        target_task="spread_error_regression",
+        dimensions=("venue", "days_rest_bucket"),
+        canonical_game_id=3,
+        team_code="LAL",
+        comparable_limit=5,
+        min_pattern_sample_size=1,
+        train_ratio=0.5,
+        validation_ratio=0.25,
+    )
+
+    assert evidence_bundle["task"]["target_column"] == "spread_error_actual"
+    assert evidence_bundle["evidence"]["pattern"]["selected_pattern"] is not None
+    assert evidence_bundle["evidence"]["comparables"]["anchor_case"]["canonical_game_id"] == 3
+    assert "benchmark_rankings" in evidence_bundle["evidence"]["benchmark_context"]
+    assert evidence_bundle["evidence"]["summary"]["pattern_key"] is not None
+    assert evidence_bundle["evidence"]["strength"]["rating"] in {
+        "weak",
+        "moderate",
+        "strong",
+    }
+    assert 0.0 <= evidence_bundle["evidence"]["strength"]["overall_score"] <= 1.0
+    assert "pattern_support" in evidence_bundle["evidence"]["strength"]["components"]
+    assert "comparable_support" in evidence_bundle["evidence"]["strength"]["components"]
+    assert "benchmark_support" in evidence_bundle["evidence"]["strength"]["components"]
+    assert evidence_bundle["evidence"]["recommendation"]["status"] in {
+        "monitor_only",
+        "review_manually",
+        "candidate_signal",
+    }
+    assert evidence_bundle["evidence"]["recommendation"]["recommended_action"] in {
+        "monitor_only",
+        "review_manually",
+        "promote_to_model_review",
+    }
+    assert (
+        evidence_bundle["evidence"]["recommendation"]["policy_profile"]["target_task"]
+        == "spread_error_regression"
+    )
+    assert evidence_bundle["evidence"]["recommendation"]["next_steps"]
+
+
+def test_build_feature_evidence_bundle_uses_task_specific_recommendation_policy() -> None:
+    canonical_games = [
+        CanonicalGameMetricRecord(
+            canonical_game_id=1,
+            season_label="2024-2025",
+            game_date=date(2024, 11, 1),
+            home_team_code="LAL",
+            away_team_code="BOS",
+            home_score=110,
+            away_score=100,
+            final_home_margin=10,
+            final_total_points=210,
+            total_line=205.5,
+            home_spread_line=-4.5,
+            away_spread_line=4.5,
+            reconciliation_status="PARTIAL_SINGLE_ROW",
+            source_row_indexes=[1],
+            warnings=["canonical.single_team_perspective_only"],
+            spread_error_home=5.5,
+            spread_error_away=-5.5,
+            total_error=4.5,
+            home_covered=True,
+            away_covered=False,
+            went_over=True,
+            went_under=False,
+        ),
+        CanonicalGameMetricRecord(
+            canonical_game_id=2,
+            season_label="2024-2025",
+            game_date=date(2024, 11, 3),
+            home_team_code="NYK",
+            away_team_code="LAL",
+            home_score=108,
+            away_score=101,
+            final_home_margin=7,
+            final_total_points=209,
+            total_line=211.5,
+            home_spread_line=-1.5,
+            away_spread_line=1.5,
+            reconciliation_status="PARTIAL_SINGLE_ROW",
+            source_row_indexes=[2],
+            warnings=["canonical.single_team_perspective_only"],
+            spread_error_home=5.5,
+            spread_error_away=-5.5,
+            total_error=-2.5,
+            home_covered=False,
+            away_covered=True,
+            went_over=False,
+            went_under=True,
+        ),
+        CanonicalGameMetricRecord(
+            canonical_game_id=3,
+            season_label="2024-2025",
+            game_date=date(2024, 11, 4),
+            home_team_code="LAL",
+            away_team_code="MIA",
+            home_score=112,
+            away_score=106,
+            final_home_margin=6,
+            final_total_points=218,
+            total_line=214.5,
+            home_spread_line=-3.5,
+            away_spread_line=3.5,
+            reconciliation_status="PARTIAL_SINGLE_ROW",
+            source_row_indexes=[3],
+            warnings=["canonical.single_team_perspective_only"],
+            spread_error_home=2.5,
+            spread_error_away=-2.5,
+            total_error=3.5,
+            home_covered=True,
+            away_covered=False,
+            went_over=True,
+            went_under=False,
+        ),
+    ]
+
+    snapshots = build_feature_snapshots(canonical_games, feature_version_id=1)
+    dataset_rows = build_feature_dataset_rows(
+        snapshots=snapshots,
+        canonical_games=canonical_games,
+        team_code="LAL",
+    )
+    evidence_bundle = build_feature_evidence_bundle(
+        dataset_rows,
+        target_task="cover_classification",
+        dimensions=("venue", "days_rest_bucket"),
+        canonical_game_id=3,
+        team_code="LAL",
+        comparable_limit=5,
+        min_pattern_sample_size=1,
+        train_ratio=0.5,
+        validation_ratio=0.25,
+    )
+
+    recommendation = evidence_bundle["evidence"]["recommendation"]
+    assert recommendation["task_type"] == "classification"
+    assert recommendation["policy_profile"]["target_task"] == "cover_classification"
+    assert recommendation["policy_profile"]["policy_name"] == "classification_cover_policy_v1"
+    assert recommendation["policy_profile"]["thresholds"]["review_min_pattern_sample"] == 2
+
+
+def test_materialize_feature_analysis_artifacts_persists_patterns_and_evidence() -> None:
+    repository, _, _ = seed_phase_two_feature_in_memory()
+    materialized = materialize_feature_analysis_artifacts_in_memory(
+        repository,
+        target_task="spread_error_regression",
+        team_code="LAL",
+        season_label="2024-2025",
+        dimensions=("venue", "days_rest_bucket"),
+        min_sample_size=1,
+        canonical_game_id=3,
+        comparable_limit=5,
+        train_ratio=0.5,
+        validation_ratio=0.25,
+    )
+
+    assert materialized["materialized_count"] >= 2
+    assert materialized["artifact_counts"]["pattern_summary"] >= 1
+    assert materialized["artifact_counts"]["evidence_bundle"] == 1
+    catalog = get_feature_analysis_artifact_catalog_in_memory(
+        repository,
+        target_task="spread_error_regression",
+        team_code="LAL",
+        season_label="2024-2025",
+        limit=50,
+    )
+    assert catalog["artifact_count"] >= 2
+    assert any(
+        artifact["artifact_type"] == "pattern_summary"
+        for artifact in catalog["artifacts"]
+    )
+    assert any(
+        artifact["artifact_type"] == "evidence_bundle"
+        for artifact in catalog["artifacts"]
+    )
+
+
+def test_feature_analysis_artifact_history_summarizes_evidence_statuses() -> None:
+    repository, _, _ = seed_phase_two_feature_in_memory()
+    materialize_feature_analysis_artifacts_in_memory(
+        repository,
+        target_task="spread_error_regression",
+        team_code="LAL",
+        season_label="2024-2025",
+        dimensions=("venue", "days_rest_bucket"),
+        min_sample_size=1,
+        canonical_game_id=3,
+        comparable_limit=5,
+        train_ratio=0.5,
+        validation_ratio=0.25,
+    )
+
+    history = get_feature_analysis_artifact_history_in_memory(
+        repository,
+        target_task="spread_error_regression",
+        team_code="LAL",
+        season_label="2024-2025",
+        latest_limit=10,
+    )
+
+    assert history["overview"]["artifact_count"] >= 2
+    assert history["overview"]["artifact_type_counts"]["evidence_bundle"] == 1
+    assert history["overview"]["evidence_status_counts"]["monitor_only"] == 1
+    assert history["daily_buckets"]
+    assert history["latest_evidence_artifacts"][0]["status"] == "monitor_only"
+
+
 def test_split_feature_dataset_rows_keeps_games_together_chronologically() -> None:
     canonical_games = [
         CanonicalGameMetricRecord(
@@ -821,6 +1520,217 @@ def test_build_feature_training_bundle_returns_split_target_summaries() -> None:
         > 0
     )
     assert len(training_bundle["split_previews"]["train"]) == 1
+
+
+def test_build_feature_training_benchmark_scores_naive_regression_baselines() -> None:
+    canonical_games = [
+        CanonicalGameMetricRecord(
+            canonical_game_id=1,
+            season_label="2024-2025",
+            game_date=date(2024, 11, 1),
+            home_team_code="LAL",
+            away_team_code="BOS",
+            home_score=110,
+            away_score=100,
+            final_home_margin=10,
+            final_total_points=210,
+            total_line=205.5,
+            home_spread_line=-4.5,
+            away_spread_line=4.5,
+            reconciliation_status="PARTIAL_SINGLE_ROW",
+            source_row_indexes=[1],
+            warnings=["canonical.single_team_perspective_only"],
+            spread_error_home=5.5,
+            spread_error_away=-5.5,
+            total_error=4.5,
+            home_covered=True,
+            away_covered=False,
+            went_over=True,
+            went_under=False,
+        ),
+        CanonicalGameMetricRecord(
+            canonical_game_id=2,
+            season_label="2024-2025",
+            game_date=date(2024, 11, 3),
+            home_team_code="NYK",
+            away_team_code="LAL",
+            home_score=101,
+            away_score=105,
+            final_home_margin=-4,
+            final_total_points=206,
+            total_line=208.5,
+            home_spread_line=1.5,
+            away_spread_line=-1.5,
+            reconciliation_status="PARTIAL_SINGLE_ROW",
+            source_row_indexes=[2],
+            warnings=["canonical.single_team_perspective_only"],
+            spread_error_home=-2.5,
+            spread_error_away=2.5,
+            total_error=-2.5,
+            home_covered=False,
+            away_covered=True,
+            went_over=False,
+            went_under=True,
+        ),
+        CanonicalGameMetricRecord(
+            canonical_game_id=3,
+            season_label="2024-2025",
+            game_date=date(2024, 11, 4),
+            home_team_code="LAL",
+            away_team_code="MIA",
+            home_score=112,
+            away_score=106,
+            final_home_margin=6,
+            final_total_points=218,
+            total_line=214.5,
+            home_spread_line=-3.5,
+            away_spread_line=3.5,
+            reconciliation_status="PARTIAL_SINGLE_ROW",
+            source_row_indexes=[3],
+            warnings=["canonical.single_team_perspective_only"],
+            spread_error_home=2.5,
+            spread_error_away=-2.5,
+            total_error=3.5,
+            home_covered=True,
+            away_covered=False,
+            went_over=True,
+            went_under=False,
+        ),
+    ]
+
+    snapshots = build_feature_snapshots(canonical_games, feature_version_id=1)
+    dataset_rows = build_feature_dataset_rows(
+        snapshots=snapshots,
+        canonical_games=canonical_games,
+        team_code="LAL",
+    )
+    benchmark = build_feature_training_benchmark(
+        dataset_rows,
+        target_task="spread_error_regression",
+        train_ratio=0.5,
+        validation_ratio=0.25,
+    )
+
+    assert benchmark["task"]["target_column"] == "spread_error_actual"
+    assert benchmark["benchmark_summary"]["train"]["row_count"] == 1
+    assert (
+        benchmark["benchmark_summary"]["validation"]["benchmarks"]["train_mean_baseline"][
+            "prediction_count"
+        ]
+        == 1
+    )
+    assert (
+        benchmark["benchmark_summary"]["test"]["benchmarks"]["rolling_3_feature_baseline"][
+            "prediction_count"
+        ]
+        == 1
+    )
+    assert benchmark["benchmark_rankings"][0]["primary_metric"] == "mae"
+
+
+def test_build_feature_training_benchmark_scores_classification_rate_baselines() -> None:
+    canonical_games = [
+        CanonicalGameMetricRecord(
+            canonical_game_id=1,
+            season_label="2024-2025",
+            game_date=date(2024, 11, 1),
+            home_team_code="LAL",
+            away_team_code="BOS",
+            home_score=110,
+            away_score=100,
+            final_home_margin=10,
+            final_total_points=210,
+            total_line=205.5,
+            home_spread_line=-4.5,
+            away_spread_line=4.5,
+            reconciliation_status="PARTIAL_SINGLE_ROW",
+            source_row_indexes=[1],
+            warnings=["canonical.single_team_perspective_only"],
+            spread_error_home=5.5,
+            spread_error_away=-5.5,
+            total_error=4.5,
+            home_covered=True,
+            away_covered=False,
+            went_over=True,
+            went_under=False,
+        ),
+        CanonicalGameMetricRecord(
+            canonical_game_id=2,
+            season_label="2024-2025",
+            game_date=date(2024, 11, 3),
+            home_team_code="NYK",
+            away_team_code="LAL",
+            home_score=101,
+            away_score=105,
+            final_home_margin=-4,
+            final_total_points=206,
+            total_line=208.5,
+            home_spread_line=1.5,
+            away_spread_line=-1.5,
+            reconciliation_status="PARTIAL_SINGLE_ROW",
+            source_row_indexes=[2],
+            warnings=["canonical.single_team_perspective_only"],
+            spread_error_home=-2.5,
+            spread_error_away=2.5,
+            total_error=-2.5,
+            home_covered=False,
+            away_covered=True,
+            went_over=False,
+            went_under=True,
+        ),
+        CanonicalGameMetricRecord(
+            canonical_game_id=3,
+            season_label="2024-2025",
+            game_date=date(2024, 11, 4),
+            home_team_code="LAL",
+            away_team_code="MIA",
+            home_score=112,
+            away_score=106,
+            final_home_margin=6,
+            final_total_points=218,
+            total_line=214.5,
+            home_spread_line=-3.5,
+            away_spread_line=3.5,
+            reconciliation_status="PARTIAL_SINGLE_ROW",
+            source_row_indexes=[3],
+            warnings=["canonical.single_team_perspective_only"],
+            spread_error_home=2.5,
+            spread_error_away=-2.5,
+            total_error=3.5,
+            home_covered=True,
+            away_covered=False,
+            went_over=True,
+            went_under=False,
+        ),
+    ]
+
+    snapshots = build_feature_snapshots(canonical_games, feature_version_id=1)
+    dataset_rows = build_feature_dataset_rows(
+        snapshots=snapshots,
+        canonical_games=canonical_games,
+        team_code="LAL",
+    )
+    benchmark = build_feature_training_benchmark(
+        dataset_rows,
+        target_task="cover_classification",
+        train_ratio=0.5,
+        validation_ratio=0.25,
+    )
+
+    assert benchmark["task"]["task_type"] == "classification"
+    assert benchmark["benchmark_rankings"][0]["primary_metric"] == "brier_score"
+    assert (
+        benchmark["benchmark_summary"]["validation"]["benchmarks"]["train_rate_baseline"][
+            "accuracy"
+        ]
+        == 1.0
+    )
+    assert (
+        benchmark["benchmark_summary"]["test"]["benchmarks"]["rolling_3_rate_baseline"][
+            "prediction_count"
+        ]
+        == 1
+    )
 
 
 def test_profile_feature_training_rows_returns_feature_manifest() -> None:

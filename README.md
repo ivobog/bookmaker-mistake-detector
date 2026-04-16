@@ -1,6 +1,6 @@
 # Bookmaker Mistake Detector
 
-Phase 0 and Phase 1 backend MVP delivery for the Bookmaker Mistake Detector.
+Phase 0, Phase 1, and the Phase 2 backend analytical core are complete for the Bookmaker Mistake Detector.
 
 ## Stack
 - `backend/`: FastAPI API service
@@ -38,11 +38,19 @@ Compare the latest labeled validation runs at `http://localhost:8000/api/v1/admi
 23. Inspect the aggregated Phase 2 feature summary for one team at `http://localhost:8000/api/v1/admin/features/summary?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025`.
 24. Export flattened Phase 2 feature rows for one team at `http://localhost:8000/api/v1/admin/features/dataset?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025`.
 25. Profile flattened Phase 2 feature rows at `http://localhost:8000/api/v1/admin/features/dataset/profile?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025`.
-26. Build chronological train/validation/test splits for flattened Phase 2 rows at `http://localhost:8000/api/v1/admin/features/dataset/splits?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025&train_ratio=0.5&validation_ratio=0.25`.
-27. Project a task-ready training view for one target at `http://localhost:8000/api/v1/admin/features/dataset/training-view?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025&target_task=spread_error_regression`.
-28. Build a split-aware training bundle for one target at `http://localhost:8000/api/v1/admin/features/dataset/training-bundle?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25`.
-29. Inspect the training manifest for one target at `http://localhost:8000/api/v1/admin/features/dataset/training-manifest?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025&target_task=spread_error_regression`.
-30. Compare training readiness across all supported targets at `http://localhost:8000/api/v1/admin/features/dataset/training-task-matrix?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025&train_ratio=0.5&validation_ratio=0.25`.
+26. Explore grouped Phase 2 historical patterns at `http://localhost:8000/api/v1/admin/features/patterns?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025&target_task=spread_error_regression&dimensions=venue,days_rest_bucket&min_sample_size=1`.
+27. Pull comparable historical cases for one anchor game at `http://localhost:8000/api/v1/admin/features/comparables?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025&target_task=spread_error_regression&dimensions=venue,days_rest_bucket&canonical_game_id=3`.
+28. Drill down from a pattern directly with `pattern_key` at `http://localhost:8000/api/v1/admin/features/comparables?repository_mode=in_memory&seed_demo=true&season_label=2024-2025&target_task=spread_error_regression&pattern_key=venue=home|days_rest_bucket=unknown_rest`.
+29. Build a unified evidence payload for one anchor case at `http://localhost:8000/api/v1/admin/features/evidence?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025&target_task=spread_error_regression&canonical_game_id=3&dimensions=venue,days_rest_bucket&comparable_limit=5&min_pattern_sample_size=1&train_ratio=0.5&validation_ratio=0.25`. The response now includes `evidence.strength` with an overall score, rating, component scores, and warnings, plus `evidence.recommendation` with analyst-facing states like `monitor_only`, `review_manually`, or `candidate_signal`. Recommendation thresholds are task-aware and exposed under `evidence.recommendation.policy_profile`.
+30. Materialize persisted Phase 2 analysis artifacts at `http://localhost:8000/api/v1/admin/features/analysis/materialize?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025&target_task=spread_error_regression&canonical_game_id=3&dimensions=venue,days_rest_bucket&min_sample_size=1&comparable_limit=5&train_ratio=0.5&validation_ratio=0.25` using `POST`.
+31. List persisted Phase 2 analysis artifacts at `http://localhost:8000/api/v1/admin/features/analysis/artifacts?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025&target_task=spread_error_regression&canonical_game_id=3&dimensions=venue,days_rest_bucket&min_sample_size=1&comparable_limit=5&train_ratio=0.5&validation_ratio=0.25`.
+32. Review persisted Phase 2 artifact history at `http://localhost:8000/api/v1/admin/features/analysis/history?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025&target_task=spread_error_regression&canonical_game_id=3&dimensions=venue,days_rest_bucket&min_sample_size=1&comparable_limit=5&train_ratio=0.5&validation_ratio=0.25`.
+30. Build chronological train/validation/test splits for flattened Phase 2 rows at `http://localhost:8000/api/v1/admin/features/dataset/splits?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025&train_ratio=0.5&validation_ratio=0.25`.
+31. Project a task-ready training view for one target at `http://localhost:8000/api/v1/admin/features/dataset/training-view?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025&target_task=spread_error_regression`.
+32. Build a split-aware training bundle for one target at `http://localhost:8000/api/v1/admin/features/dataset/training-bundle?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25`.
+33. Inspect the training manifest for one target at `http://localhost:8000/api/v1/admin/features/dataset/training-manifest?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025&target_task=spread_error_regression`.
+34. Score naive baselines for one target at `http://localhost:8000/api/v1/admin/features/dataset/training-benchmark?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25`.
+35. Compare training readiness across all supported targets at `http://localhost:8000/api/v1/admin/features/dataset/training-task-matrix?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025&train_ratio=0.5&validation_ratio=0.25`.
 
 ## Phase 0 Outcome
 This scaffold gives us:
@@ -54,7 +62,18 @@ This scaffold gives us:
 ## Phase Status
 Phase 0 is complete.
 Phase 1 is complete for the backend MVP data spine.
-Phase 2 is in progress with baseline feature generation, richer analytical fields, and a feature snapshot query API.
+Phase 2 is complete for the backend analytical core.
+
+## Phase 2 Outcome
+The repo now includes:
+- versioned feature snapshots and time-safe rolling team/matchup feature generation
+- flattened feature datasets, dataset profiles, and chronological train/validation/test splits
+- target-specific training views, manifests, bundles, task matrices, and naive benchmark scoring
+- grouped pattern discovery with drill-down pattern keys
+- comparable historical case retrieval with ranking
+- unified evidence bundles with strength scoring and task-aware recommendation policies
+- persisted Phase 2 analysis artifacts for pattern summaries and evidence bundles
+- artifact catalog and artifact history rollups for persisted analytical outputs
 
 ## Phase 1 Outcome
 The repo now includes:
@@ -88,4 +107,4 @@ The repo now includes:
 - a worker entry point that can execute the same fixture-backed ingestion flow in `in_memory` or `postgres` mode
 
 ## Next Phase
-Start Phase 2 by building feature versioning, time-safe feature generation, and the first analytical APIs on top of the canonical game spine.
+Start Phase 3 by building model training, model artifact/version management, future-game scoring, and explainable opportunity generation on top of the completed analytical core.

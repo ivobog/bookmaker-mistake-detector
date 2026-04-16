@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timezone
-from statistics import mean, pstdev
+from statistics import mean, median, pstdev
 from typing import Any
 
 from bookmaker_detector_api.repositories import InMemoryIngestionRepository
@@ -52,6 +52,96 @@ FEATURE_TRAINING_TASKS = {
         "target_column": "went_over_actual",
     },
 }
+FEATURE_EVIDENCE_RECOMMENDATION_POLICIES = {
+    "point_margin_regression": {
+        "policy_name": "regression_margin_policy_v1",
+        "candidate_min_overall_score": 0.72,
+        "review_min_overall_score": 0.48,
+        "candidate_min_pattern_sample": 5,
+        "review_min_pattern_sample": 3,
+        "candidate_min_comparables": 3,
+        "review_min_comparables": 1,
+        "candidate_min_benchmark_stability": 0.65,
+    },
+    "spread_error_regression": {
+        "policy_name": "regression_error_policy_v1",
+        "candidate_min_overall_score": 0.7,
+        "review_min_overall_score": 0.45,
+        "candidate_min_pattern_sample": 4,
+        "review_min_pattern_sample": 3,
+        "candidate_min_comparables": 2,
+        "review_min_comparables": 1,
+        "candidate_min_benchmark_stability": 0.6,
+    },
+    "total_error_regression": {
+        "policy_name": "regression_error_policy_v1",
+        "candidate_min_overall_score": 0.7,
+        "review_min_overall_score": 0.45,
+        "candidate_min_pattern_sample": 4,
+        "review_min_pattern_sample": 3,
+        "candidate_min_comparables": 2,
+        "review_min_comparables": 1,
+        "candidate_min_benchmark_stability": 0.6,
+    },
+    "total_points_regression": {
+        "policy_name": "regression_totals_policy_v1",
+        "candidate_min_overall_score": 0.72,
+        "review_min_overall_score": 0.48,
+        "candidate_min_pattern_sample": 5,
+        "review_min_pattern_sample": 3,
+        "candidate_min_comparables": 2,
+        "review_min_comparables": 1,
+        "candidate_min_benchmark_stability": 0.65,
+    },
+    "cover_classification": {
+        "policy_name": "classification_cover_policy_v1",
+        "candidate_min_overall_score": 0.68,
+        "review_min_overall_score": 0.42,
+        "candidate_min_pattern_sample": 4,
+        "review_min_pattern_sample": 2,
+        "candidate_min_comparables": 2,
+        "review_min_comparables": 1,
+        "candidate_min_benchmark_stability": 0.55,
+    },
+    "over_classification": {
+        "policy_name": "classification_total_policy_v1",
+        "candidate_min_overall_score": 0.68,
+        "review_min_overall_score": 0.42,
+        "candidate_min_pattern_sample": 4,
+        "review_min_pattern_sample": 2,
+        "candidate_min_comparables": 2,
+        "review_min_comparables": 1,
+        "candidate_min_benchmark_stability": 0.55,
+    },
+}
+FEATURE_REGRESSION_BASELINE_FEATURES = {
+    "point_margin_regression": {
+        "rolling_3_feature_baseline": "rolling_3_avg_point_margin",
+        "rolling_10_feature_baseline": "rolling_10_avg_point_margin",
+    },
+    "spread_error_regression": {
+        "rolling_3_feature_baseline": "rolling_3_avg_spread_error",
+        "rolling_10_feature_baseline": "rolling_10_avg_spread_error",
+    },
+    "total_error_regression": {
+        "rolling_3_feature_baseline": "rolling_3_avg_total_error",
+        "rolling_10_feature_baseline": "rolling_10_avg_total_error",
+    },
+    "total_points_regression": {
+        "rolling_3_feature_baseline": "rolling_3_avg_total_points",
+        "rolling_10_feature_baseline": "rolling_10_avg_total_points",
+    },
+}
+FEATURE_CLASSIFICATION_BASELINE_FEATURES = {
+    "cover_classification": {
+        "rolling_3_rate_baseline": "rolling_3_cover_rate",
+        "rolling_10_rate_baseline": "rolling_10_cover_rate",
+    },
+    "over_classification": {
+        "rolling_3_rate_baseline": "rolling_3_over_rate",
+        "rolling_10_rate_baseline": "rolling_10_over_rate",
+    },
+}
 FEATURE_DATASET_PROFILE_COLUMNS = (
     "games_played_prior",
     "days_rest",
@@ -67,6 +157,27 @@ FEATURE_DATASET_PROFILE_COLUMNS = (
     "current_cover_streak",
     "recent_point_margin_delta_3_vs_10",
 )
+FEATURE_COMPARABLE_DISTANCE_COLUMNS = (
+    "days_rest",
+    "games_played_prior",
+    "prior_matchup_count",
+    "rolling_3_avg_point_margin",
+    "rolling_3_avg_total_points",
+    "rolling_3_avg_spread_error",
+    "rolling_3_avg_total_error",
+    "point_margin_stddev",
+    "spread_error_stddev",
+)
+FEATURE_PATTERN_DIMENSIONS = {
+    "venue",
+    "days_rest_bucket",
+    "games_played_bucket",
+    "prior_matchup_bucket",
+    "rolling_3_spread_error_bucket",
+    "rolling_3_total_error_bucket",
+    "rolling_3_cover_rate_bucket",
+    "rolling_3_over_rate_bucket",
+}
 
 
 @dataclass(slots=True)
@@ -129,6 +240,21 @@ class FeatureSnapshotRecord:
     away_team_code: str
     feature_payload: dict[str, Any]
     created_at: datetime | None = None
+
+
+@dataclass(slots=True)
+class FeatureAnalysisArtifactRecord:
+    id: int
+    feature_version_id: int
+    artifact_type: str
+    target_task: str
+    team_code: str | None
+    season_label: str | None
+    artifact_key: str
+    dimensions: list[str]
+    payload: dict[str, Any]
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 def materialize_baseline_feature_snapshots_for_in_memory(
@@ -411,6 +537,80 @@ def count_feature_snapshots_in_memory(
             limit=None,
         )
     )
+
+
+def save_feature_analysis_artifacts_in_memory(
+    repository: InMemoryIngestionRepository,
+    artifacts: list[FeatureAnalysisArtifactRecord],
+) -> int:
+    saved_count = 0
+    for artifact in artifacts:
+        existing = next(
+            (
+                entry
+                for entry in repository.feature_analysis_artifacts
+                if entry["feature_version_id"] == artifact.feature_version_id
+                and entry["artifact_type"] == artifact.artifact_type
+                and entry["target_task"] == artifact.target_task
+                and entry.get("team_code") == artifact.team_code
+                and entry.get("season_label") == artifact.season_label
+                and entry["artifact_key"] == artifact.artifact_key
+            ),
+            None,
+        )
+        payload = asdict(artifact)
+        if existing is None:
+            payload["id"] = len(repository.feature_analysis_artifacts) + 1
+            payload["created_at"] = datetime.now(timezone.utc)
+            payload["updated_at"] = payload["created_at"]
+            repository.feature_analysis_artifacts.append(payload)
+        else:
+            payload["id"] = existing["id"]
+            payload["created_at"] = existing.get("created_at")
+            payload["updated_at"] = datetime.now(timezone.utc)
+            existing.update(payload)
+        saved_count += 1
+    return saved_count
+
+
+def list_feature_analysis_artifacts_in_memory(
+    repository: InMemoryIngestionRepository,
+    *,
+    feature_version_id: int | None = None,
+    feature_key: str = DEFAULT_FEATURE_KEY,
+    artifact_type: str | None = None,
+    target_task: str | None = None,
+    team_code: str | None = None,
+    season_label: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+) -> list[FeatureAnalysisArtifactRecord]:
+    if feature_version_id is None:
+        feature_version = get_feature_version_in_memory(repository, feature_key=feature_key)
+        if feature_version is None:
+            return []
+        feature_version_id = feature_version.id
+
+    selected = [
+        FeatureAnalysisArtifactRecord(**entry)
+        for entry in repository.feature_analysis_artifacts
+        if entry["feature_version_id"] == feature_version_id
+        and (artifact_type is None or entry["artifact_type"] == artifact_type)
+        and (target_task is None or entry["target_task"] == target_task)
+        and (team_code is None or entry.get("team_code") == team_code)
+        and (season_label is None or entry.get("season_label") == season_label)
+    ]
+    sorted_selected = sorted(
+        selected,
+        key=lambda entry: (
+            entry.artifact_type,
+            entry.target_task,
+            entry.artifact_key,
+        ),
+    )
+    if limit is None:
+        return sorted_selected[offset:]
+    return sorted_selected[offset : offset + limit]
 
 
 def get_feature_version_in_memory(
@@ -724,6 +924,228 @@ def get_feature_training_task_matrix_in_memory(
     }
 
 
+def get_feature_training_benchmark_in_memory(
+    repository: InMemoryIngestionRepository,
+    *,
+    feature_key: str = DEFAULT_FEATURE_KEY,
+    target_task: str,
+    team_code: str | None = None,
+    season_label: str | None = None,
+    train_ratio: float = 0.7,
+    validation_ratio: float = 0.15,
+    drop_null_targets: bool = True,
+) -> dict[str, Any]:
+    feature_version = get_feature_version_in_memory(
+        repository,
+        feature_key=feature_key,
+    )
+    if feature_version is None:
+        return {
+            "feature_version": None,
+            "row_count": 0,
+            "task": None,
+            "benchmark_summary": {},
+            "benchmark_rankings": [],
+        }
+
+    snapshots = list_feature_snapshots_in_memory(
+        repository,
+        feature_version_id=feature_version.id,
+        team_code=team_code,
+        season_label=season_label,
+        limit=None,
+    )
+    canonical_games = list_canonical_game_metric_records_in_memory(repository)
+    dataset_rows = build_feature_dataset_rows(
+        snapshots=snapshots,
+        canonical_games=canonical_games,
+        team_code=team_code,
+    )
+    benchmark = build_feature_training_benchmark(
+        dataset_rows,
+        target_task=target_task,
+        train_ratio=train_ratio,
+        validation_ratio=validation_ratio,
+        drop_null_targets=drop_null_targets,
+    )
+    return {
+        "feature_version": asdict(feature_version),
+        "row_count": len(dataset_rows),
+        **benchmark,
+    }
+
+
+def get_feature_pattern_catalog_in_memory(
+    repository: InMemoryIngestionRepository,
+    *,
+    feature_key: str = DEFAULT_FEATURE_KEY,
+    target_task: str,
+    team_code: str | None = None,
+    season_label: str | None = None,
+    dimensions: tuple[str, ...] = ("venue", "days_rest_bucket"),
+    min_sample_size: int = 2,
+    limit: int = 50,
+) -> dict[str, Any]:
+    feature_version = get_feature_version_in_memory(
+        repository,
+        feature_key=feature_key,
+    )
+    if feature_version is None:
+        return {
+            "feature_version": None,
+            "row_count": 0,
+            "task": None,
+            "pattern_count": 0,
+            "patterns": [],
+        }
+
+    snapshots = list_feature_snapshots_in_memory(
+        repository,
+        feature_version_id=feature_version.id,
+        team_code=team_code,
+        season_label=season_label,
+        limit=None,
+    )
+    canonical_games = list_canonical_game_metric_records_in_memory(repository)
+    dataset_rows = build_feature_dataset_rows(
+        snapshots=snapshots,
+        canonical_games=canonical_games,
+        team_code=team_code,
+    )
+    pattern_result = build_feature_pattern_catalog(
+        dataset_rows,
+        target_task=target_task,
+        dimensions=dimensions,
+        min_sample_size=min_sample_size,
+        limit=limit,
+    )
+    return {
+        "feature_version": asdict(feature_version),
+        "row_count": len(dataset_rows),
+        **pattern_result,
+    }
+
+
+def get_feature_comparable_cases_in_memory(
+    repository: InMemoryIngestionRepository,
+    *,
+    feature_key: str = DEFAULT_FEATURE_KEY,
+    target_task: str,
+    team_code: str | None = None,
+    season_label: str | None = None,
+    dimensions: tuple[str, ...] = ("venue", "days_rest_bucket"),
+    canonical_game_id: int | None = None,
+    condition_values: tuple[str, ...] | None = None,
+    pattern_key: str | None = None,
+    limit: int = 20,
+) -> dict[str, Any]:
+    feature_version = get_feature_version_in_memory(
+        repository,
+        feature_key=feature_key,
+    )
+    if feature_version is None:
+        return {
+            "feature_version": None,
+            "row_count": 0,
+            "task": None,
+            "anchor_case": None,
+            "comparable_count": 0,
+            "comparables": [],
+        }
+
+    snapshots = list_feature_snapshots_in_memory(
+        repository,
+        feature_version_id=feature_version.id,
+        team_code=team_code,
+        season_label=season_label,
+        limit=None,
+    )
+    canonical_games = list_canonical_game_metric_records_in_memory(repository)
+    dataset_rows = build_feature_dataset_rows(
+        snapshots=snapshots,
+        canonical_games=canonical_games,
+        team_code=team_code,
+    )
+    comparable_result = build_feature_comparable_cases(
+        dataset_rows,
+        target_task=target_task,
+        dimensions=dimensions,
+        canonical_game_id=canonical_game_id,
+        team_code=team_code,
+        condition_values=condition_values,
+        pattern_key=pattern_key,
+        limit=limit,
+    )
+    return {
+        "feature_version": asdict(feature_version),
+        "row_count": len(dataset_rows),
+        **comparable_result,
+    }
+
+
+def get_feature_evidence_bundle_in_memory(
+    repository: InMemoryIngestionRepository,
+    *,
+    feature_key: str = DEFAULT_FEATURE_KEY,
+    target_task: str,
+    team_code: str | None = None,
+    season_label: str | None = None,
+    dimensions: tuple[str, ...] = ("venue", "days_rest_bucket"),
+    canonical_game_id: int | None = None,
+    condition_values: tuple[str, ...] | None = None,
+    pattern_key: str | None = None,
+    comparable_limit: int = 10,
+    min_pattern_sample_size: int = 1,
+    train_ratio: float = 0.7,
+    validation_ratio: float = 0.15,
+    drop_null_targets: bool = True,
+) -> dict[str, Any]:
+    feature_version = get_feature_version_in_memory(
+        repository,
+        feature_key=feature_key,
+    )
+    if feature_version is None:
+        return {
+            "feature_version": None,
+            "row_count": 0,
+            "task": None,
+            "evidence": {},
+        }
+
+    snapshots = list_feature_snapshots_in_memory(
+        repository,
+        feature_version_id=feature_version.id,
+        team_code=team_code,
+        season_label=season_label,
+        limit=None,
+    )
+    canonical_games = list_canonical_game_metric_records_in_memory(repository)
+    dataset_rows = build_feature_dataset_rows(
+        snapshots=snapshots,
+        canonical_games=canonical_games,
+        team_code=team_code,
+    )
+    evidence_bundle = build_feature_evidence_bundle(
+        dataset_rows,
+        target_task=target_task,
+        dimensions=dimensions,
+        canonical_game_id=canonical_game_id,
+        team_code=team_code,
+        condition_values=condition_values,
+        pattern_key=pattern_key,
+        comparable_limit=comparable_limit,
+        min_pattern_sample_size=min_pattern_sample_size,
+        train_ratio=train_ratio,
+        validation_ratio=validation_ratio,
+        drop_null_targets=drop_null_targets,
+    )
+    return {
+        "feature_version": asdict(feature_version),
+        "row_count": len(dataset_rows),
+        **evidence_bundle,
+    }
+
+
 def get_feature_training_bundle_in_memory(
     repository: InMemoryIngestionRepository,
     *,
@@ -854,6 +1276,31 @@ def ensure_feature_tables(connection: Any) -> None:
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 UNIQUE (feature_version_id, canonical_game_id)
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS feature_analysis_artifact (
+                id BIGSERIAL PRIMARY KEY,
+                feature_version_id BIGINT NOT NULL REFERENCES feature_version(id) ON DELETE CASCADE,
+                artifact_type VARCHAR(64) NOT NULL,
+                target_task VARCHAR(64) NOT NULL,
+                scope_team_code VARCHAR(16) NOT NULL DEFAULT '',
+                scope_season_label VARCHAR(32) NOT NULL DEFAULT '',
+                artifact_key VARCHAR(255) NOT NULL,
+                dimensions_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+                payload_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                UNIQUE (
+                    feature_version_id,
+                    artifact_type,
+                    target_task,
+                    scope_team_code,
+                    scope_season_label,
+                    artifact_key
+                )
             )
             """
         )
@@ -1115,6 +1562,130 @@ def count_feature_snapshots_postgres(
         cursor.execute(query, params)
         row = cursor.fetchone()
     return int(row[0]) if row is not None else 0
+
+
+def save_feature_analysis_artifacts_postgres(
+    connection: Any,
+    artifacts: list[FeatureAnalysisArtifactRecord],
+) -> int:
+    if not artifacts:
+        return 0
+    ensure_feature_tables(connection)
+    with connection.cursor() as cursor:
+        for artifact in artifacts:
+            cursor.execute(
+                """
+                INSERT INTO feature_analysis_artifact (
+                    feature_version_id,
+                    artifact_type,
+                    target_task,
+                    scope_team_code,
+                    scope_season_label,
+                    artifact_key,
+                    dimensions_json,
+                    payload_json
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb)
+                ON CONFLICT (
+                    feature_version_id,
+                    artifact_type,
+                    target_task,
+                    scope_team_code,
+                    scope_season_label,
+                    artifact_key
+                )
+                DO UPDATE SET
+                    dimensions_json = EXCLUDED.dimensions_json,
+                    payload_json = EXCLUDED.payload_json,
+                    updated_at = NOW()
+                """,
+                (
+                    artifact.feature_version_id,
+                    artifact.artifact_type,
+                    artifact.target_task,
+                    artifact.team_code or "",
+                    artifact.season_label or "",
+                    artifact.artifact_key,
+                    _json_dumps(artifact.dimensions),
+                    _json_dumps(artifact.payload),
+                ),
+            )
+    connection.commit()
+    return len(artifacts)
+
+
+def list_feature_analysis_artifacts_postgres(
+    connection: Any,
+    *,
+    feature_version_id: int | None = None,
+    feature_key: str = DEFAULT_FEATURE_KEY,
+    artifact_type: str | None = None,
+    target_task: str | None = None,
+    team_code: str | None = None,
+    season_label: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+) -> list[FeatureAnalysisArtifactRecord]:
+    ensure_feature_tables(connection)
+    if feature_version_id is None:
+        feature_version = get_feature_version_postgres(connection, feature_key=feature_key)
+        if feature_version is None:
+            return []
+        feature_version_id = feature_version.id
+
+    query = """
+        SELECT
+            id,
+            feature_version_id,
+            artifact_type,
+            target_task,
+            scope_team_code,
+            scope_season_label,
+            artifact_key,
+            dimensions_json,
+            payload_json,
+            created_at,
+            updated_at
+        FROM feature_analysis_artifact
+        WHERE feature_version_id = %s
+    """
+    params: list[Any] = [feature_version_id]
+    if artifact_type is not None:
+        query += " AND artifact_type = %s"
+        params.append(artifact_type)
+    if target_task is not None:
+        query += " AND target_task = %s"
+        params.append(target_task)
+    if team_code is not None:
+        query += " AND scope_team_code = %s"
+        params.append(team_code)
+    if season_label is not None:
+        query += " AND scope_season_label = %s"
+        params.append(season_label)
+    query += " ORDER BY artifact_type ASC, target_task ASC, artifact_key ASC"
+    if limit is not None:
+        query += " LIMIT %s OFFSET %s"
+        params.extend([limit, offset])
+
+    with connection.cursor() as cursor:
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+    return [
+        FeatureAnalysisArtifactRecord(
+            id=int(row[0]),
+            feature_version_id=int(row[1]),
+            artifact_type=row[2],
+            target_task=row[3],
+            team_code=row[4] or None,
+            season_label=row[5] or None,
+            artifact_key=row[6],
+            dimensions=row[7],
+            payload=row[8],
+            created_at=row[9],
+            updated_at=row[10],
+        )
+        for row in rows
+    ]
 
 
 def get_feature_version_postgres(
@@ -1445,6 +2016,530 @@ def get_feature_training_task_matrix_postgres(
     }
 
 
+def get_feature_training_benchmark_postgres(
+    connection: Any,
+    *,
+    feature_key: str = DEFAULT_FEATURE_KEY,
+    target_task: str,
+    team_code: str | None = None,
+    season_label: str | None = None,
+    train_ratio: float = 0.7,
+    validation_ratio: float = 0.15,
+    drop_null_targets: bool = True,
+) -> dict[str, Any]:
+    feature_version = get_feature_version_postgres(
+        connection,
+        feature_key=feature_key,
+    )
+    if feature_version is None:
+        return {
+            "feature_version": None,
+            "row_count": 0,
+            "task": None,
+            "benchmark_summary": {},
+            "benchmark_rankings": [],
+        }
+
+    snapshots = list_feature_snapshots_postgres(
+        connection,
+        feature_version_id=feature_version.id,
+        team_code=team_code,
+        season_label=season_label,
+        limit=None,
+    )
+    canonical_games = list_canonical_game_metric_records_postgres(connection)
+    dataset_rows = build_feature_dataset_rows(
+        snapshots=snapshots,
+        canonical_games=canonical_games,
+        team_code=team_code,
+    )
+    benchmark = build_feature_training_benchmark(
+        dataset_rows,
+        target_task=target_task,
+        train_ratio=train_ratio,
+        validation_ratio=validation_ratio,
+        drop_null_targets=drop_null_targets,
+    )
+    return {
+        "feature_version": asdict(feature_version),
+        "row_count": len(dataset_rows),
+        **benchmark,
+    }
+
+
+def get_feature_pattern_catalog_postgres(
+    connection: Any,
+    *,
+    feature_key: str = DEFAULT_FEATURE_KEY,
+    target_task: str,
+    team_code: str | None = None,
+    season_label: str | None = None,
+    dimensions: tuple[str, ...] = ("venue", "days_rest_bucket"),
+    min_sample_size: int = 2,
+    limit: int = 50,
+) -> dict[str, Any]:
+    feature_version = get_feature_version_postgres(
+        connection,
+        feature_key=feature_key,
+    )
+    if feature_version is None:
+        return {
+            "feature_version": None,
+            "row_count": 0,
+            "task": None,
+            "pattern_count": 0,
+            "patterns": [],
+        }
+
+    snapshots = list_feature_snapshots_postgres(
+        connection,
+        feature_version_id=feature_version.id,
+        team_code=team_code,
+        season_label=season_label,
+        limit=None,
+    )
+    canonical_games = list_canonical_game_metric_records_postgres(connection)
+    dataset_rows = build_feature_dataset_rows(
+        snapshots=snapshots,
+        canonical_games=canonical_games,
+        team_code=team_code,
+    )
+    pattern_result = build_feature_pattern_catalog(
+        dataset_rows,
+        target_task=target_task,
+        dimensions=dimensions,
+        min_sample_size=min_sample_size,
+        limit=limit,
+    )
+    return {
+        "feature_version": asdict(feature_version),
+        "row_count": len(dataset_rows),
+        **pattern_result,
+    }
+
+
+def get_feature_comparable_cases_postgres(
+    connection: Any,
+    *,
+    feature_key: str = DEFAULT_FEATURE_KEY,
+    target_task: str,
+    team_code: str | None = None,
+    season_label: str | None = None,
+    dimensions: tuple[str, ...] = ("venue", "days_rest_bucket"),
+    canonical_game_id: int | None = None,
+    condition_values: tuple[str, ...] | None = None,
+    pattern_key: str | None = None,
+    limit: int = 20,
+) -> dict[str, Any]:
+    feature_version = get_feature_version_postgres(
+        connection,
+        feature_key=feature_key,
+    )
+    if feature_version is None:
+        return {
+            "feature_version": None,
+            "row_count": 0,
+            "task": None,
+            "anchor_case": None,
+            "comparable_count": 0,
+            "comparables": [],
+        }
+
+    snapshots = list_feature_snapshots_postgres(
+        connection,
+        feature_version_id=feature_version.id,
+        team_code=team_code,
+        season_label=season_label,
+        limit=None,
+    )
+    canonical_games = list_canonical_game_metric_records_postgres(connection)
+    dataset_rows = build_feature_dataset_rows(
+        snapshots=snapshots,
+        canonical_games=canonical_games,
+        team_code=team_code,
+    )
+    comparable_result = build_feature_comparable_cases(
+        dataset_rows,
+        target_task=target_task,
+        dimensions=dimensions,
+        canonical_game_id=canonical_game_id,
+        team_code=team_code,
+        condition_values=condition_values,
+        pattern_key=pattern_key,
+        limit=limit,
+    )
+    return {
+        "feature_version": asdict(feature_version),
+        "row_count": len(dataset_rows),
+        **comparable_result,
+    }
+
+
+def get_feature_evidence_bundle_postgres(
+    connection: Any,
+    *,
+    feature_key: str = DEFAULT_FEATURE_KEY,
+    target_task: str,
+    team_code: str | None = None,
+    season_label: str | None = None,
+    dimensions: tuple[str, ...] = ("venue", "days_rest_bucket"),
+    canonical_game_id: int | None = None,
+    condition_values: tuple[str, ...] | None = None,
+    pattern_key: str | None = None,
+    comparable_limit: int = 10,
+    min_pattern_sample_size: int = 1,
+    train_ratio: float = 0.7,
+    validation_ratio: float = 0.15,
+    drop_null_targets: bool = True,
+) -> dict[str, Any]:
+    feature_version = get_feature_version_postgres(
+        connection,
+        feature_key=feature_key,
+    )
+    if feature_version is None:
+        return {
+            "feature_version": None,
+            "row_count": 0,
+            "task": None,
+            "evidence": {},
+        }
+
+    snapshots = list_feature_snapshots_postgres(
+        connection,
+        feature_version_id=feature_version.id,
+        team_code=team_code,
+        season_label=season_label,
+        limit=None,
+    )
+    canonical_games = list_canonical_game_metric_records_postgres(connection)
+    dataset_rows = build_feature_dataset_rows(
+        snapshots=snapshots,
+        canonical_games=canonical_games,
+        team_code=team_code,
+    )
+    evidence_bundle = build_feature_evidence_bundle(
+        dataset_rows,
+        target_task=target_task,
+        dimensions=dimensions,
+        canonical_game_id=canonical_game_id,
+        team_code=team_code,
+        condition_values=condition_values,
+        pattern_key=pattern_key,
+        comparable_limit=comparable_limit,
+        min_pattern_sample_size=min_pattern_sample_size,
+        train_ratio=train_ratio,
+        validation_ratio=validation_ratio,
+        drop_null_targets=drop_null_targets,
+    )
+    return {
+        "feature_version": asdict(feature_version),
+        "row_count": len(dataset_rows),
+        **evidence_bundle,
+    }
+
+
+def materialize_feature_analysis_artifacts_in_memory(
+    repository: InMemoryIngestionRepository,
+    *,
+    feature_key: str = DEFAULT_FEATURE_KEY,
+    target_task: str,
+    team_code: str | None = None,
+    season_label: str | None = None,
+    dimensions: tuple[str, ...] = ("venue", "days_rest_bucket"),
+    min_sample_size: int = 2,
+    canonical_game_id: int | None = None,
+    condition_values: tuple[str, ...] | None = None,
+    pattern_key: str | None = None,
+    comparable_limit: int = 10,
+    train_ratio: float = 0.7,
+    validation_ratio: float = 0.15,
+    drop_null_targets: bool = True,
+) -> dict[str, Any]:
+    feature_version = get_feature_version_in_memory(repository, feature_key=feature_key)
+    if feature_version is None:
+        return {
+            "feature_version": None,
+            "row_count": 0,
+            "materialized_count": 0,
+            "artifact_counts": {},
+            "artifacts": [],
+        }
+    snapshots = list_feature_snapshots_in_memory(
+        repository,
+        feature_version_id=feature_version.id,
+        team_code=team_code,
+        season_label=season_label,
+        limit=None,
+    )
+    canonical_games = list_canonical_game_metric_records_in_memory(repository)
+    dataset_rows = build_feature_dataset_rows(
+        snapshots=snapshots,
+        canonical_games=canonical_games,
+        team_code=team_code,
+    )
+    return _materialize_feature_analysis_artifacts(
+        dataset_rows=dataset_rows,
+        feature_version=feature_version,
+        save_artifacts=lambda artifacts: save_feature_analysis_artifacts_in_memory(
+            repository,
+            artifacts,
+        ),
+        list_artifacts=lambda: list_feature_analysis_artifacts_in_memory(
+            repository,
+            feature_version_id=feature_version.id,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            limit=200,
+        ),
+        target_task=target_task,
+        team_code=team_code,
+        season_label=season_label,
+        dimensions=dimensions,
+        min_sample_size=min_sample_size,
+        canonical_game_id=canonical_game_id,
+        condition_values=condition_values,
+        pattern_key=pattern_key,
+        comparable_limit=comparable_limit,
+        train_ratio=train_ratio,
+        validation_ratio=validation_ratio,
+        drop_null_targets=drop_null_targets,
+    )
+
+
+def materialize_feature_analysis_artifacts_postgres(
+    connection: Any,
+    *,
+    feature_key: str = DEFAULT_FEATURE_KEY,
+    target_task: str,
+    team_code: str | None = None,
+    season_label: str | None = None,
+    dimensions: tuple[str, ...] = ("venue", "days_rest_bucket"),
+    min_sample_size: int = 2,
+    canonical_game_id: int | None = None,
+    condition_values: tuple[str, ...] | None = None,
+    pattern_key: str | None = None,
+    comparable_limit: int = 10,
+    train_ratio: float = 0.7,
+    validation_ratio: float = 0.15,
+    drop_null_targets: bool = True,
+) -> dict[str, Any]:
+    feature_version = get_feature_version_postgres(connection, feature_key=feature_key)
+    if feature_version is None:
+        return {
+            "feature_version": None,
+            "row_count": 0,
+            "materialized_count": 0,
+            "artifact_counts": {},
+            "artifacts": [],
+        }
+    snapshots = list_feature_snapshots_postgres(
+        connection,
+        feature_version_id=feature_version.id,
+        team_code=team_code,
+        season_label=season_label,
+        limit=None,
+    )
+    canonical_games = list_canonical_game_metric_records_postgres(connection)
+    dataset_rows = build_feature_dataset_rows(
+        snapshots=snapshots,
+        canonical_games=canonical_games,
+        team_code=team_code,
+    )
+    return _materialize_feature_analysis_artifacts(
+        dataset_rows=dataset_rows,
+        feature_version=feature_version,
+        save_artifacts=lambda artifacts: save_feature_analysis_artifacts_postgres(
+            connection,
+            artifacts,
+        ),
+        list_artifacts=lambda: list_feature_analysis_artifacts_postgres(
+            connection,
+            feature_version_id=feature_version.id,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            limit=200,
+        ),
+        target_task=target_task,
+        team_code=team_code,
+        season_label=season_label,
+        dimensions=dimensions,
+        min_sample_size=min_sample_size,
+        canonical_game_id=canonical_game_id,
+        condition_values=condition_values,
+        pattern_key=pattern_key,
+        comparable_limit=comparable_limit,
+        train_ratio=train_ratio,
+        validation_ratio=validation_ratio,
+        drop_null_targets=drop_null_targets,
+    )
+
+
+def get_feature_analysis_artifact_catalog_in_memory(
+    repository: InMemoryIngestionRepository,
+    *,
+    feature_key: str = DEFAULT_FEATURE_KEY,
+    artifact_type: str | None = None,
+    target_task: str | None = None,
+    team_code: str | None = None,
+    season_label: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> dict[str, Any]:
+    feature_version = get_feature_version_in_memory(repository, feature_key=feature_key)
+    if feature_version is None:
+        return {
+            "feature_version": None,
+            "artifact_count": 0,
+            "artifacts": [],
+        }
+    artifacts = list_feature_analysis_artifacts_in_memory(
+        repository,
+        feature_version_id=feature_version.id,
+        artifact_type=artifact_type,
+        target_task=target_task,
+        team_code=team_code,
+        season_label=season_label,
+        limit=limit,
+        offset=offset,
+    )
+    full_count = len(
+        list_feature_analysis_artifacts_in_memory(
+            repository,
+            feature_version_id=feature_version.id,
+            artifact_type=artifact_type,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            limit=None,
+        )
+    )
+    return {
+        "feature_version": asdict(feature_version),
+        "artifact_count": full_count,
+        "artifacts": [asdict(artifact) for artifact in artifacts],
+    }
+
+
+def get_feature_analysis_artifact_catalog_postgres(
+    connection: Any,
+    *,
+    feature_key: str = DEFAULT_FEATURE_KEY,
+    artifact_type: str | None = None,
+    target_task: str | None = None,
+    team_code: str | None = None,
+    season_label: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> dict[str, Any]:
+    feature_version = get_feature_version_postgres(connection, feature_key=feature_key)
+    if feature_version is None:
+        return {
+            "feature_version": None,
+            "artifact_count": 0,
+            "artifacts": [],
+        }
+    artifacts = list_feature_analysis_artifacts_postgres(
+        connection,
+        feature_version_id=feature_version.id,
+        artifact_type=artifact_type,
+        target_task=target_task,
+        team_code=team_code,
+        season_label=season_label,
+        limit=limit,
+        offset=offset,
+    )
+    full_count = len(
+        list_feature_analysis_artifacts_postgres(
+            connection,
+            feature_version_id=feature_version.id,
+            artifact_type=artifact_type,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            limit=None,
+        )
+    )
+    return {
+        "feature_version": asdict(feature_version),
+        "artifact_count": full_count,
+        "artifacts": [asdict(artifact) for artifact in artifacts],
+    }
+
+
+def get_feature_analysis_artifact_history_in_memory(
+    repository: InMemoryIngestionRepository,
+    *,
+    feature_key: str = DEFAULT_FEATURE_KEY,
+    artifact_type: str | None = None,
+    target_task: str | None = None,
+    team_code: str | None = None,
+    season_label: str | None = None,
+    latest_limit: int = 20,
+) -> dict[str, Any]:
+    feature_version = get_feature_version_in_memory(repository, feature_key=feature_key)
+    if feature_version is None:
+        return {
+            "feature_version": None,
+            "overview": {},
+            "daily_buckets": [],
+            "latest_evidence_artifacts": [],
+        }
+    artifacts = list_feature_analysis_artifacts_in_memory(
+        repository,
+        feature_version_id=feature_version.id,
+        artifact_type=artifact_type,
+        target_task=target_task,
+        team_code=team_code,
+        season_label=season_label,
+        limit=None,
+    )
+    return {
+        "feature_version": asdict(feature_version),
+        **_build_feature_analysis_artifact_history_payload(
+            artifacts,
+            latest_limit=latest_limit,
+        ),
+    }
+
+
+def get_feature_analysis_artifact_history_postgres(
+    connection: Any,
+    *,
+    feature_key: str = DEFAULT_FEATURE_KEY,
+    artifact_type: str | None = None,
+    target_task: str | None = None,
+    team_code: str | None = None,
+    season_label: str | None = None,
+    latest_limit: int = 20,
+) -> dict[str, Any]:
+    feature_version = get_feature_version_postgres(connection, feature_key=feature_key)
+    if feature_version is None:
+        return {
+            "feature_version": None,
+            "overview": {},
+            "daily_buckets": [],
+            "latest_evidence_artifacts": [],
+        }
+    artifacts = list_feature_analysis_artifacts_postgres(
+        connection,
+        feature_version_id=feature_version.id,
+        artifact_type=artifact_type,
+        target_task=target_task,
+        team_code=team_code,
+        season_label=season_label,
+        limit=None,
+    )
+    return {
+        "feature_version": asdict(feature_version),
+        **_build_feature_analysis_artifact_history_payload(
+            artifacts,
+            latest_limit=latest_limit,
+        ),
+    }
+
+
 def get_feature_training_bundle_postgres(
     connection: Any,
     *,
@@ -1758,6 +2853,884 @@ def build_feature_training_task_matrix(
             "bundle_summary": training_bundle["bundle_summary"],
         }
     return task_matrix
+
+
+def build_feature_training_benchmark(
+    dataset_rows: list[dict[str, Any]],
+    *,
+    target_task: str,
+    train_ratio: float = 0.7,
+    validation_ratio: float = 0.15,
+    drop_null_targets: bool = True,
+) -> dict[str, Any]:
+    task_config = FEATURE_TRAINING_TASKS.get(target_task)
+    if task_config is None:
+        raise ValueError(f"Unsupported target_task: {target_task}")
+
+    split_rows = _partition_feature_dataset_rows(
+        dataset_rows,
+        train_ratio=train_ratio,
+        validation_ratio=validation_ratio,
+    )
+    split_training_rows = {
+        split_name: build_feature_training_view(
+            rows,
+            target_task=target_task,
+            drop_null_targets=drop_null_targets,
+        )["training_rows"]
+        for split_name, rows in split_rows.items()
+    }
+    train_rows = split_training_rows["train"]
+    train_target_values = [
+        row["target_value"] for row in train_rows if row["target_value"] is not None
+    ]
+    train_target_mean = _mean_or_none(train_target_values)
+    train_positive_rate = _mean_or_none(
+        1.0 if row["target_value"] else 0.0
+        for row in train_rows
+        if row["target_value"] is not None
+    )
+
+    baseline_specs = _get_training_benchmark_specs(
+        target_task=target_task,
+        task_type=task_config["task_type"],
+        train_target_mean=train_target_mean,
+        train_positive_rate=train_positive_rate,
+    )
+    benchmark_summary: dict[str, Any] = {}
+    for split_name, training_rows in split_training_rows.items():
+        benchmark_summary[split_name] = {
+            "row_count": len(training_rows),
+            "benchmarks": {
+                baseline_name: _score_training_baseline(
+                    training_rows,
+                    predictor=predictor,
+                    task_type=task_config["task_type"],
+                )
+                for baseline_name, predictor in baseline_specs.items()
+            },
+        }
+
+    return {
+        "task": {
+            "name": target_task,
+            "task_type": task_config["task_type"],
+            "target_column": task_config["target_column"],
+            "drop_null_targets": drop_null_targets,
+        },
+        "benchmark_summary": benchmark_summary,
+        "benchmark_rankings": _rank_training_benchmarks(
+            benchmark_summary,
+            task_type=task_config["task_type"],
+        ),
+    }
+
+
+def build_feature_evidence_bundle(
+    dataset_rows: list[dict[str, Any]],
+    *,
+    target_task: str,
+    dimensions: tuple[str, ...] = ("venue", "days_rest_bucket"),
+    canonical_game_id: int | None = None,
+    team_code: str | None = None,
+    condition_values: tuple[str, ...] | None = None,
+    pattern_key: str | None = None,
+    comparable_limit: int = 10,
+    min_pattern_sample_size: int = 1,
+    train_ratio: float = 0.7,
+    validation_ratio: float = 0.15,
+    drop_null_targets: bool = True,
+) -> dict[str, Any]:
+    comparable_result = build_feature_comparable_cases(
+        dataset_rows,
+        target_task=target_task,
+        dimensions=dimensions,
+        canonical_game_id=canonical_game_id,
+        team_code=team_code,
+        condition_values=condition_values,
+        pattern_key=pattern_key,
+        limit=comparable_limit,
+    )
+    resolved_dimensions = tuple(comparable_result["dimensions"])
+    resolved_condition_values = tuple(comparable_result["condition_values"])
+    resolved_pattern_key = comparable_result["pattern_key"]
+    pattern_catalog = build_feature_pattern_catalog(
+        dataset_rows,
+        target_task=target_task,
+        dimensions=resolved_dimensions,
+        min_sample_size=min_pattern_sample_size,
+        limit=max(len(dataset_rows), 1),
+    )
+    selected_pattern = next(
+        (
+            pattern
+            for pattern in pattern_catalog["patterns"]
+            if pattern.get("pattern_key") == resolved_pattern_key
+        ),
+        None,
+    )
+    benchmark_result = build_feature_training_benchmark(
+        dataset_rows,
+        target_task=target_task,
+        train_ratio=train_ratio,
+        validation_ratio=validation_ratio,
+        drop_null_targets=drop_null_targets,
+    )
+    evidence_summary = {
+        "pattern_key": resolved_pattern_key,
+        "condition_count": len(resolved_dimensions),
+        "comparable_count": comparable_result["comparable_count"],
+        "top_comparable_similarity_score": (
+            comparable_result["comparables"][0]["similarity_score"]
+            if comparable_result["comparables"]
+            else None
+        ),
+        "pattern_sample_size": (
+            selected_pattern["sample_size"] if selected_pattern is not None else None
+        ),
+        "best_benchmark": (
+            benchmark_result["benchmark_rankings"][0]
+            if benchmark_result["benchmark_rankings"]
+            else None
+        ),
+    }
+    evidence_strength = _build_evidence_strength_summary(
+        task_type=comparable_result["task"]["task_type"],
+        selected_pattern=selected_pattern,
+        comparables=comparable_result["comparables"],
+        benchmark_rankings=benchmark_result["benchmark_rankings"],
+    )
+    evidence_recommendation = _build_evidence_recommendation(
+        target_task=target_task,
+        task_type=comparable_result["task"]["task_type"],
+        evidence_strength=evidence_strength,
+        selected_pattern=selected_pattern,
+        comparables=comparable_result["comparables"],
+        benchmark_rankings=benchmark_result["benchmark_rankings"],
+    )
+    return {
+        "task": comparable_result["task"],
+        "evidence": {
+            "summary": evidence_summary,
+            "strength": evidence_strength,
+            "recommendation": evidence_recommendation,
+            "pattern": {
+                "dimensions": list(resolved_dimensions),
+                "condition_values": list(resolved_condition_values),
+                "selected_pattern": selected_pattern,
+            },
+            "comparables": {
+                "anchor_case": comparable_result["anchor_case"],
+                "pattern_key": comparable_result["pattern_key"],
+                "summary": comparable_result["comparable_summary"],
+                "cases": comparable_result["comparables"],
+            },
+            "benchmark_context": {
+                "task": benchmark_result["task"],
+                "benchmark_rankings": benchmark_result["benchmark_rankings"],
+                "benchmark_summary": benchmark_result["benchmark_summary"],
+            },
+        },
+    }
+
+
+def _materialize_feature_analysis_artifacts(
+    *,
+    dataset_rows: list[dict[str, Any]],
+    feature_version: FeatureVersionRecord,
+    save_artifacts,
+    list_artifacts,
+    target_task: str,
+    team_code: str | None,
+    season_label: str | None,
+    dimensions: tuple[str, ...],
+    min_sample_size: int,
+    canonical_game_id: int | None,
+    condition_values: tuple[str, ...] | None,
+    pattern_key: str | None,
+    comparable_limit: int,
+    train_ratio: float,
+    validation_ratio: float,
+    drop_null_targets: bool,
+) -> dict[str, Any]:
+    pattern_result = build_feature_pattern_catalog(
+        dataset_rows,
+        target_task=target_task,
+        dimensions=dimensions,
+        min_sample_size=min_sample_size,
+        limit=max(len(dataset_rows), 1),
+    )
+    artifacts = [
+        FeatureAnalysisArtifactRecord(
+            id=0,
+            feature_version_id=feature_version.id,
+            artifact_type="pattern_summary",
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            artifact_key=pattern["pattern_key"],
+            dimensions=list(dimensions),
+            payload=pattern,
+        )
+        for pattern in pattern_result["patterns"]
+    ]
+
+    evidence_result = None
+    if (
+        canonical_game_id is not None
+        or condition_values is not None
+        or pattern_key is not None
+    ):
+        evidence_result = build_feature_evidence_bundle(
+            dataset_rows,
+            target_task=target_task,
+            dimensions=dimensions,
+            canonical_game_id=canonical_game_id,
+            team_code=team_code,
+            condition_values=condition_values,
+            pattern_key=pattern_key,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            drop_null_targets=drop_null_targets,
+        )
+        resolved_pattern_key = evidence_result["evidence"]["summary"]["pattern_key"]
+        artifacts.append(
+            FeatureAnalysisArtifactRecord(
+                id=0,
+                feature_version_id=feature_version.id,
+                artifact_type="evidence_bundle",
+                target_task=target_task,
+                team_code=team_code,
+                season_label=season_label,
+                artifact_key=_build_evidence_artifact_key(
+                    canonical_game_id=canonical_game_id,
+                    team_code=team_code,
+                    pattern_key=resolved_pattern_key,
+                ),
+                dimensions=list(dimensions),
+                payload=evidence_result["evidence"],
+            )
+        )
+
+    materialized_count = save_artifacts(artifacts)
+    artifact_counts = {
+        "pattern_summary": len(
+            [artifact for artifact in artifacts if artifact.artifact_type == "pattern_summary"]
+        ),
+        "evidence_bundle": len(
+            [artifact for artifact in artifacts if artifact.artifact_type == "evidence_bundle"]
+        ),
+    }
+    persisted_artifacts = [asdict(artifact) for artifact in list_artifacts()]
+    return {
+        "feature_version": asdict(feature_version),
+        "row_count": len(dataset_rows),
+        "materialized_count": materialized_count,
+        "artifact_counts": artifact_counts,
+        "artifacts": persisted_artifacts,
+        "evidence": evidence_result["evidence"] if evidence_result is not None else None,
+    }
+
+
+def _build_feature_analysis_artifact_history_payload(
+    artifacts: list[FeatureAnalysisArtifactRecord],
+    *,
+    latest_limit: int,
+) -> dict[str, Any]:
+    artifact_type_counts: dict[str, int] = {}
+    evidence_status_counts: dict[str, int] = {}
+    evidence_rating_counts: dict[str, int] = {}
+    daily_buckets: dict[str, dict[str, Any]] = {}
+
+    for artifact in artifacts:
+        artifact_type_counts[artifact.artifact_type] = (
+            artifact_type_counts.get(artifact.artifact_type, 0) + 1
+        )
+        bucket_key = _feature_artifact_bucket_date(artifact)
+        bucket = daily_buckets.setdefault(
+            bucket_key,
+            {
+                "bucket_date": bucket_key,
+                "artifact_count": 0,
+                "artifact_type_counts": {},
+                "evidence_status_counts": {},
+            },
+        )
+        bucket["artifact_count"] = int(bucket["artifact_count"]) + 1
+        bucket["artifact_type_counts"][artifact.artifact_type] = (
+            int(bucket["artifact_type_counts"].get(artifact.artifact_type, 0)) + 1
+        )
+
+        if artifact.artifact_type != "evidence_bundle":
+            continue
+        recommendation = artifact.payload.get("recommendation", {})
+        strength = artifact.payload.get("strength", {})
+        status = recommendation.get("status")
+        rating = strength.get("rating")
+        if status is not None:
+            evidence_status_counts[status] = evidence_status_counts.get(status, 0) + 1
+            bucket["evidence_status_counts"][status] = (
+                int(bucket["evidence_status_counts"].get(status, 0)) + 1
+            )
+        if rating is not None:
+            evidence_rating_counts[rating] = evidence_rating_counts.get(rating, 0) + 1
+
+    latest_evidence_artifacts = sorted(
+        [artifact for artifact in artifacts if artifact.artifact_type == "evidence_bundle"],
+        key=lambda artifact: (
+            artifact.updated_at or artifact.created_at or datetime.min.replace(tzinfo=timezone.utc),
+            artifact.artifact_key,
+        ),
+        reverse=True,
+    )[:latest_limit]
+
+    return {
+        "overview": {
+            "artifact_count": len(artifacts),
+            "artifact_type_counts": artifact_type_counts,
+            "evidence_status_counts": evidence_status_counts,
+            "evidence_strength_rating_counts": evidence_rating_counts,
+        },
+        "daily_buckets": sorted(
+            daily_buckets.values(),
+            key=lambda bucket: bucket["bucket_date"],
+        ),
+        "latest_evidence_artifacts": [
+            {
+                "artifact_key": artifact.artifact_key,
+                "target_task": artifact.target_task,
+                "team_code": artifact.team_code,
+                "season_label": artifact.season_label,
+                "status": artifact.payload.get("recommendation", {}).get("status"),
+                "rating": artifact.payload.get("strength", {}).get("rating"),
+                "overall_score": artifact.payload.get("strength", {}).get("overall_score"),
+                "updated_at": artifact.updated_at,
+            }
+            for artifact in latest_evidence_artifacts
+        ],
+    }
+
+
+def _feature_artifact_bucket_date(artifact: FeatureAnalysisArtifactRecord) -> str:
+    reference = artifact.updated_at or artifact.created_at
+    if reference is None:
+        return "unknown"
+    return reference.date().isoformat()
+
+
+def _build_evidence_artifact_key(
+    *,
+    canonical_game_id: int | None,
+    team_code: str | None,
+    pattern_key: str,
+) -> str:
+    key_parts = [f"pattern={pattern_key}"]
+    if canonical_game_id is not None:
+        key_parts.insert(0, f"canonical_game_id={canonical_game_id}")
+    if team_code is not None:
+        key_parts.insert(1 if canonical_game_id is not None else 0, f"team_code={team_code}")
+    return "|".join(key_parts)
+
+
+def _build_evidence_strength_summary(
+    *,
+    task_type: str,
+    selected_pattern: dict[str, Any] | None,
+    comparables: list[dict[str, Any]],
+    benchmark_rankings: list[dict[str, Any]],
+) -> dict[str, Any]:
+    pattern_component = _build_pattern_strength_component(
+        task_type=task_type,
+        selected_pattern=selected_pattern,
+    )
+    comparable_component = _build_comparable_strength_component(comparables)
+    benchmark_component = _build_benchmark_strength_component(
+        benchmark_rankings=benchmark_rankings,
+    )
+    overall_score = round(
+        (
+            pattern_component["score"]
+            + comparable_component["score"]
+            + benchmark_component["score"]
+        )
+        / 3,
+        4,
+    )
+    warnings = []
+    if selected_pattern is None:
+        warnings.append("pattern_not_found")
+    elif int(selected_pattern.get("sample_size", 0)) < 3:
+        warnings.append("low_pattern_sample")
+    if len(comparables) == 0:
+        warnings.append("no_comparables_found")
+    elif len(comparables) < 3:
+        warnings.append("thin_comparable_set")
+    if not benchmark_rankings:
+        warnings.append("benchmark_context_unavailable")
+    elif benchmark_component["stability_score"] < 0.5:
+        warnings.append("benchmark_instability")
+    return {
+        "overall_score": overall_score,
+        "rating": _evidence_strength_rating(overall_score),
+        "components": {
+            "pattern_support": pattern_component,
+            "comparable_support": comparable_component,
+            "benchmark_support": benchmark_component,
+        },
+        "warnings": warnings,
+    }
+
+
+def _build_evidence_recommendation(
+    *,
+    target_task: str,
+    task_type: str,
+    evidence_strength: dict[str, Any],
+    selected_pattern: dict[str, Any] | None,
+    comparables: list[dict[str, Any]],
+    benchmark_rankings: list[dict[str, Any]],
+) -> dict[str, Any]:
+    policy = FEATURE_EVIDENCE_RECOMMENDATION_POLICIES.get(
+        target_task,
+        FEATURE_EVIDENCE_RECOMMENDATION_POLICIES["spread_error_regression"],
+    )
+    overall_score = float(evidence_strength["overall_score"])
+    warnings = list(evidence_strength["warnings"])
+    pattern_sample_size = int(selected_pattern.get("sample_size", 0)) if selected_pattern else 0
+    comparable_count = len(comparables)
+    top_similarity = comparables[0]["similarity_score"] if comparables else None
+    benchmark_support = evidence_strength["components"]["benchmark_support"]
+    benchmark_stability_score = benchmark_support["stability_score"]
+    benchmark_name = (
+        benchmark_rankings[0]["baseline_name"] if benchmark_rankings else None
+    )
+
+    if (
+        overall_score >= policy["candidate_min_overall_score"]
+        and pattern_sample_size >= policy["candidate_min_pattern_sample"]
+        and comparable_count >= policy["candidate_min_comparables"]
+        and benchmark_stability_score >= policy["candidate_min_benchmark_stability"]
+        and "benchmark_instability" not in warnings
+    ):
+        status = "candidate_signal"
+        recommended_action = "promote_to_model_review"
+        headline = "Signal looks strong enough for deeper model review."
+    elif overall_score >= policy["review_min_overall_score"] or (
+        pattern_sample_size >= policy["review_min_pattern_sample"]
+        and comparable_count >= policy["review_min_comparables"]
+    ):
+        status = "review_manually"
+        recommended_action = "review_manually"
+        headline = "Signal has some support, but still needs analyst judgment."
+    else:
+        status = "monitor_only"
+        recommended_action = "monitor_only"
+        headline = "Evidence is still thin, so this should stay in monitoring."
+
+    rationale = []
+    if pattern_sample_size > 0:
+        rationale.append(f"pattern sample size={pattern_sample_size}")
+    if comparable_count > 0:
+        rationale.append(f"comparables found={comparable_count}")
+    if top_similarity is not None:
+        rationale.append(f"top comparable similarity={top_similarity}")
+    if benchmark_name is not None:
+        rationale.append(
+            f"best benchmark={benchmark_name} (stability={benchmark_stability_score})"
+        )
+
+    next_steps = {
+        "candidate_signal": [
+            "compare against stronger benchmark or first simple model",
+            "review top comparables for face validity",
+            "track whether the signal persists on future windows",
+        ],
+        "review_manually": [
+            "inspect the ranked comparables",
+            "check whether the pattern holds across nearby buckets",
+            "wait for more history before escalating automatically",
+        ],
+        "monitor_only": [
+            "collect more historical examples for this bucket",
+            "watch for additional comparable cases",
+            "recheck after the next ingestion run",
+        ],
+    }[status]
+
+    return {
+        "status": status,
+        "recommended_action": recommended_action,
+        "headline": headline,
+        "task_type": task_type,
+        "policy_profile": {
+            "target_task": target_task,
+            "policy_name": policy["policy_name"],
+            "thresholds": {
+                "candidate_min_overall_score": policy["candidate_min_overall_score"],
+                "review_min_overall_score": policy["review_min_overall_score"],
+                "candidate_min_pattern_sample": policy["candidate_min_pattern_sample"],
+                "review_min_pattern_sample": policy["review_min_pattern_sample"],
+                "candidate_min_comparables": policy["candidate_min_comparables"],
+                "review_min_comparables": policy["review_min_comparables"],
+                "candidate_min_benchmark_stability": policy[
+                    "candidate_min_benchmark_stability"
+                ],
+            },
+        },
+        "rationale": rationale,
+        "blocking_factors": warnings,
+        "snapshot": {
+            "overall_score": overall_score,
+            "pattern_sample_size": pattern_sample_size,
+            "comparable_count": comparable_count,
+            "top_comparable_similarity_score": top_similarity,
+            "best_benchmark_name": benchmark_name,
+            "benchmark_stability_score": benchmark_stability_score,
+        },
+        "next_steps": next_steps,
+    }
+
+
+def _build_pattern_strength_component(
+    *,
+    task_type: str,
+    selected_pattern: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if selected_pattern is None:
+        return {
+            "score": 0.0,
+            "sample_size": 0,
+            "signal_strength": None,
+            "signal_score": 0.0,
+            "sample_score": 0.0,
+        }
+
+    sample_size = int(selected_pattern.get("sample_size", 0))
+    signal_strength = selected_pattern.get("signal_strength")
+    sample_score = _bounded_ratio(sample_size, 8)
+    signal_score = _pattern_signal_score(
+        task_type=task_type,
+        signal_strength=signal_strength,
+        target_stddev=selected_pattern.get("target_stddev"),
+    )
+    return {
+        "score": round((sample_score * 0.6) + (signal_score * 0.4), 4),
+        "sample_size": sample_size,
+        "signal_strength": signal_strength,
+        "sample_score": sample_score,
+        "signal_score": signal_score,
+    }
+
+
+def _build_comparable_strength_component(
+    comparables: list[dict[str, Any]],
+) -> dict[str, Any]:
+    comparable_count = len(comparables)
+    similarity_scores = [
+        float(entry["similarity_score"])
+        for entry in comparables
+        if entry.get("similarity_score") is not None
+    ]
+    top_similarity_score = similarity_scores[0] if similarity_scores else None
+    average_similarity_score = _mean_or_none(similarity_scores)
+    count_score = _bounded_ratio(comparable_count, 8)
+    similarity_score = (
+        round(((top_similarity_score or 0.0) + (average_similarity_score or 0.0)) / 2, 4)
+        if similarity_scores
+        else 0.0
+    )
+    return {
+        "score": round((count_score * 0.5) + (similarity_score * 0.5), 4),
+        "comparable_count": comparable_count,
+        "top_similarity_score": top_similarity_score,
+        "average_similarity_score": average_similarity_score,
+        "count_score": count_score,
+        "similarity_score": similarity_score,
+    }
+
+
+def _build_benchmark_strength_component(
+    *,
+    benchmark_rankings: list[dict[str, Any]],
+) -> dict[str, Any]:
+    if not benchmark_rankings:
+        return {
+            "score": 0.0,
+            "baseline_name": None,
+            "primary_metric": None,
+            "validation_primary_metric": None,
+            "test_primary_metric": None,
+            "stability_gap": None,
+            "stability_score": 0.0,
+            "separation_score": 0.0,
+            "coverage_score": 0.0,
+        }
+
+    best_benchmark = benchmark_rankings[0]
+    second_benchmark = benchmark_rankings[1] if len(benchmark_rankings) > 1 else None
+    validation_primary_metric = best_benchmark.get("validation_primary_metric")
+    test_primary_metric = best_benchmark.get("test_primary_metric")
+    stability_gap = _metric_gap(validation_primary_metric, test_primary_metric)
+    stability_score = _metric_stability_score(
+        validation_primary_metric,
+        test_primary_metric,
+    )
+    separation_score = _benchmark_separation_score(best_benchmark, second_benchmark)
+    coverage_score = _bounded_ratio(best_benchmark.get("test_prediction_count", 0), 8)
+    return {
+        "score": round(
+            (stability_score * 0.4) + (separation_score * 0.35) + (coverage_score * 0.25),
+            4,
+        ),
+        "baseline_name": best_benchmark.get("baseline_name"),
+        "primary_metric": best_benchmark.get("primary_metric"),
+        "validation_primary_metric": validation_primary_metric,
+        "test_primary_metric": test_primary_metric,
+        "stability_gap": stability_gap,
+        "stability_score": stability_score,
+        "separation_score": separation_score,
+        "coverage_score": coverage_score,
+    }
+
+
+def _pattern_signal_score(
+    *,
+    task_type: str,
+    signal_strength: Any,
+    target_stddev: Any,
+) -> float:
+    if signal_strength is None:
+        return 0.0
+    if task_type == "classification":
+        return _bounded_ratio(signal_strength, 0.25)
+    if target_stddev not in (None, 0):
+        return _bounded_ratio(abs(float(signal_strength)), float(target_stddev))
+    return _bounded_ratio(abs(float(signal_strength)), 5.0)
+
+
+def _metric_gap(first_value: Any, second_value: Any) -> float | None:
+    if first_value is None or second_value is None:
+        return None
+    return round(abs(float(first_value) - float(second_value)), 4)
+
+
+def _metric_stability_score(first_value: Any, second_value: Any) -> float:
+    if first_value is None or second_value is None:
+        return 0.0
+    gap = abs(float(first_value) - float(second_value))
+    denominator = max(abs(float(first_value)), abs(float(second_value)), 1.0)
+    return round(max(0.0, 1.0 - min(gap / denominator, 1.0)), 4)
+
+
+def _benchmark_separation_score(
+    best_benchmark: dict[str, Any],
+    second_benchmark: dict[str, Any] | None,
+) -> float:
+    if second_benchmark is None:
+        return 0.5
+    best_value = best_benchmark.get("test_primary_metric")
+    second_value = second_benchmark.get("test_primary_metric")
+    if best_value is None or second_value is None:
+        return 0.0
+    gap = float(second_value) - float(best_value)
+    denominator = max(abs(float(second_value)), 1.0)
+    return round(max(0.0, min(gap / denominator, 1.0)), 4)
+
+
+def _evidence_strength_rating(score: float) -> str:
+    if score >= 0.75:
+        return "strong"
+    if score >= 0.45:
+        return "moderate"
+    return "weak"
+
+
+def _bounded_ratio(value: Any, upper_bound: float) -> float:
+    numeric_value = float(value or 0.0)
+    if upper_bound <= 0:
+        return 0.0
+    return round(max(0.0, min(numeric_value / upper_bound, 1.0)), 4)
+
+
+def build_feature_pattern_catalog(
+    dataset_rows: list[dict[str, Any]],
+    *,
+    target_task: str,
+    dimensions: tuple[str, ...] = ("venue", "days_rest_bucket"),
+    min_sample_size: int = 2,
+    limit: int = 50,
+) -> dict[str, Any]:
+    task_config = FEATURE_TRAINING_TASKS.get(target_task)
+    if task_config is None:
+        raise ValueError(f"Unsupported target_task: {target_task}")
+    if not dimensions:
+        raise ValueError("Expected at least one pattern dimension.")
+
+    normalized_dimensions = tuple(dimensions)
+    invalid_dimensions = [
+        dimension
+        for dimension in normalized_dimensions
+        if dimension not in FEATURE_PATTERN_DIMENSIONS
+    ]
+    if invalid_dimensions:
+        raise ValueError(f"Unsupported pattern dimensions: {', '.join(invalid_dimensions)}")
+
+    target_column = task_config["target_column"]
+    rows_with_targets = [
+        row for row in dataset_rows if row.get(target_column) is not None
+    ]
+    grouped_rows: dict[tuple[str, ...], list[dict[str, Any]]] = {}
+    for row in rows_with_targets:
+        condition_key = tuple(
+            str(_pattern_dimension_value(row, dimension))
+            for dimension in normalized_dimensions
+        )
+        grouped_rows.setdefault(condition_key, []).append(row)
+
+    patterns = []
+    for condition_key, grouped in grouped_rows.items():
+        if len(grouped) < min_sample_size:
+            continue
+        pattern_key = _build_pattern_key(normalized_dimensions, condition_key)
+        patterns.append(
+            {
+                "pattern_key": pattern_key,
+                "conditions": {
+                    dimension: value
+                    for dimension, value in zip(normalized_dimensions, condition_key)
+                },
+                "comparable_lookup": {
+                    "dimensions": list(normalized_dimensions),
+                    "condition_values": list(condition_key),
+                    "pattern_key": pattern_key,
+                },
+                **_build_pattern_metrics(grouped, task_config=task_config),
+            }
+        )
+
+    ranked_patterns = sorted(
+        patterns,
+        key=lambda pattern: (
+            -int(pattern["sample_size"]),
+            -float(pattern["signal_strength"] or 0.0),
+        ),
+    )
+    return {
+        "task": {
+            "name": target_task,
+            "task_type": task_config["task_type"],
+            "target_column": target_column,
+        },
+        "dimensions": list(normalized_dimensions),
+        "min_sample_size": min_sample_size,
+        "pattern_count": len(ranked_patterns),
+        "patterns": ranked_patterns[:limit],
+    }
+
+
+def build_feature_comparable_cases(
+    dataset_rows: list[dict[str, Any]],
+    *,
+    target_task: str,
+    dimensions: tuple[str, ...] = ("venue", "days_rest_bucket"),
+    canonical_game_id: int | None = None,
+    team_code: str | None = None,
+    condition_values: tuple[str, ...] | None = None,
+    pattern_key: str | None = None,
+    limit: int = 20,
+) -> dict[str, Any]:
+    task_config = FEATURE_TRAINING_TASKS.get(target_task)
+    if task_config is None:
+        raise ValueError(f"Unsupported target_task: {target_task}")
+    if not dimensions:
+        raise ValueError("Expected at least one comparable dimension.")
+
+    normalized_dimensions = tuple(dimensions)
+    if pattern_key is not None:
+        parsed_dimensions, parsed_condition_values = _parse_pattern_key(pattern_key)
+        normalized_dimensions = parsed_dimensions
+        condition_values = parsed_condition_values
+
+    invalid_dimensions = [
+        dimension
+        for dimension in normalized_dimensions
+        if dimension not in FEATURE_PATTERN_DIMENSIONS
+    ]
+    if invalid_dimensions:
+        raise ValueError(
+            f"Unsupported comparable dimensions: {', '.join(invalid_dimensions)}"
+        )
+
+    anchor_row = None
+    if canonical_game_id is not None:
+        anchor_row = _find_dataset_anchor_row(
+            dataset_rows,
+            canonical_game_id=canonical_game_id,
+            team_code=team_code,
+        )
+
+    resolved_condition_values = _resolve_comparable_condition_values(
+        anchor_row=anchor_row,
+        condition_values=condition_values,
+        dimensions=normalized_dimensions,
+    )
+    target_column = task_config["target_column"]
+    comparable_rows = [
+        row
+        for row in dataset_rows
+        if row.get(target_column) is not None
+        and all(
+            str(_pattern_dimension_value(row, dimension)) == value
+            for dimension, value in zip(normalized_dimensions, resolved_condition_values)
+        )
+        and not _is_same_anchor_case(row, anchor_row)
+    ]
+    scored_comparables = [
+        _score_comparable_candidate(anchor_row=anchor_row, candidate_row=row)
+        for row in comparable_rows
+    ]
+    scored_comparables = sorted(
+        scored_comparables,
+        key=lambda entry: (
+            float(entry["similarity_score"])
+            if entry["similarity_score"] is not None
+            else float("-inf"),
+            entry["row"]["game_date"],
+            entry["row"]["canonical_game_id"],
+        ),
+        reverse=True,
+    )
+    comparable_summary = _build_pattern_metrics(
+        comparable_rows,
+        task_config=task_config,
+    )
+    return {
+        "task": {
+            "name": target_task,
+            "task_type": task_config["task_type"],
+            "target_column": target_column,
+        },
+        "dimensions": list(normalized_dimensions),
+        "anchor_case": _serialize_anchor_case(anchor_row, normalized_dimensions),
+        "pattern_key": _build_pattern_key(normalized_dimensions, resolved_condition_values),
+        "condition_values": list(resolved_condition_values),
+        "comparable_count": len(scored_comparables),
+        "comparable_summary": {
+            **comparable_summary,
+            "ranking_mode": "anchor_similarity" if anchor_row is not None else "recency_only",
+        },
+        "comparables": [
+            _serialize_comparable_case(
+                entry["row"],
+                normalized_dimensions,
+                similarity_score=entry["similarity_score"],
+                similarity_breakdown=entry["similarity_breakdown"],
+            )
+            for entry in scored_comparables[:limit]
+        ],
+    }
 
 
 def _partition_feature_dataset_rows(
@@ -2085,10 +4058,14 @@ def _build_feature_dataset_row(
         "rolling_5_avg_total_points": rolling_5["avg_total_points"],
         "rolling_5_avg_spread_error": rolling_5["avg_spread_error"],
         "rolling_5_avg_total_error": rolling_5["avg_total_error"],
+        "rolling_5_cover_rate": rolling_5["cover_rate"],
+        "rolling_5_over_rate": rolling_5["over_rate"],
         "rolling_10_avg_point_margin": rolling_10["avg_point_margin"],
         "rolling_10_avg_total_points": rolling_10["avg_total_points"],
         "rolling_10_avg_spread_error": rolling_10["avg_spread_error"],
         "rolling_10_avg_total_error": rolling_10["avg_total_error"],
+        "rolling_10_cover_rate": rolling_10["cover_rate"],
+        "rolling_10_over_rate": rolling_10["over_rate"],
         "point_margin_stddev": payload["volatility"]["point_margin_stddev"],
         "total_points_stddev": payload["volatility"]["total_points_stddev"],
         "spread_error_stddev": payload["volatility"]["spread_error_stddev"],
@@ -2459,3 +4436,520 @@ def _first_non_null_feature_value(training_rows, column: str) -> Any:
         if value is not None:
             return value
     return None
+
+
+def _get_training_benchmark_specs(
+    *,
+    target_task: str,
+    task_type: str,
+    train_target_mean: float | None,
+    train_positive_rate: float | None,
+) -> dict[str, Any]:
+    if task_type == "regression":
+        feature_baselines = FEATURE_REGRESSION_BASELINE_FEATURES.get(target_task, {})
+        return {
+            "zero_baseline": lambda _row: 0.0,
+            "train_mean_baseline": lambda _row, value=train_target_mean: value,
+            **{
+                baseline_name: (
+                    lambda row, feature_column=feature_column: row["features"].get(
+                        feature_column
+                    )
+                )
+                for baseline_name, feature_column in feature_baselines.items()
+            },
+        }
+
+    feature_baselines = FEATURE_CLASSIFICATION_BASELINE_FEATURES.get(target_task, {})
+    return {
+        "train_rate_baseline": lambda _row, value=train_positive_rate: value,
+        **{
+            baseline_name: (
+                lambda row, feature_column=feature_column: row["features"].get(
+                    feature_column
+                )
+            )
+            for baseline_name, feature_column in feature_baselines.items()
+        },
+    }
+
+
+def _score_training_baseline(
+    training_rows: list[dict[str, Any]],
+    *,
+    predictor,
+    task_type: str,
+) -> dict[str, Any]:
+    if task_type == "regression":
+        return _score_regression_baseline(training_rows, predictor=predictor)
+    return _score_classification_baseline(training_rows, predictor=predictor)
+
+
+def _score_regression_baseline(training_rows, *, predictor) -> dict[str, Any]:
+    scored_rows = []
+    for row in training_rows:
+        target_value = row["target_value"]
+        prediction = predictor(row)
+        if target_value is None or prediction is None:
+            continue
+        error = float(prediction) - float(target_value)
+        scored_rows.append(
+            {
+                "target_value": float(target_value),
+                "prediction": round(float(prediction), 4),
+                "absolute_error": round(abs(error), 4),
+                "squared_error": round(error * error, 4),
+            }
+        )
+
+    absolute_errors = [row["absolute_error"] for row in scored_rows]
+    squared_errors = [row["squared_error"] for row in scored_rows]
+    return {
+        "prediction_count": len(scored_rows),
+        "coverage_rate": round(len(scored_rows) / len(training_rows), 4)
+        if training_rows
+        else 0.0,
+        "mae": _mean_or_none(absolute_errors),
+        "rmse": round(float(mean(squared_errors) ** 0.5), 4) if squared_errors else None,
+        "mean_prediction": _mean_or_none(row["prediction"] for row in scored_rows),
+    }
+
+
+def _score_classification_baseline(training_rows, *, predictor) -> dict[str, Any]:
+    scored_rows = []
+    for row in training_rows:
+        target_value = row["target_value"]
+        raw_prediction = predictor(row)
+        probability = _normalize_probability(raw_prediction)
+        if target_value is None or probability is None:
+            continue
+        predicted_label = probability >= 0.5
+        actual_label = bool(target_value)
+        scored_rows.append(
+            {
+                "actual_label": actual_label,
+                "predicted_label": predicted_label,
+                "probability": probability,
+            }
+        )
+
+    true_positive = sum(
+        1
+        for row in scored_rows
+        if row["actual_label"] is True and row["predicted_label"] is True
+    )
+    true_negative = sum(
+        1
+        for row in scored_rows
+        if row["actual_label"] is False and row["predicted_label"] is False
+    )
+    false_positive = sum(
+        1
+        for row in scored_rows
+        if row["actual_label"] is False and row["predicted_label"] is True
+    )
+    false_negative = sum(
+        1
+        for row in scored_rows
+        if row["actual_label"] is True and row["predicted_label"] is False
+    )
+    brier_scores = [
+        (row["probability"] - (1.0 if row["actual_label"] else 0.0)) ** 2
+        for row in scored_rows
+    ]
+    return {
+        "prediction_count": len(scored_rows),
+        "coverage_rate": round(len(scored_rows) / len(training_rows), 4)
+        if training_rows
+        else 0.0,
+        "accuracy": round(
+            (true_positive + true_negative) / len(scored_rows), 4
+        )
+        if scored_rows
+        else None,
+        "brier_score": _mean_or_none(brier_scores),
+        "positive_prediction_rate": _mean_or_none(
+            1.0 if row["predicted_label"] else 0.0 for row in scored_rows
+        ),
+        "confusion_matrix": {
+            "true_positive": true_positive,
+            "true_negative": true_negative,
+            "false_positive": false_positive,
+            "false_negative": false_negative,
+        },
+    }
+
+
+def _rank_training_benchmarks(
+    benchmark_summary: dict[str, Any],
+    *,
+    task_type: str,
+) -> list[dict[str, Any]]:
+    validation_benchmarks = benchmark_summary.get("validation", {}).get("benchmarks", {})
+    test_benchmarks = benchmark_summary.get("test", {}).get("benchmarks", {})
+    if task_type == "regression":
+        primary_metric = "mae"
+        prefers_lower = True
+    else:
+        primary_metric = "brier_score"
+        prefers_lower = True
+
+    rankings = []
+    baseline_names = sorted(set(validation_benchmarks) | set(test_benchmarks))
+    for baseline_name in baseline_names:
+        validation_metrics = validation_benchmarks.get(baseline_name, {})
+        test_metrics = test_benchmarks.get(baseline_name, {})
+        rankings.append(
+            {
+                "baseline_name": baseline_name,
+                "primary_metric": primary_metric,
+                "validation_primary_metric": validation_metrics.get(primary_metric),
+                "test_primary_metric": test_metrics.get(primary_metric),
+                "validation_prediction_count": validation_metrics.get("prediction_count", 0),
+                "test_prediction_count": test_metrics.get("prediction_count", 0),
+            }
+        )
+
+    def ranking_key(entry: dict[str, Any]) -> tuple[float, int, float]:
+        test_value = entry["test_primary_metric"]
+        validation_value = entry["validation_primary_metric"]
+        test_prediction_count = entry["test_prediction_count"]
+        sentinel = float("inf") if prefers_lower else float("-inf")
+        comparable_test = test_value if test_value is not None else sentinel
+        comparable_validation = validation_value if validation_value is not None else sentinel
+        return (
+            comparable_test,
+            -test_prediction_count,
+            comparable_validation,
+        )
+
+    return sorted(rankings, key=ranking_key)
+
+
+def _normalize_probability(value: Any) -> float | None:
+    if value is None:
+        return None
+    normalized = float(value)
+    if normalized < 0:
+        normalized = 0.0
+    if normalized > 1:
+        normalized = 1.0
+    return round(normalized, 4)
+
+
+def _pattern_dimension_value(row: dict[str, Any], dimension: str) -> str:
+    if dimension == "venue":
+        return str(row["venue"])
+    if dimension == "days_rest_bucket":
+        return _bucket_days_rest(row.get("days_rest"))
+    if dimension == "games_played_bucket":
+        return _bucket_games_played(row.get("games_played_prior"))
+    if dimension == "prior_matchup_bucket":
+        return _bucket_prior_matchup(row.get("prior_matchup_count"))
+    if dimension == "rolling_3_spread_error_bucket":
+        return _bucket_signed_metric(row.get("rolling_3_avg_spread_error"))
+    if dimension == "rolling_3_total_error_bucket":
+        return _bucket_signed_metric(row.get("rolling_3_avg_total_error"))
+    if dimension == "rolling_3_cover_rate_bucket":
+        return _bucket_rate(row.get("rolling_3_cover_rate"))
+    if dimension == "rolling_3_over_rate_bucket":
+        return _bucket_rate(row.get("rolling_3_over_rate"))
+    raise ValueError(f"Unsupported pattern dimension: {dimension}")
+
+
+def _find_dataset_anchor_row(
+    dataset_rows: list[dict[str, Any]],
+    *,
+    canonical_game_id: int,
+    team_code: str | None,
+) -> dict[str, Any]:
+    matches = [
+        row
+        for row in dataset_rows
+        if int(row["canonical_game_id"]) == canonical_game_id
+        and (team_code is None or row["team_code"] == team_code)
+    ]
+    if not matches:
+        raise ValueError("No dataset row found for the requested comparable anchor.")
+    if len(matches) > 1 and team_code is None:
+        raise ValueError(
+            "Comparable anchor requires team_code when a game has multiple perspectives."
+        )
+    return matches[0]
+
+
+def _resolve_comparable_condition_values(
+    *,
+    anchor_row: dict[str, Any] | None,
+    condition_values: tuple[str, ...] | None,
+    dimensions: tuple[str, ...],
+) -> tuple[str, ...]:
+    if condition_values is not None:
+        if len(condition_values) != len(dimensions):
+            raise ValueError("condition_values must align 1:1 with dimensions.")
+        return tuple(condition_values)
+    if anchor_row is None:
+        raise ValueError("Provide either canonical_game_id or explicit condition_values.")
+    return tuple(
+        str(_pattern_dimension_value(anchor_row, dimension))
+        for dimension in dimensions
+    )
+
+
+def _is_same_anchor_case(
+    row: dict[str, Any],
+    anchor_row: dict[str, Any] | None,
+) -> bool:
+    if anchor_row is None:
+        return False
+    return (
+        int(row["canonical_game_id"]) == int(anchor_row["canonical_game_id"])
+        and row["team_code"] == anchor_row["team_code"]
+    )
+
+
+def _serialize_anchor_case(
+    anchor_row: dict[str, Any] | None,
+    dimensions: tuple[str, ...],
+) -> dict[str, Any] | None:
+    if anchor_row is None:
+        return None
+    return {
+        "canonical_game_id": anchor_row["canonical_game_id"],
+        "game_date": anchor_row["game_date"],
+        "season_label": anchor_row["season_label"],
+        "team_code": anchor_row["team_code"],
+        "opponent_code": anchor_row["opponent_code"],
+        "venue": anchor_row["venue"],
+        "matched_conditions": {
+            dimension: _pattern_dimension_value(anchor_row, dimension)
+            for dimension in dimensions
+        },
+        "target_values": {
+            "point_margin_actual": anchor_row["point_margin_actual"],
+            "spread_error_actual": anchor_row["spread_error_actual"],
+            "total_error_actual": anchor_row["total_error_actual"],
+            "covered_actual": anchor_row["covered_actual"],
+            "went_over_actual": anchor_row["went_over_actual"],
+        },
+    }
+
+
+def _serialize_comparable_case(
+    row: dict[str, Any],
+    dimensions: tuple[str, ...],
+    *,
+    similarity_score: float | None = None,
+    similarity_breakdown: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return {
+        "canonical_game_id": row["canonical_game_id"],
+        "game_date": row["game_date"],
+        "season_label": row["season_label"],
+        "team_code": row["team_code"],
+        "opponent_code": row["opponent_code"],
+        "venue": row["venue"],
+        "matched_conditions": {
+            dimension: _pattern_dimension_value(row, dimension)
+            for dimension in dimensions
+        },
+        "similarity_score": similarity_score,
+        "similarity_breakdown": similarity_breakdown or {},
+        "target_values": {
+            "point_margin_actual": row["point_margin_actual"],
+            "spread_error_actual": row["spread_error_actual"],
+            "total_error_actual": row["total_error_actual"],
+            "covered_actual": row["covered_actual"],
+            "went_over_actual": row["went_over_actual"],
+        },
+    }
+
+
+def _build_pattern_key(
+    dimensions: tuple[str, ...],
+    condition_values: tuple[str, ...],
+) -> str:
+    return "|".join(
+        f"{dimension}={value}"
+        for dimension, value in zip(dimensions, condition_values)
+    )
+
+
+def _parse_pattern_key(pattern_key: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    dimensions: list[str] = []
+    condition_values: list[str] = []
+    for segment in pattern_key.split("|"):
+        if "=" not in segment:
+            raise ValueError("Invalid pattern_key format.")
+        dimension, value = segment.split("=", 1)
+        dimension = dimension.strip()
+        value = value.strip()
+        if not dimension:
+            raise ValueError("Invalid pattern_key format.")
+        dimensions.append(dimension)
+        condition_values.append(value)
+    if not dimensions:
+        raise ValueError("Invalid pattern_key format.")
+    return tuple(dimensions), tuple(condition_values)
+
+
+def _score_comparable_candidate(
+    *,
+    anchor_row: dict[str, Any] | None,
+    candidate_row: dict[str, Any],
+) -> dict[str, Any]:
+    if anchor_row is None:
+        return {
+            "row": candidate_row,
+            "similarity_score": None,
+            "similarity_breakdown": {},
+        }
+
+    exact_match_columns = (
+        "team_code",
+        "opponent_code",
+        "season_label",
+    )
+    breakdown: dict[str, Any] = {
+        "exact_matches": {},
+        "numeric_distances": {},
+    }
+    weighted_distance = 0.0
+    weighted_components = 0.0
+
+    for column in exact_match_columns:
+        is_match = anchor_row.get(column) == candidate_row.get(column)
+        breakdown["exact_matches"][column] = is_match
+        weighted_distance += 0.0 if is_match else 1.0
+        weighted_components += 1.0
+
+    for column in FEATURE_COMPARABLE_DISTANCE_COLUMNS:
+        anchor_value = anchor_row.get(column)
+        candidate_value = candidate_row.get(column)
+        if anchor_value is None and candidate_value is None:
+            continue
+        if anchor_value is None or candidate_value is None:
+            breakdown["numeric_distances"][column] = None
+            weighted_distance += 0.5
+            weighted_components += 1.0
+            continue
+        difference = abs(float(anchor_value) - float(candidate_value))
+        normalized_difference = difference / (1.0 + abs(float(anchor_value)))
+        breakdown["numeric_distances"][column] = round(normalized_difference, 4)
+        weighted_distance += normalized_difference
+        weighted_components += 1.0
+
+    similarity_score = (
+        round(max(0.0, 1.0 - (weighted_distance / weighted_components)), 4)
+        if weighted_components
+        else None
+    )
+    breakdown["component_count"] = int(weighted_components)
+    breakdown["weighted_distance"] = round(weighted_distance, 4)
+    return {
+        "row": candidate_row,
+        "similarity_score": similarity_score,
+        "similarity_breakdown": breakdown,
+    }
+
+
+def _build_pattern_metrics(
+    rows: list[dict[str, Any]],
+    *,
+    task_config: dict[str, Any],
+) -> dict[str, Any]:
+    target_column = task_config["target_column"]
+    target_values = [row[target_column] for row in rows if row.get(target_column) is not None]
+    if task_config["task_type"] == "classification":
+        boolean_values = [bool(value) for value in target_values]
+        true_count = sum(1 for value in boolean_values if value is True)
+        false_count = sum(1 for value in boolean_values if value is False)
+        hit_rate = round(true_count / len(boolean_values), 4) if boolean_values else None
+        variance = round(hit_rate * (1 - hit_rate), 4) if hit_rate is not None else None
+        return {
+            "sample_size": len(boolean_values),
+            "target_mean": hit_rate,
+            "target_median": hit_rate,
+            "target_stddev": _pstdev_or_none(1.0 if value else 0.0 for value in boolean_values),
+            "hit_rate": hit_rate,
+            "variance": variance,
+            "target_value_counts": {
+                "true": true_count,
+                "false": false_count,
+            },
+            "signal_strength": round(abs(hit_rate - 0.5), 4) if hit_rate is not None else None,
+        }
+
+    numeric_values = [float(value) for value in target_values]
+    target_mean = _mean_or_none(numeric_values)
+    target_median = round(float(median(numeric_values)), 4) if numeric_values else None
+    target_stddev = _pstdev_or_none(numeric_values)
+    return {
+        "sample_size": len(numeric_values),
+        "target_mean": target_mean,
+        "target_median": target_median,
+        "target_stddev": target_stddev,
+        "hit_rate": None,
+        "variance": round(target_stddev * target_stddev, 4)
+        if target_stddev is not None
+        else None,
+        "target_value_counts": {},
+        "signal_strength": round(abs(target_mean), 4) if target_mean is not None else None,
+    }
+
+
+def _bucket_days_rest(value: Any) -> str:
+    if value is None:
+        return "unknown_rest"
+    numeric = int(value)
+    if numeric <= 1:
+        return "0_to_1_days"
+    if numeric == 2:
+        return "2_days"
+    if numeric == 3:
+        return "3_days"
+    return "4_plus_days"
+
+
+def _bucket_games_played(value: Any) -> str:
+    if value is None:
+        return "unknown_games_played"
+    numeric = int(value)
+    if numeric <= 4:
+        return "0_to_4_games"
+    if numeric <= 9:
+        return "5_to_9_games"
+    return "10_plus_games"
+
+
+def _bucket_prior_matchup(value: Any) -> str:
+    if value is None:
+        return "unknown_matchups"
+    numeric = int(value)
+    if numeric == 0:
+        return "0_prior_matchups"
+    if numeric == 1:
+        return "1_prior_matchup"
+    return "2_plus_prior_matchups"
+
+
+def _bucket_signed_metric(value: Any) -> str:
+    if value is None:
+        return "unknown"
+    numeric = float(value)
+    if numeric <= -1.0:
+        return "negative"
+    if numeric >= 1.0:
+        return "positive"
+    return "neutral"
+
+
+def _bucket_rate(value: Any) -> str:
+    if value is None:
+        return "unknown_rate"
+    numeric = float(value)
+    if numeric < 0.4:
+        return "low_rate"
+    if numeric > 0.6:
+        return "high_rate"
+    return "balanced_rate"

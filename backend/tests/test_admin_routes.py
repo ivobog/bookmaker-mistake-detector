@@ -240,6 +240,166 @@ def test_feature_dataset_profile_endpoint_returns_dataset_health_summary() -> No
     assert "days_rest" in payload["profile"]["feature_coverage"]
 
 
+def test_feature_patterns_endpoint_returns_bucketed_pattern_summaries() -> None:
+    response = client.get(
+        "/api/v1/admin/features/patterns"
+        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+        "&target_task=spread_error_regression&dimensions=venue,days_rest_bucket"
+        "&min_sample_size=1&limit=10"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["filters"]["target_task"] == "spread_error_regression"
+    assert payload["filters"]["dimensions"] == ["venue", "days_rest_bucket"]
+    assert payload["task"]["target_column"] == "spread_error_actual"
+    assert payload["row_count"] == 3
+    assert payload["pattern_count"] >= 2
+    assert "pattern_key" in payload["patterns"][0]
+    assert "comparable_lookup" in payload["patterns"][0]
+    assert "conditions" in payload["patterns"][0]
+    assert "sample_size" in payload["patterns"][0]
+
+
+def test_feature_comparables_endpoint_returns_matching_cases() -> None:
+    response = client.get(
+        "/api/v1/admin/features/comparables"
+        "?repository_mode=in_memory&seed_demo=true&season_label=2024-2025"
+        "&target_task=spread_error_regression&dimensions=venue,days_rest_bucket"
+        "&condition_values=home,unknown_rest&limit=10"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["filters"]["target_task"] == "spread_error_regression"
+    assert payload["filters"]["dimensions"] == ["venue", "days_rest_bucket"]
+    assert payload["filters"]["condition_values"] == ["home", "unknown_rest"]
+    assert payload["task"]["target_column"] == "spread_error_actual"
+    assert payload["comparable_count"] >= 1
+    assert payload["comparables"]
+    assert payload["comparables"][0]["matched_conditions"]["venue"] == "home"
+    assert "similarity_score" in payload["comparables"][0]
+
+
+def test_feature_comparables_endpoint_accepts_pattern_key() -> None:
+    response = client.get(
+        "/api/v1/admin/features/comparables"
+        "?repository_mode=in_memory&seed_demo=true&season_label=2024-2025"
+        "&target_task=spread_error_regression&pattern_key=venue=home|days_rest_bucket=unknown_rest"
+        "&limit=10"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["filters"]["pattern_key"] == "venue=home|days_rest_bucket=unknown_rest"
+    assert payload["pattern_key"] == "venue=home|days_rest_bucket=unknown_rest"
+    assert payload["comparable_count"] >= 1
+
+
+def test_feature_evidence_endpoint_returns_unified_analysis_payload() -> None:
+    response = client.get(
+        "/api/v1/admin/features/evidence"
+        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+        "&target_task=spread_error_regression&canonical_game_id=3"
+        "&dimensions=venue,days_rest_bucket&comparable_limit=5"
+        "&min_pattern_sample_size=1&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["filters"]["canonical_game_id"] == 3
+    assert payload["task"]["target_column"] == "spread_error_actual"
+    assert payload["evidence"]["summary"]["pattern_key"] is not None
+    assert payload["evidence"]["strength"]["rating"] in {
+        "weak",
+        "moderate",
+        "strong",
+    }
+    assert payload["evidence"]["recommendation"]["status"] in {
+        "monitor_only",
+        "review_manually",
+        "candidate_signal",
+    }
+    assert (
+        payload["evidence"]["recommendation"]["policy_profile"]["target_task"]
+        == "spread_error_regression"
+    )
+    assert payload["evidence"]["pattern"]["selected_pattern"] is not None
+    assert payload["evidence"]["comparables"]["anchor_case"]["canonical_game_id"] == 3
+    assert "benchmark_rankings" in payload["evidence"]["benchmark_context"]
+
+
+def test_feature_analysis_materialize_endpoint_persists_pattern_and_evidence_artifacts() -> None:
+    response = client.post(
+        "/api/v1/admin/features/analysis/materialize"
+        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+        "&target_task=spread_error_regression&canonical_game_id=3"
+        "&dimensions=venue,days_rest_bucket&min_sample_size=1"
+        "&comparable_limit=5&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["materialized_count"] >= 2
+    assert payload["artifact_counts"]["pattern_summary"] >= 1
+    assert payload["artifact_counts"]["evidence_bundle"] == 1
+    assert any(
+        artifact["artifact_type"] == "pattern_summary"
+        for artifact in payload["artifacts"]
+    )
+    assert any(
+        artifact["artifact_type"] == "evidence_bundle"
+        for artifact in payload["artifacts"]
+    )
+
+
+def test_feature_analysis_artifacts_endpoint_lists_materialized_artifacts() -> None:
+    response = client.get(
+        "/api/v1/admin/features/analysis/artifacts"
+        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+        "&target_task=spread_error_regression&canonical_game_id=3"
+        "&dimensions=venue,days_rest_bucket&min_sample_size=1"
+        "&comparable_limit=5&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["artifact_count"] >= 2
+    assert payload["filters"]["target_task"] == "spread_error_regression"
+    assert any(
+        artifact["artifact_type"] == "pattern_summary"
+        for artifact in payload["artifacts"]
+    )
+    assert any(
+        artifact["artifact_type"] == "evidence_bundle"
+        for artifact in payload["artifacts"]
+    )
+
+
+def test_feature_analysis_history_endpoint_returns_artifact_rollup() -> None:
+    response = client.get(
+        "/api/v1/admin/features/analysis/history"
+        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+        "&target_task=spread_error_regression&canonical_game_id=3"
+        "&dimensions=venue,days_rest_bucket&min_sample_size=1"
+        "&comparable_limit=5&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["overview"]["artifact_count"] >= 2
+    assert payload["overview"]["artifact_type_counts"]["evidence_bundle"] == 1
+    assert payload["overview"]["evidence_status_counts"]["monitor_only"] == 1
+    assert payload["daily_buckets"]
+    assert payload["latest_evidence_artifacts"]
+
+
 def test_feature_dataset_splits_endpoint_returns_chronological_split_summary() -> None:
     response = client.get(
         "/api/v1/admin/features/dataset/splits"
@@ -320,6 +480,24 @@ def test_feature_dataset_training_bundle_endpoint_returns_split_task_package() -
     assert payload["bundle_summary"]["test"]["game_count"] == 1
     assert payload["bundle_summary"]["train"]["target_summary"]["row_count"] == 1
     assert len(payload["split_previews"]["train"]) == 1
+
+
+def test_feature_dataset_training_benchmark_endpoint_returns_baseline_scores() -> None:
+    response = client.get(
+        "/api/v1/admin/features/dataset/training-benchmark"
+        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["filters"]["target_task"] == "spread_error_regression"
+    assert payload["task"]["target_column"] == "spread_error_actual"
+    assert payload["row_count"] == 3
+    assert "train_mean_baseline" in payload["benchmark_summary"]["validation"]["benchmarks"]
+    assert "rolling_3_feature_baseline" in payload["benchmark_summary"]["test"]["benchmarks"]
+    assert payload["benchmark_rankings"][0]["primary_metric"] == "mae"
 
 
 def test_feature_dataset_training_task_matrix_endpoint_returns_task_comparison() -> None:

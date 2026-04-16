@@ -114,6 +114,7 @@ Completion notes:
 
 ### Phase 2: Analytical Core
 Duration: 2 weeks
+Status: Complete for backend MVP
 
 Objectives:
 - turn historical games into usable analytical context
@@ -139,6 +140,13 @@ Exit criteria:
 - features use only prior games
 - pattern discovery enforces minimum sample thresholds
 - historical comparable cases can be retrieved for a given condition set
+
+Completion notes:
+- versioned feature snapshots and time-safe rolling team/matchup features are implemented
+- flattened feature datasets, profiles, chronological splits, training views, manifests, bundles, task matrices, and naive benchmark scoring are available
+- grouped pattern discovery, comparable-case retrieval, ranked comparables, and unified evidence bundles are implemented
+- evidence strength scoring, task-aware recommendation policies, persisted analysis artifacts, and artifact history rollups are available through admin APIs
+- Phase 2 backend verification is currently backed by a passing test suite and live Docker smoke tests across the analytical and artifact surfaces
 
 ### Phase 3: Predictive and Opportunity Layer
 Duration: 2 weeks
