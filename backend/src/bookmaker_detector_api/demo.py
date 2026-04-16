@@ -3,10 +3,20 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
+from bookmaker_detector_api.db.postgres import postgres_connection
 from bookmaker_detector_api.ingestion.providers import CoversHistoricalTeamPageProvider
-from bookmaker_detector_api.repositories import InMemoryIngestionRepository
+from bookmaker_detector_api.repositories import (
+    InMemoryIngestionRepository,
+    PostgresIngestionRepository,
+)
 from bookmaker_detector_api.services.admin_diagnostics import get_admin_diagnostics
 from bookmaker_detector_api.services.canonical import canonicalize_rows
+from bookmaker_detector_api.services.features import (
+    get_feature_snapshot_catalog_in_memory,
+    get_feature_snapshot_catalog_postgres,
+    materialize_baseline_feature_snapshots_for_in_memory,
+    materialize_baseline_feature_snapshots_for_postgres,
+)
 from bookmaker_detector_api.services.fetch_ingestion_runner import run_fetch_and_ingest
 from bookmaker_detector_api.services.fixture_ingestion_runner import run_fixture_ingestion
 from bookmaker_detector_api.services.ingestion_pipeline import (
@@ -192,3 +202,117 @@ def _build_validation_ingestion_source_url(
 ) -> str:
     timestamp = started_at.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     return f"{fixture_url}#validation_run={run_label}:{timestamp}"
+
+
+def run_phase_two_feature_demo(*, repository_mode: str = "in_memory") -> dict[str, object]:
+    if repository_mode == "in_memory":
+        repository, ingest_result, feature_result = seed_phase_two_feature_in_memory()
+    else:
+        with postgres_connection() as connection:
+            _, ingest_result, feature_result = seed_phase_two_feature_postgres(connection)
+
+    return {
+        "repository_mode": repository_mode,
+        "ingest_result": {
+            "job_id": ingest_result.job_id,
+            "page_retrieval_id": ingest_result.page_retrieval_id,
+            "raw_rows_saved": ingest_result.raw_rows_saved,
+            "canonical_games_saved": ingest_result.canonical_games_saved,
+            "metrics_saved": ingest_result.metrics_saved,
+            "warnings": ingest_result.warnings,
+        },
+        "feature_result": {
+            **feature_result,
+            "feature_snapshots": feature_result["feature_snapshots"][:3],
+        },
+    }
+
+
+def seed_phase_two_feature_in_memory() -> tuple[
+    InMemoryIngestionRepository,
+    object,
+    dict[str, object],
+]:
+    provider = CoversHistoricalTeamPageProvider()
+    fixture_html = provider.load_fixture(FIXTURE_DIR / "covers_sample_team_page.html")
+    repository = InMemoryIngestionRepository()
+    ingest_result = ingest_historical_team_page(
+        request=HistoricalIngestionRequest(
+            provider_name=provider.provider_name,
+            team_code="LAL",
+            season_label="2024-2025",
+            source_url="https://example.com/covers/lal/2024-2025",
+            requested_by="phase-2-feature-demo",
+            html=fixture_html,
+        ),
+        provider=provider,
+        repository=repository,
+    )
+    feature_result = materialize_baseline_feature_snapshots_for_in_memory(repository)
+    return repository, ingest_result, feature_result
+
+
+def seed_phase_two_feature_postgres(
+    connection: object,
+) -> tuple[PostgresIngestionRepository, object, dict[str, object]]:
+    provider = CoversHistoricalTeamPageProvider()
+    fixture_html = provider.load_fixture(FIXTURE_DIR / "covers_sample_team_page.html")
+    repository = PostgresIngestionRepository(connection)
+    ingest_result = ingest_historical_team_page(
+        request=HistoricalIngestionRequest(
+            provider_name=provider.provider_name,
+            team_code="LAL",
+            season_label="2024-2025",
+            source_url="https://example.com/covers/lal/2024-2025",
+            requested_by="phase-2-feature-demo",
+            html=fixture_html,
+        ),
+        provider=provider,
+        repository=repository,
+    )
+    feature_result = materialize_baseline_feature_snapshots_for_postgres(connection)
+    return repository, ingest_result, feature_result
+
+
+def run_phase_two_feature_snapshot_query_demo(
+    *,
+    repository_mode: str = "in_memory",
+    feature_key: str = "baseline_team_features_v1",
+    team_code: str | None = None,
+    season_label: str | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> dict[str, object]:
+    if repository_mode == "in_memory":
+        repository, _, _ = seed_phase_two_feature_in_memory()
+        snapshot_result = get_feature_snapshot_catalog_in_memory(
+            repository,
+            feature_key=feature_key,
+            team_code=team_code,
+            season_label=season_label,
+            limit=limit,
+            offset=offset,
+        )
+    else:
+        with postgres_connection() as connection:
+            seed_phase_two_feature_postgres(connection)
+            snapshot_result = get_feature_snapshot_catalog_postgres(
+                connection,
+                feature_key=feature_key,
+                team_code=team_code,
+                season_label=season_label,
+                limit=limit,
+                offset=offset,
+            )
+
+    return {
+        "repository_mode": repository_mode,
+        "filters": {
+            "feature_key": feature_key,
+            "team_code": team_code,
+            "season_label": season_label,
+            "limit": limit,
+            "offset": offset,
+        },
+        **snapshot_result,
+    }

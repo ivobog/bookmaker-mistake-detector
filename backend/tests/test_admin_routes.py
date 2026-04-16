@@ -127,6 +127,226 @@ def test_phase_one_fetch_reporting_demo_endpoint_isolates_labeled_run() -> None:
     assert payload["jobs"][0]["payload"]["run_label"] == payload["page_retrievals"][0]["run_label"]
 
 
+def test_phase_two_feature_demo_endpoint_exposes_feature_snapshot_summary() -> None:
+    response = client.get("/api/v1/admin/phase-2-feature-demo?repository_mode=in_memory")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["ingest_result"]["canonical_games_saved"] == 3
+    assert payload["feature_result"]["canonical_game_count"] == 3
+    assert payload["feature_result"]["snapshots_saved"] == 3
+    assert (
+        payload["feature_result"]["feature_version"]["feature_key"]
+        == "baseline_team_features_v1"
+    )
+    assert len(payload["feature_result"]["feature_snapshots"]) == 3
+
+
+def test_feature_snapshots_endpoint_returns_filtered_phase_two_snapshots() -> None:
+    response = client.get(
+        "/api/v1/admin/features/snapshots"
+        "?repository_mode=in_memory&seed_demo=true&team_code=MIA&season_label=2024-2025"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["filters"]["team_code"] == "MIA"
+    assert payload["filters"]["season_label"] == "2024-2025"
+    assert payload["feature_version"]["feature_key"] == "baseline_team_features_v1"
+    assert payload["snapshot_count"] == 1
+    assert len(payload["feature_snapshots"]) == 1
+    snapshot = payload["feature_snapshots"][0]
+    assert snapshot["away_team_code"] == "MIA"
+    assert snapshot["feature_payload"]["home_team"]["rolling_home_windows"]["3"]["sample_size"] == 1
+    assert "volatility" in snapshot["feature_payload"]["home_team"]
+    assert "trend_signals" in snapshot["feature_payload"]["home_team"]
+    assert (
+        snapshot["feature_payload"]["home_team"]["trend_signals"][
+            "recent_point_margin_delta_3_vs_10"
+        ]
+        == 0.0
+    )
+
+
+def test_feature_summary_endpoint_returns_team_rollup() -> None:
+    response = client.get(
+        "/api/v1/admin/features/summary"
+        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["filters"]["team_code"] == "LAL"
+    assert payload["filters"]["season_label"] == "2024-2025"
+    assert payload["feature_version"]["feature_key"] == "baseline_team_features_v1"
+    assert payload["snapshot_count"] == 3
+    assert payload["perspective_count"] == 3
+    assert payload["summary"]["team_count"] == 1
+    assert (
+        payload["summary"]["home_perspective_count"]
+        + payload["summary"]["away_perspective_count"]
+        == 3
+    )
+    assert "rolling_window_averages" in payload["summary"]
+    assert payload["latest_perspective"]["team_code"] == "LAL"
+
+
+def test_feature_dataset_endpoint_returns_flattened_rows() -> None:
+    response = client.get(
+        "/api/v1/admin/features/dataset"
+        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["filters"]["team_code"] == "LAL"
+    assert payload["filters"]["season_label"] == "2024-2025"
+    assert payload["feature_version"]["feature_key"] == "baseline_team_features_v1"
+    assert payload["row_count"] == 3
+    assert len(payload["feature_rows"]) == 3
+    first_row = payload["feature_rows"][0]
+    assert first_row["team_code"] == "LAL"
+    assert first_row["games_played_prior"] == 0
+    assert "rolling_3_avg_point_margin" in first_row
+    assert "point_margin_actual" in first_row
+    assert "covered_actual" in first_row
+
+
+def test_feature_dataset_profile_endpoint_returns_dataset_health_summary() -> None:
+    response = client.get(
+        "/api/v1/admin/features/dataset/profile"
+        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["filters"]["team_code"] == "LAL"
+    assert payload["filters"]["season_label"] == "2024-2025"
+    assert payload["feature_version"]["feature_key"] == "baseline_team_features_v1"
+    assert payload["row_count"] == 3
+    assert payload["profile"]["season_count"] == 1
+    assert payload["profile"]["team_count"] == 1
+    assert (
+        payload["profile"]["venue_counts"]["home"]
+        + payload["profile"]["venue_counts"]["away"]
+        == 3
+    )
+    assert "covered_actual" in payload["profile"]["label_balance"]
+    assert "days_rest" in payload["profile"]["feature_coverage"]
+
+
+def test_feature_dataset_splits_endpoint_returns_chronological_split_summary() -> None:
+    response = client.get(
+        "/api/v1/admin/features/dataset/splits"
+        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+        "&train_ratio=0.5&validation_ratio=0.25&preview_limit=2"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["filters"]["team_code"] == "LAL"
+    assert payload["filters"]["season_label"] == "2024-2025"
+    assert payload["filters"]["preview_limit"] == 2
+    assert payload["row_count"] == 3
+    assert payload["split_summary"]["train"]["game_count"] == 1
+    assert payload["split_summary"]["validation"]["game_count"] == 1
+    assert payload["split_summary"]["test"]["game_count"] == 1
+    assert payload["split_summary"]["train"]["row_count"] == 1
+    assert payload["split_summary"]["validation"]["row_count"] == 1
+    assert payload["split_summary"]["test"]["row_count"] == 1
+    assert len(payload["split_previews"]["train"]) == 1
+
+
+def test_feature_dataset_training_view_endpoint_returns_target_projection() -> None:
+    response = client.get(
+        "/api/v1/admin/features/dataset/training-view"
+        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+        "&target_task=spread_error_regression"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["filters"]["team_code"] == "LAL"
+    assert payload["filters"]["target_task"] == "spread_error_regression"
+    assert payload["task"]["target_column"] == "spread_error_actual"
+    assert payload["row_count"] == 3
+    first_row = payload["training_rows"][0]
+    assert first_row["team_code"] == "LAL"
+    assert "target_value" in first_row
+    assert "games_played_prior" in first_row["features"]
+    assert "spread_error_actual" not in first_row["features"]
+
+
+def test_feature_dataset_training_manifest_endpoint_returns_schema_summary() -> None:
+    response = client.get(
+        "/api/v1/admin/features/dataset/training-manifest"
+        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+        "&target_task=spread_error_regression"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["filters"]["target_task"] == "spread_error_regression"
+    assert payload["task"]["target_column"] == "spread_error_actual"
+    assert payload["training_manifest"]["feature_column_count"] > 0
+    assert "games_played_prior" in payload["training_manifest"]["feature_columns"]
+    assert "games_played_prior" in payload["training_manifest"]["feature_coverage"]
+
+
+def test_feature_dataset_training_bundle_endpoint_returns_split_task_package() -> None:
+    response = client.get(
+        "/api/v1/admin/features/dataset/training-bundle"
+        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+        "&preview_limit=1"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["filters"]["target_task"] == "spread_error_regression"
+    assert payload["task"]["target_column"] == "spread_error_actual"
+    assert payload["row_count"] == 3
+    assert payload["bundle_summary"]["train"]["game_count"] == 1
+    assert payload["bundle_summary"]["validation"]["game_count"] == 1
+    assert payload["bundle_summary"]["test"]["game_count"] == 1
+    assert payload["bundle_summary"]["train"]["target_summary"]["row_count"] == 1
+    assert len(payload["split_previews"]["train"]) == 1
+
+
+def test_feature_dataset_training_task_matrix_endpoint_returns_task_comparison() -> None:
+    response = client.get(
+        "/api/v1/admin/features/dataset/training-task-matrix"
+        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+        "&train_ratio=0.5&validation_ratio=0.25"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["dataset_row_count"] == 3
+    assert "spread_error_regression" in payload["task_matrix"]
+    assert "cover_classification" in payload["task_matrix"]
+    assert (
+        payload["task_matrix"]["spread_error_regression"]["task"]["target_column"]
+        == "spread_error_actual"
+    )
+    assert (
+        payload["task_matrix"]["spread_error_regression"]["bundle_summary"]["train"][
+            "game_count"
+        ]
+        == 1
+    )
+
+
 def test_phase_one_fetch_reporting_demo_uses_distinct_ingestion_source_url(monkeypatch) -> None:
     captured: dict[str, object] = {}
 

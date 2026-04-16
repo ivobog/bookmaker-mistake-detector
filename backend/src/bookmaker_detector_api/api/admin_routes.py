@@ -2,22 +2,49 @@ from datetime import date
 
 from fastapi import APIRouter, Query
 
+from bookmaker_detector_api.db.postgres import postgres_connection
 from bookmaker_detector_api.demo import (
     run_phase_one_demo,
     run_phase_one_fetch_demo,
     run_phase_one_fetch_failure_demo,
     run_phase_one_persistence_demo,
     run_phase_one_worker_demo,
+    seed_phase_two_feature_in_memory,
+    seed_phase_two_feature_postgres,
 )
 from bookmaker_detector_api.demo import (
     run_phase_one_fetch_reporting_demo as run_phase_one_fetch_reporting_demo_job,
 )
+from bookmaker_detector_api.demo import (
+    run_phase_two_feature_demo as run_phase_two_feature_demo_job,
+)
+from bookmaker_detector_api.repositories import InMemoryIngestionRepository
 from bookmaker_detector_api.services.admin_diagnostics import (
     get_admin_diagnostics,
     resolve_started_window,
 )
 from bookmaker_detector_api.services.data_quality_maintenance import (
     normalize_data_quality_taxonomy,
+)
+from bookmaker_detector_api.services.features import (
+    get_feature_dataset_in_memory,
+    get_feature_dataset_postgres,
+    get_feature_dataset_profile_in_memory,
+    get_feature_dataset_profile_postgres,
+    get_feature_dataset_splits_in_memory,
+    get_feature_dataset_splits_postgres,
+    get_feature_snapshot_catalog_in_memory,
+    get_feature_snapshot_catalog_postgres,
+    get_feature_snapshot_summary_in_memory,
+    get_feature_snapshot_summary_postgres,
+    get_feature_training_bundle_in_memory,
+    get_feature_training_bundle_postgres,
+    get_feature_training_manifest_in_memory,
+    get_feature_training_manifest_postgres,
+    get_feature_training_task_matrix_in_memory,
+    get_feature_training_task_matrix_postgres,
+    get_feature_training_view_in_memory,
+    get_feature_training_view_postgres,
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -66,6 +93,475 @@ def phase_one_fetch_reporting_demo(
     repository_mode: str = Query(default="in_memory"),
 ) -> dict[str, object]:
     return run_phase_one_fetch_reporting_demo_job(repository_mode=repository_mode)
+
+
+@router.get("/phase-2-feature-demo")
+def phase_two_feature_demo(
+    repository_mode: str = Query(default="in_memory"),
+) -> dict[str, object]:
+    return run_phase_two_feature_demo_job(repository_mode=repository_mode)
+
+
+@router.get("/features/snapshots")
+def feature_snapshots(
+    repository_mode: str = Query(default="in_memory"),
+    seed_demo: bool = Query(default=True),
+    feature_key: str = Query(default="baseline_team_features_v1"),
+    team_code: str | None = Query(default=None),
+    season_label: str | None = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+) -> dict[str, object]:
+    if repository_mode == "in_memory":
+        repository = InMemoryIngestionRepository()
+        if seed_demo:
+            repository, _, _ = seed_phase_two_feature_in_memory()
+        snapshot_result = get_feature_snapshot_catalog_in_memory(
+            repository,
+            feature_key=feature_key,
+            team_code=team_code,
+            season_label=season_label,
+            limit=limit,
+            offset=offset,
+        )
+    elif repository_mode == "postgres":
+        with postgres_connection() as connection:
+            if seed_demo:
+                seed_phase_two_feature_postgres(connection)
+            snapshot_result = get_feature_snapshot_catalog_postgres(
+                connection,
+                feature_key=feature_key,
+                team_code=team_code,
+                season_label=season_label,
+                limit=limit,
+                offset=offset,
+            )
+    else:
+        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+
+    return {
+        "repository_mode": repository_mode,
+        "filters": {
+            "feature_key": feature_key,
+            "team_code": team_code,
+            "season_label": season_label,
+            "limit": limit,
+            "offset": offset,
+        },
+        **snapshot_result,
+    }
+
+
+@router.get("/features/summary")
+def feature_summary(
+    repository_mode: str = Query(default="in_memory"),
+    seed_demo: bool = Query(default=True),
+    feature_key: str = Query(default="baseline_team_features_v1"),
+    team_code: str | None = Query(default=None),
+    season_label: str | None = Query(default=None),
+) -> dict[str, object]:
+    if repository_mode == "in_memory":
+        repository = InMemoryIngestionRepository()
+        if seed_demo:
+            repository, _, _ = seed_phase_two_feature_in_memory()
+        summary_result = get_feature_snapshot_summary_in_memory(
+            repository,
+            feature_key=feature_key,
+            team_code=team_code,
+            season_label=season_label,
+        )
+    elif repository_mode == "postgres":
+        with postgres_connection() as connection:
+            if seed_demo:
+                seed_phase_two_feature_postgres(connection)
+            summary_result = get_feature_snapshot_summary_postgres(
+                connection,
+                feature_key=feature_key,
+                team_code=team_code,
+                season_label=season_label,
+            )
+    else:
+        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+
+    return {
+        "repository_mode": repository_mode,
+        "filters": {
+            "feature_key": feature_key,
+            "team_code": team_code,
+            "season_label": season_label,
+        },
+        **summary_result,
+    }
+
+
+@router.get("/features/dataset")
+def feature_dataset(
+    repository_mode: str = Query(default="in_memory"),
+    seed_demo: bool = Query(default=True),
+    feature_key: str = Query(default="baseline_team_features_v1"),
+    team_code: str | None = Query(default=None),
+    season_label: str | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> dict[str, object]:
+    if repository_mode == "in_memory":
+        repository = InMemoryIngestionRepository()
+        if seed_demo:
+            repository, _, _ = seed_phase_two_feature_in_memory()
+        dataset_result = get_feature_dataset_in_memory(
+            repository,
+            feature_key=feature_key,
+            team_code=team_code,
+            season_label=season_label,
+            limit=limit,
+            offset=offset,
+        )
+    elif repository_mode == "postgres":
+        with postgres_connection() as connection:
+            if seed_demo:
+                seed_phase_two_feature_postgres(connection)
+            dataset_result = get_feature_dataset_postgres(
+                connection,
+                feature_key=feature_key,
+                team_code=team_code,
+                season_label=season_label,
+                limit=limit,
+                offset=offset,
+            )
+    else:
+        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+
+    return {
+        "repository_mode": repository_mode,
+        "filters": {
+            "feature_key": feature_key,
+            "team_code": team_code,
+            "season_label": season_label,
+            "limit": limit,
+            "offset": offset,
+        },
+        **dataset_result,
+    }
+
+
+@router.get("/features/dataset/profile")
+def feature_dataset_profile(
+    repository_mode: str = Query(default="in_memory"),
+    seed_demo: bool = Query(default=True),
+    feature_key: str = Query(default="baseline_team_features_v1"),
+    team_code: str | None = Query(default=None),
+    season_label: str | None = Query(default=None),
+) -> dict[str, object]:
+    if repository_mode == "in_memory":
+        repository = InMemoryIngestionRepository()
+        if seed_demo:
+            repository, _, _ = seed_phase_two_feature_in_memory()
+        profile_result = get_feature_dataset_profile_in_memory(
+            repository,
+            feature_key=feature_key,
+            team_code=team_code,
+            season_label=season_label,
+        )
+    elif repository_mode == "postgres":
+        with postgres_connection() as connection:
+            if seed_demo:
+                seed_phase_two_feature_postgres(connection)
+            profile_result = get_feature_dataset_profile_postgres(
+                connection,
+                feature_key=feature_key,
+                team_code=team_code,
+                season_label=season_label,
+            )
+    else:
+        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+
+    return {
+        "repository_mode": repository_mode,
+        "filters": {
+            "feature_key": feature_key,
+            "team_code": team_code,
+            "season_label": season_label,
+        },
+        **profile_result,
+    }
+
+
+@router.get("/features/dataset/splits")
+def feature_dataset_splits(
+    repository_mode: str = Query(default="in_memory"),
+    seed_demo: bool = Query(default=True),
+    feature_key: str = Query(default="baseline_team_features_v1"),
+    team_code: str | None = Query(default=None),
+    season_label: str | None = Query(default=None),
+    train_ratio: float = Query(default=0.7, gt=0, lt=1),
+    validation_ratio: float = Query(default=0.15, ge=0, lt=1),
+    preview_limit: int = Query(default=5, ge=1, le=20),
+) -> dict[str, object]:
+    if repository_mode == "in_memory":
+        repository = InMemoryIngestionRepository()
+        if seed_demo:
+            repository, _, _ = seed_phase_two_feature_in_memory()
+        split_result = get_feature_dataset_splits_in_memory(
+            repository,
+            feature_key=feature_key,
+            team_code=team_code,
+            season_label=season_label,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            preview_limit=preview_limit,
+        )
+    elif repository_mode == "postgres":
+        with postgres_connection() as connection:
+            if seed_demo:
+                seed_phase_two_feature_postgres(connection)
+            split_result = get_feature_dataset_splits_postgres(
+                connection,
+                feature_key=feature_key,
+                team_code=team_code,
+                season_label=season_label,
+                train_ratio=train_ratio,
+                validation_ratio=validation_ratio,
+                preview_limit=preview_limit,
+            )
+    else:
+        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+
+    return {
+        "repository_mode": repository_mode,
+        "filters": {
+            "feature_key": feature_key,
+            "team_code": team_code,
+            "season_label": season_label,
+            "train_ratio": train_ratio,
+            "validation_ratio": validation_ratio,
+            "preview_limit": preview_limit,
+        },
+        **split_result,
+    }
+
+
+@router.get("/features/dataset/training-view")
+def feature_dataset_training_view(
+    repository_mode: str = Query(default="in_memory"),
+    seed_demo: bool = Query(default=True),
+    feature_key: str = Query(default="baseline_team_features_v1"),
+    target_task: str = Query(default="spread_error_regression"),
+    team_code: str | None = Query(default=None),
+    season_label: str | None = Query(default=None),
+    drop_null_targets: bool = Query(default=True),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> dict[str, object]:
+    if repository_mode == "in_memory":
+        repository = InMemoryIngestionRepository()
+        if seed_demo:
+            repository, _, _ = seed_phase_two_feature_in_memory()
+        training_view = get_feature_training_view_in_memory(
+            repository,
+            feature_key=feature_key,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            drop_null_targets=drop_null_targets,
+            limit=limit,
+            offset=offset,
+        )
+    elif repository_mode == "postgres":
+        with postgres_connection() as connection:
+            if seed_demo:
+                seed_phase_two_feature_postgres(connection)
+            training_view = get_feature_training_view_postgres(
+                connection,
+                feature_key=feature_key,
+                target_task=target_task,
+                team_code=team_code,
+                season_label=season_label,
+                drop_null_targets=drop_null_targets,
+                limit=limit,
+                offset=offset,
+            )
+    else:
+        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+
+    return {
+        "repository_mode": repository_mode,
+        "filters": {
+            "feature_key": feature_key,
+            "target_task": target_task,
+            "team_code": team_code,
+            "season_label": season_label,
+            "drop_null_targets": drop_null_targets,
+            "limit": limit,
+            "offset": offset,
+        },
+        **training_view,
+    }
+
+
+@router.get("/features/dataset/training-manifest")
+def feature_dataset_training_manifest(
+    repository_mode: str = Query(default="in_memory"),
+    seed_demo: bool = Query(default=True),
+    feature_key: str = Query(default="baseline_team_features_v1"),
+    target_task: str = Query(default="spread_error_regression"),
+    team_code: str | None = Query(default=None),
+    season_label: str | None = Query(default=None),
+    drop_null_targets: bool = Query(default=True),
+) -> dict[str, object]:
+    if repository_mode == "in_memory":
+        repository = InMemoryIngestionRepository()
+        if seed_demo:
+            repository, _, _ = seed_phase_two_feature_in_memory()
+        training_manifest = get_feature_training_manifest_in_memory(
+            repository,
+            feature_key=feature_key,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            drop_null_targets=drop_null_targets,
+        )
+    elif repository_mode == "postgres":
+        with postgres_connection() as connection:
+            if seed_demo:
+                seed_phase_two_feature_postgres(connection)
+            training_manifest = get_feature_training_manifest_postgres(
+                connection,
+                feature_key=feature_key,
+                target_task=target_task,
+                team_code=team_code,
+                season_label=season_label,
+                drop_null_targets=drop_null_targets,
+            )
+    else:
+        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+
+    return {
+        "repository_mode": repository_mode,
+        "filters": {
+            "feature_key": feature_key,
+            "target_task": target_task,
+            "team_code": team_code,
+            "season_label": season_label,
+            "drop_null_targets": drop_null_targets,
+        },
+        **training_manifest,
+    }
+
+
+@router.get("/features/dataset/training-bundle")
+def feature_dataset_training_bundle(
+    repository_mode: str = Query(default="in_memory"),
+    seed_demo: bool = Query(default=True),
+    feature_key: str = Query(default="baseline_team_features_v1"),
+    target_task: str = Query(default="spread_error_regression"),
+    team_code: str | None = Query(default=None),
+    season_label: str | None = Query(default=None),
+    train_ratio: float = Query(default=0.7, gt=0, lt=1),
+    validation_ratio: float = Query(default=0.15, ge=0, lt=1),
+    drop_null_targets: bool = Query(default=True),
+    preview_limit: int = Query(default=5, ge=1, le=20),
+) -> dict[str, object]:
+    if repository_mode == "in_memory":
+        repository = InMemoryIngestionRepository()
+        if seed_demo:
+            repository, _, _ = seed_phase_two_feature_in_memory()
+        training_bundle = get_feature_training_bundle_in_memory(
+            repository,
+            feature_key=feature_key,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            drop_null_targets=drop_null_targets,
+            preview_limit=preview_limit,
+        )
+    elif repository_mode == "postgres":
+        with postgres_connection() as connection:
+            if seed_demo:
+                seed_phase_two_feature_postgres(connection)
+            training_bundle = get_feature_training_bundle_postgres(
+                connection,
+                feature_key=feature_key,
+                target_task=target_task,
+                team_code=team_code,
+                season_label=season_label,
+                train_ratio=train_ratio,
+                validation_ratio=validation_ratio,
+                drop_null_targets=drop_null_targets,
+                preview_limit=preview_limit,
+            )
+    else:
+        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+
+    return {
+        "repository_mode": repository_mode,
+        "filters": {
+            "feature_key": feature_key,
+            "target_task": target_task,
+            "team_code": team_code,
+            "season_label": season_label,
+            "train_ratio": train_ratio,
+            "validation_ratio": validation_ratio,
+            "drop_null_targets": drop_null_targets,
+            "preview_limit": preview_limit,
+        },
+        **training_bundle,
+    }
+
+
+@router.get("/features/dataset/training-task-matrix")
+def feature_dataset_training_task_matrix(
+    repository_mode: str = Query(default="in_memory"),
+    seed_demo: bool = Query(default=True),
+    feature_key: str = Query(default="baseline_team_features_v1"),
+    team_code: str | None = Query(default=None),
+    season_label: str | None = Query(default=None),
+    train_ratio: float = Query(default=0.7, gt=0, lt=1),
+    validation_ratio: float = Query(default=0.15, ge=0, lt=1),
+    drop_null_targets: bool = Query(default=True),
+) -> dict[str, object]:
+    if repository_mode == "in_memory":
+        repository = InMemoryIngestionRepository()
+        if seed_demo:
+            repository, _, _ = seed_phase_two_feature_in_memory()
+        training_task_matrix = get_feature_training_task_matrix_in_memory(
+            repository,
+            feature_key=feature_key,
+            team_code=team_code,
+            season_label=season_label,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            drop_null_targets=drop_null_targets,
+        )
+    elif repository_mode == "postgres":
+        with postgres_connection() as connection:
+            if seed_demo:
+                seed_phase_two_feature_postgres(connection)
+            training_task_matrix = get_feature_training_task_matrix_postgres(
+                connection,
+                feature_key=feature_key,
+                team_code=team_code,
+                season_label=season_label,
+                train_ratio=train_ratio,
+                validation_ratio=validation_ratio,
+                drop_null_targets=drop_null_targets,
+            )
+    else:
+        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+
+    return {
+        "repository_mode": repository_mode,
+        "filters": {
+            "feature_key": feature_key,
+            "team_code": team_code,
+            "season_label": season_label,
+            "train_ratio": train_ratio,
+            "validation_ratio": validation_ratio,
+            "drop_null_targets": drop_null_targets,
+        },
+        **training_task_matrix,
+    }
 
 
 @router.get("/jobs/recent")

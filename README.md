@@ -33,6 +33,16 @@ Compare the latest labeled validation runs at `http://localhost:8000/api/v1/admi
 18. Inspect a tighter recent trend window at `http://localhost:8000/api/v1/admin/ingestion/trends?repository_mode=in_memory&seed_demo=true&days=2`.
 19. Inspect retrieval reliability trends at `http://localhost:8000/api/v1/admin/retrieval/trends?repository_mode=in_memory&seed_demo=true`.
 20. Inspect parse and reconciliation quality trends at `http://localhost:8000/api/v1/admin/ingestion/quality-trends?repository_mode=in_memory&seed_demo=true`.
+21. Inspect the initial Phase 2 feature snapshot demo at `http://localhost:8000/api/v1/admin/phase-2-feature-demo?repository_mode=in_memory`.
+22. Query Phase 2 feature snapshots with team and season filters at `http://localhost:8000/api/v1/admin/features/snapshots?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025`.
+23. Inspect the aggregated Phase 2 feature summary for one team at `http://localhost:8000/api/v1/admin/features/summary?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025`.
+24. Export flattened Phase 2 feature rows for one team at `http://localhost:8000/api/v1/admin/features/dataset?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025`.
+25. Profile flattened Phase 2 feature rows at `http://localhost:8000/api/v1/admin/features/dataset/profile?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025`.
+26. Build chronological train/validation/test splits for flattened Phase 2 rows at `http://localhost:8000/api/v1/admin/features/dataset/splits?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025&train_ratio=0.5&validation_ratio=0.25`.
+27. Project a task-ready training view for one target at `http://localhost:8000/api/v1/admin/features/dataset/training-view?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025&target_task=spread_error_regression`.
+28. Build a split-aware training bundle for one target at `http://localhost:8000/api/v1/admin/features/dataset/training-bundle?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25`.
+29. Inspect the training manifest for one target at `http://localhost:8000/api/v1/admin/features/dataset/training-manifest?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025&target_task=spread_error_regression`.
+30. Compare training readiness across all supported targets at `http://localhost:8000/api/v1/admin/features/dataset/training-task-matrix?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025&train_ratio=0.5&validation_ratio=0.25`.
 
 ## Phase 0 Outcome
 This scaffold gives us:
@@ -44,7 +54,7 @@ This scaffold gives us:
 ## Phase Status
 Phase 0 is complete.
 Phase 1 is complete for the backend MVP data spine.
-Phase 2 is the recommended next build phase.
+Phase 2 is in progress with baseline feature generation, richer analytical fields, and a feature snapshot query API.
 
 ## Phase 1 Outcome
 The repo now includes:
