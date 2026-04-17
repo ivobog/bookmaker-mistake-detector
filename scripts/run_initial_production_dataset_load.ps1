@@ -13,9 +13,18 @@ $ErrorActionPreference = "Stop"
 
 $backendPath = Join-Path $PSScriptRoot "..\backend"
 $resolvedBackendPath = Resolve-Path $backendPath
+$backendSrcPath = Join-Path $resolvedBackendPath "src"
+$originalPythonPath = $env:PYTHONPATH
 
 Push-Location $resolvedBackendPath
 try {
+    if ([string]::IsNullOrWhiteSpace($originalPythonPath)) {
+        $env:PYTHONPATH = $backendSrcPath
+    }
+    else {
+        $env:PYTHONPATH = "$backendSrcPath$([IO.Path]::PathSeparator)$originalPythonPath"
+    }
+
     $arguments = @(
         "-m",
         "bookmaker_detector_api.cli.initial_production_dataset_load",
@@ -50,5 +59,6 @@ try {
     python @arguments
 }
 finally {
+    $env:PYTHONPATH = $originalPythonPath
     Pop-Location
 }
