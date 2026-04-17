@@ -2112,7 +2112,7 @@ def test_retrieval_trends_endpoint_returns_rollup() -> None:
     assert overview["retrieval_count"] == 5
     assert overview["successful_retrievals"] == 4
     assert overview["failed_retrievals"] == 1
-    assert overview["payload_saved_count"] == 0
+    assert overview["payload_saved_count"] == 1
     assert overview["missing_http_status_count"] == 1
     assert len(payload["retrieval_trends"]["daily_buckets"]) == 4
 
