@@ -30,7 +30,9 @@ from bookmaker_detector_api.services.model_market_board_sources import (
     _build_market_board_source_request_context,
     _normalize_market_board_source_games,
     build_model_market_board_source_games,
-    list_model_market_board_sources,
+)
+from bookmaker_detector_api.services.model_market_board_sources import (
+    list_model_market_board_sources as _list_model_market_board_sources,
 )
 from bookmaker_detector_api.services.model_market_board_store import (
     _build_market_board_refresh_change_summary,
@@ -100,6 +102,8 @@ from bookmaker_detector_api.services.model_records import (
     ModelSelectionSnapshotRecord,
     ModelTrainingRunRecord,
 )
+
+list_model_market_board_sources = _list_model_market_board_sources
 
 SUPPORTED_MODEL_TARGET_TASKS = {
     "point_margin_regression",

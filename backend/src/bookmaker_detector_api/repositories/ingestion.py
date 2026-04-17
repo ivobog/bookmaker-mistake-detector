@@ -36,14 +36,21 @@ from bookmaker_detector_api.repositories.ingestion_types import (
     DailyJobRunSummary,
     DailyPageRetrievalSummary,
     DataQualityIssueRecord,
-    IngestionRepository,
     JobRunRecord,
     PageRetrievalRecord,
     PageRetrievalSnapshot,
     PersistedCanonicalGame,
-    PersistedIngestionRun,
     PersistedRawRow,
 )
+from bookmaker_detector_api.repositories.ingestion_types import (
+    IngestionRepository as _IngestionRepository,
+)
+from bookmaker_detector_api.repositories.ingestion_types import (
+    PersistedIngestionRun as _PersistedIngestionRun,
+)
+
+IngestionRepository = _IngestionRepository
+PersistedIngestionRun = _PersistedIngestionRun
 
 
 class InMemoryIngestionRepository:
