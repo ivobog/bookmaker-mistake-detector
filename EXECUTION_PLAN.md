@@ -2,420 +2,277 @@
 
 ## 1. Planning Basis
 This execution plan is based on:
-- `bookmaker_mistake_detector_vision_document.md`
-- `bookmaker_mistake_detector_srs.md`
-- `bookmaker_mistake_detector_sdd.md`
+- `C:\Users\Ivica\Downloads\bookmaker_mistake_detector_srs_v_2_clean.md`
+- `C:\Users\Ivica\Downloads\bookmaker_mistake_detector_sdd_v_2_clean.md`
 
-Observed local state on April 16, 2026:
-- the project is now bootstrapped locally at `C:\Users\Ivica\Downloads\bookmakers-mistake-detector`
-- Phase 0 foundation work is complete
-- Phase 1 historical data spine work is functionally complete for the backend MVP
+This version replaces the older phase-status plan in the repository. The current planning target is not "finish Phase 5 polish." It is to bring the repository into the clean release baseline described by the new SRS/SDD.
 
-This execution plan started as a greenfield build plan and is now updated to reflect current delivery status.
+## 2. Goal
+Deliver a clean release candidate that:
+- preserves the existing NBA ingestion, analytics, modeling, opportunity, and backtest capabilities
+- separates analyst, admin, and development concerns
+- removes demo-driven behavior from stable runtime contracts
+- removes runtime schema creation from normal production paths
+- decomposes oversized modules into maintainable service and repository boundaries
+- leaves the repository looking like a product system rather than an accumulated workshop state
 
-## 2. Delivery Goal
-Deliver an MVP that can:
-- ingest historical NBA regular season team game pages for the last 4 completed seasons
-- normalize team-perspective rows into canonical games
-- calculate spread and total line error
-- generate time-safe historical features
-- discover recurring line-miss patterns
-- train lightweight residual models
-- score upcoming games and surface explainable opportunities
-- expose analyst and admin web experiences
-- validate signal quality with walk-forward backtests
+## 3. Current-State Findings
+Observed repository shape on April 17, 2026:
+- the API currently mounts only health and one large admin router under `/api/v1`
+- `backend/src/bookmaker_detector_api/api/admin_routes.py` is extremely large and currently mixes stable admin APIs, demo endpoints, orchestration helpers, and mutation-heavy workflows
+- `backend/src/bookmaker_detector_api/repositories/ingestion.py` is oversized and carries multiple persistence concerns in one file
+- `backend/src/bookmaker_detector_api/services/models.py` contains runtime schema creation helpers such as `ensure_model_tables(...)`, which conflicts with the migration-owned schema rule in the SDD
+- the root `README.md` still behaves like a long validation journal and endpoint inventory rather than a concise portable entry point
+- the repo already has strong functional coverage across ingestion, features, models, backtests, frontend, and runbooks, so the highest-value work is now structural cleanup and production hardening rather than net-new MVP capability
 
-## 3. Delivery Strategy
-Build in four execution tracks that run in parallel where possible:
-- `Track A: Platform and developer foundations`
-- `Track B: Data ingestion and canonical analytics`
-- `Track C: Intelligence layer: features, patterns, models, backtests`
-- `Track D: Product surface: APIs, analyst UI, admin UI`
+## 4. Delivery Strategy
+Execute the work in five tracks:
+- `Track A: API surface cleanup`
+- `Track B: persistence and schema cleanup`
+- `Track C: service decomposition and orchestration cleanup`
+- `Track D: documentation and repo cleanup`
+- `Track E: regression, acceptance, and release hardening`
 
-The critical path is:
-`data ingestion -> canonical games -> metrics -> features -> patterns/models -> opportunity generation -> UI`
+Critical path:
+`route separation -> side-effect removal -> schema ownership cleanup -> repository decomposition -> regression and acceptance`
 
-## 4. Recommended Phases
+## 5. Execution Phases
 
-### Phase 0: Foundation and Project Setup
-Duration: 1 week
-Status: Complete
+### Phase 1: Baseline and Gap Closure
+Objective:
+- freeze the clean-release scope and convert the SRS/SDD into a concrete backlog
 
-Objectives:
-- establish repository structure
-- choose MVP stack and coding standards
-- define environments and local developer workflow
-- create a thin vertical skeleton for API, jobs, database, and frontend
-
-Work items:
-- initialize monorepo or split repo structure
-- create backend service scaffold
-- create frontend scaffold
-- add Docker Compose for local development
-- provision PostgreSQL
-- add config management, logging, linting, formatting, and test runners
-- create initial CI pipeline for lint, unit tests, and type checks
-- define seed reference data for teams and seasons
+Tasks:
+- inventory all current routes and classify each as `analyst`, `admin`, `dev-only`, or `delete`
+- inventory query parameters that trigger seeding, auto-training, auto-selection, auto-materialization, auto-refresh, or other hidden mutations
+- inventory every runtime DDL entry point
+- inventory large modules and map them to target package boundaries from the SDD
+- crosswalk current tests and docs against SRS acceptance criteria
 
 Deliverables:
-- running local stack
-- base database migrations
-- CI baseline
-- repo conventions documented
+- route inventory
+- cleanup backlog with priorities
+- acceptance checklist mapped to real code areas
 
 Exit criteria:
-- `frontend`, `api`, `worker`, and `postgres` boot locally
-- one sample API route and one sample UI page are working
-- migrations and tests run in CI
+- every public endpoint and major module has an explicit keep/move/remove decision
+- the team has a ranked backlog instead of a general cleanup intention
 
-Completion notes:
-- local Docker development stack exists
-- backend, frontend, worker, and Postgres scaffolds are in place
-- baseline CI and repo conventions are present
+### Phase 2: API Surface Separation
+Objective:
+- reshape the runtime surface so stable product behavior is explicit and narrow
 
-### Phase 1: Historical Data Spine
-Duration: 2 to 3 weeks
-Status: Complete for backend MVP
-
-Objectives:
-- build the raw ingestion and canonical game backbone
-- make data correctness visible early
-
-Work items:
-- implement provider abstraction
-- implement page fetcher and retrieval metadata persistence
-- implement regular season section parsing
-- parse opponent, venue, score, ATS, and O/U fields
-- persist raw team-perspective rows with idempotency guards
-- implement canonical matching and reconciliation states
-- compute final margin, final total, spread error, and total error
-- add admin diagnostics for parse failures and reconciliation conflicts
-- create parser fixtures and canonicalization regression tests
+Tasks:
+- split the current admin mega-router into focused modules:
+  - `health`
+  - `analyst_opportunities`
+  - `analyst_patterns`
+  - `analyst_trends`
+  - `analyst_backtests`
+  - `admin_ingestion`
+  - `admin_features`
+  - `admin_models`
+  - `admin_backtests`
+  - `admin_maintenance`
+- create explicit `/api/v1/analyst/...` and `/api/v1/admin/...` namespaces
+- move demo and fixture flows out of stable runtime contracts into scripts, fixtures, tests, or dev-only routers
+- remove development toggles from stable GET endpoints
+- add typed request/response schemas for stable routes
+- enforce that analyst GET endpoints are read-only and side-effect-free
 
 Deliverables:
-- raw historical row store
-- canonical game table
-- metric computation pipeline
-- admin diagnostics for ingestion quality
+- decomposed route package
+- stable analyst surface
+- explicit admin mutation surface
+- isolated dev/demo entry points
 
 Exit criteria:
-- at least one provider works end to end for a representative sample
-- regular season rows are isolated correctly
-- canonical game creation is deterministic
-- data quality metrics are visible for missing lines and conflicts
+- stable analyst endpoints no longer accept demo-oriented mutation toggles
+- admin routes are smaller, responsibility-focused, and easier to test
+- ordinary reads do not trigger training, seeding, scoring, or materialization
 
-Completion notes:
-- one provider (`covers`) works end to end across fixture-backed and fetch-backed flows
-- raw rows, canonical games, metrics, retrievals, job runs, and data-quality issues persist
-- failed fetches and parse/canonicalization issues are recorded and queryable
-- admin diagnostics cover jobs, issues, stats, trends, retrieval trends, quality trends, and validation-run comparison
-- live Postgres validation has been performed repeatedly across the Phase 1 path
-- Phase 1 backend verification is currently backed by a passing test suite
+### Phase 3: Persistence and Schema Ownership Cleanup
+Objective:
+- make production persistence Postgres-first, explicit, and migration-owned
 
-### Phase 2: Analytical Core
-Duration: 2 weeks
-Status: Complete for backend MVP
-
-Objectives:
-- turn historical games into usable analytical context
-- establish reproducible feature and pattern pipelines
-
-Work items:
-- implement feature versioning
-- generate time-safe team, opponent, and matchup features
-- support rolling windows for 3, 5, and 10 games
-- implement rest, back-to-back, ATS trend, O/U trend, and volatility features
-- build pattern discovery engine using bucketed conditions
-- compute sample size, mean error, median error, hit rate, and variance
-- persist comparable historical matches
-- expose pattern and trend APIs
+Tasks:
+- break up `repositories/ingestion.py` into:
+  - `contracts.py`
+  - `records.py`
+  - `postgres/*`
+  - `in_memory/*`
+  - `reporting_queries.py`
+  - `quality_helpers.py`
+- move any remaining runtime DDL helpers out of normal service/repository execution paths
+- make migrations and init SQL the only production schema owners
+- confine in-memory repositories to tests, fixtures, and controlled development flows
+- centralize repository construction behind clearer contracts/factories
+- tighten transaction boundaries for mutation workflows
 
 Deliverables:
-- versioned feature snapshots
-- persisted pattern summaries
-- comparable-game lookup
-- initial analyst-facing pattern explorer data
+- decomposed repository layer
+- removal of runtime schema creation from production paths
+- clearer repository contract boundary
 
 Exit criteria:
-- features use only prior games
-- pattern discovery enforces minimum sample thresholds
-- historical comparable cases can be retrieved for a given condition set
+- production services can assume schema existence
+- no normal production request path performs table creation or alteration
+- persistence code is organized by responsibility rather than by feature phase
 
-Completion notes:
-- versioned feature snapshots and time-safe rolling team/matchup features are implemented
-- flattened feature datasets, profiles, chronological splits, training views, manifests, bundles, task matrices, and naive benchmark scoring are available
-- grouped pattern discovery, comparable-case retrieval, ranked comparables, and unified evidence bundles are implemented
-- evidence strength scoring, task-aware recommendation policies, persisted analysis artifacts, and artifact history rollups are available through admin APIs
-- Phase 2 backend verification is currently backed by a passing test suite and live Docker smoke tests across the analytical and artifact surfaces
+### Phase 4: Service and Job Decomposition
+Objective:
+- narrow service responsibilities and make heavy workflows explicit
 
-### Phase 3: Predictive and Opportunity Layer
-Duration: 2 weeks
-Status: Complete for backend MVP
-
-Objectives:
-- convert analytics into restrained, explainable recommendations
-
-Work items:
-- create training datasets for spread residual and total residual targets
-- train baseline models: one linear model and one tree-based model
-- implement model registry metadata and artifact storage
-- ingest future schedule and available market lines
-- score future games
-- combine predictions with pattern support
-- implement opportunity thresholds and opportunity scoring
-- generate evidence objects separating model, pattern, and comparable-game support
-- expose opportunity list and detail APIs
+Tasks:
+- split oversized analytics/service modules by responsibility:
+  - ingestion
+  - canonicalization
+  - metrics
+  - features
+  - patterns
+  - model registry/training/evaluation/selection/scoring
+  - opportunities
+  - backtesting
+  - diagnostics
+- consolidate orchestration logic into explicit job or service entry points
+- remove repeated demo branches from business logic
+- ensure scheduled and admin-triggered jobs follow the explicit dependency chain:
+  - ingestion
+  - canonicalization
+  - metrics
+  - features
+  - patterns
+  - training
+  - scoring
+  - opportunities
+- preserve artifact traceability across features, models, scoring runs, opportunities, and backtests
 
 Deliverables:
-- residual model pipeline
-- scheduled game scoring pipeline
-- opportunity generation service
-- explainable opportunity API responses
+- smaller service modules
+- explicit job entry points
+- reduced branching between demo and production logic
 
 Exit criteria:
-- model runs are versioned and reproducible
-- opportunities are created only when thresholds are met
-- each opportunity includes explanation summary and supporting evidence
+- heavy workflows are triggered only through jobs, scripts, or explicit admin mutations
+- services are understandable without phase-history context
 
-Completion notes:
-- lightweight regression baselines, evaluation snapshots, selection history, scoring previews, opportunities, market boards, refresh queues, scoring queues, cadence runs, source runs, and external-source refresh providers are implemented
-- the backend can refresh, score, and materialize explainable opportunities for upcoming boards through persisted operational workflows
-- Phase 3 backend verification is currently backed by a passing test suite and live Docker smoke tests across the predictive and market-board surfaces
+### Phase 5: Documentation and Repository Cleanup
+Objective:
+- make the repository portable and release-oriented
 
-### Phase 4: Backtesting, UX, and Operations Hardening
-Duration: 2 weeks
-Status: Complete for MVP
-
-Objectives:
-- validate signal quality
-- complete analyst and admin workflows
-- make the system operable
-
-Work items:
-- implement walk-forward backtest engine
-- simulate threshold-based spread and totals strategies
-- compute ROI, hit rate, push rate, and edge-bucket performance
-- build analyst dashboard
-- build opportunity detail page
-- build backtest results page
-- build admin jobs, issue views, and run history
-- add job orchestration, retries, and structured audit logging
-- add alerting hooks for ingestion failures and zero-output scoring runs
+Tasks:
+- rewrite the root `README.md` into a concise entry point
+- move operational depth into `docs/operations`, `docs/release`, and `docs/architecture`
+- remove machine-local paths and stale phase narrative from production-facing docs
+- classify leftover scaffolding into:
+  - keep as production
+  - move to admin/internal
+  - move to scripts/tests/fixtures
+  - delete
+- remove dead imports, duplicate helpers, and obsolete development leftovers
 
 Deliverables:
-- backtest results and stored runs
-- analyst UI MVP
-- admin UI MVP
-- production-like job flow and observability
-
-Completion notes:
-- persisted walk-forward backtests, fold summaries, and history views are implemented
-- the frontend now supports analyst backtest inspection, opportunity review, provenance drill-through, and artifact comparison workflows
-- the compare route includes alignment checks, mismatch summaries, and analyst guidance for fold-vs-opportunity review
-- Phase 4 verification is backed by passing frontend typecheck, lint, and build checks
+- concise README
+- cleaned supporting docs
+- reduced repository noise
 
 Exit criteria:
-- walk-forward evaluation runs without leakage
-- analyst can inspect opportunities, evidence, and comparables
-- admin can inspect jobs, parse issues, and backtest history
+- a new engineer can understand what the project is and how to run it without reading a long phase log
+- production-facing docs no longer depend on one developer's local environment
 
-### Phase 5: Release Candidate
-Duration: 1 week
-Status: In progress
+### Phase 6: Regression, Acceptance, and Release Gate
+Objective:
+- prove that cleanup did not break the product and that the repository meets the clean baseline
 
-Objectives:
-- stabilize the MVP for internal use
-
-Work items:
-- full regression pass
-- parser resilience checks
-- performance tuning on key queries
-- documentation and runbooks
-- seed demo dataset or initial production dataset load
-- acceptance review against SRS MVP criteria
+Tasks:
+- expand automated regression around:
+  - parser/canonicalization correctness
+  - feature time-safety
+  - model and backtest reproducibility
+  - analyst/admin route separation
+  - side-effect-free stable reads
+  - absence of runtime DDL in production flows
+- run backend tests, frontend validation, and release smoke checks
+- validate SRS acceptance criteria one by one
+- record residual risks and known issues
+- produce a final release checklist outcome
 
 Deliverables:
-- MVP release candidate
-- known issues list
-- operating checklist
-
-Current slice notes:
-- Phase 5 has started with a runnable regression script
-- release-candidate runbook documentation is now present
-- known-issues tracking is now explicitly seeded in the repo
+- passing regression evidence
+- completed acceptance matrix
+- release recommendation with known gaps if any remain
 
 Exit criteria:
-- MVP acceptance checklist passes
-- core jobs run in order reliably
-- demo workflow works end to end from ingestion to surfaced opportunities
+- the clean baseline in the SRS/SDD is demonstrably satisfied
+- remaining gaps, if any, are explicit and small enough for a controlled release decision
 
-## 5. Suggested Sprint Breakdown
+## 6. Priority Backlog
 
-### Sprint 1
-- repository bootstrap
-- local infrastructure
-- DB migrations
-- team/season/provider reference tables
-- CI and quality tooling
+### P0: Must Do First
+- split `admin_routes.py`
+- create `/analyst` and `/admin` route boundaries
+- remove demo mutation toggles from stable GET contracts
+- remove runtime DDL from production service paths
+- decompose the ingestion repository layer
+- rewrite the main README
+- add regression coverage for side-effect-free reads and route separation
 
-### Sprint 2
-- provider adapter
-- page retrieval
-- raw parsing
-- raw row persistence
-- parser fixtures
+### P1: Should Do During Cleanup
+- decompose oversized service modules, especially modeling/orchestration paths
+- move demo flows into scripts/tests/fixtures or dev-only mounts
+- standardize schema models and response contracts
+- tighten job/service naming and package structure
+- improve transaction and failure handling around admin mutation workflows
 
-### Sprint 3
-- canonicalization
-- metrics
-- ingestion diagnostics
-- reconciliation diagnostics
+### P2: Follow-Up Hardening
+- refine worker/job orchestration boundaries
+- improve admin operational dashboards after cleanup settles
+- add more focused test utilities around separated repository contracts
 
-### Sprint 4
-- feature generation
-- feature versioning
-- team trend summaries
-- pattern discovery
+## 7. Suggested Order of Execution
+1. Freeze endpoint and module inventory.
+2. Refactor route composition and create analyst/admin/dev boundaries.
+3. Remove hidden side effects from stable reads.
+4. Eliminate runtime DDL from production paths.
+5. Decompose repository and service layers behind clear contracts.
+6. Clean documentation and remove repo leftovers.
+7. Run full regression and acceptance validation.
 
-### Sprint 5
-- model training
-- scheduled game ingestion
-- prediction scoring
-- opportunity generation
+## 8. Risks and Mitigations
 
-### Sprint 6
-- backtesting
-- dashboard UI
-- opportunity detail UI
-- admin job/run pages
-
-### Sprint 7
-- hardening
-- observability
-- acceptance validation
-- release prep
-
-## 6. Workstream Backlog by Priority
-
-### P0: Must Have
-- repo and environment bootstrap
-- Postgres schema and migrations
-- provider adapter and parsing
-- raw row persistence
-- canonical game normalization
-- spread and total error metrics
-- time-safe feature generation
-- residual model training and scoring
-- opportunity generation and evidence model
-- walk-forward backtesting
-- analyst opportunities UI
-- admin diagnostics UI
-
-### P1: Should Have
-- raw page snapshot storage
-- model comparison between linear and tree baselines
-- richer comparable-game ranking
-- structured logging and alerting
-- job retry and rerun controls
-
-### P2: Nice to Have After MVP
-- additional providers
-- opening vs closing line support
-- richer charting and filters
-- more advanced model explainability
-- more operational dashboards
-
-## 7. Team Roles
-Minimum effective team:
-- `1 full-stack lead` for architecture, API, and cross-cutting delivery
-- `1 data/backend engineer` for ingestion, canonicalization, features, jobs
-- `1 frontend engineer` for analyst and admin UX
-- `1 data scientist / ML engineer` for pattern logic, models, and backtests
-- `1 QA partner or shared test ownership` across the team
-
-If the team is smaller, execution order should prioritize:
-1. data spine
-2. analytical core
-3. backtests
-4. UI polish
-
-## 8. Major Risks and Mitigations
-
-### Risk: provider layout changes
+### Risk: cleanup breaks current demo-driven flows
 Mitigation:
-- isolate provider adapters
-- store sample fixtures
-- build parser regression tests early
+- preserve demo coverage in scripts/tests before removing route-level shortcuts
+- migrate behavior first, then delete old entry points
 
-### Risk: canonicalization errors poison downstream analytics
+### Risk: route splitting causes frontend/API drift
 Mitigation:
-- use explicit reconciliation statuses
-- expose conflict diagnostics in admin views
-- block questionable records from model training unless reviewed
+- add typed schemas and contract tests while splitting routes
+- migrate frontend calls behind stable analyst endpoints before deleting old ones
 
-### Risk: leakage invalidates results
+### Risk: runtime DDL removal exposes missing migration coverage
 Mitigation:
-- centralize time-safe feature logic
-- test feature windows and backtest splits explicitly
-- version features, models, and strategies
+- inventory all tables touched by `ensure_*` helpers
+- add missing SQL init or migration scripts before removing runtime creation logic
 
-### Risk: attractive patterns are just noise
+### Risk: large-file decomposition creates temporary duplication
 Mitigation:
-- enforce minimum sample size
-- require multi-season coverage where possible
-- compare performance by edge bucket in walk-forward backtests
+- split by responsibility in small slices
+- keep regression coverage running after each extraction step
 
-### Risk: recommendation quality is too noisy
-Mitigation:
-- keep thresholds conservative
-- separate prediction from surfaced opportunity
-- prefer fewer stronger opportunities
+## 9. Definition of Done
+This execution plan is complete when the repository satisfies all of the following:
+- analyst, admin, and development concerns are clearly separated
+- stable read endpoints are side-effect-free
+- demo helpers no longer shape stable product contracts
+- runtime schema creation is not part of normal production execution
+- route and repository responsibilities are decomposed into maintainable modules
+- README and supporting docs are concise, portable, and clean
+- regression and acceptance evidence support the clean release claim
 
-## 9. Acceptance Gates
-
-### Gate A: Data Foundation
-- can ingest and parse target provider pages
-- raw parse quality is measurable
-- canonical games are reproducible
-
-### Gate B: Analytical Readiness
-- spread error and total error are validated
-- features are time-safe
-- pattern summaries are queryable and interpretable
-
-### Gate C: Signal Readiness
-- residual models train successfully
-- opportunity rules produce explainable outputs
-- walk-forward backtests complete successfully
-
-### Gate D: Product Readiness
-- dashboard, detail, pattern, and admin views work end to end
-- jobs are observable and retryable
-- MVP acceptance criteria from the SRS are satisfied
-
-## 10. Current Phase Status
-
-### Completed
-- Phase 0: Foundation and Project Setup
-- Phase 1: Historical Data Spine
-- Phase 2: Analytical Core
-- Phase 3: Predictive and Opportunity Layer
-- Phase 4: Backtesting, UX, and Operations Hardening
-
-### Active recommendation
-- continue Phase 5: Release Candidate
-
-### Phase 5 current focus
-- use the new regression script as the default release-candidate validation path
-- tighten documentation, runbooks, and known-issues handling for internal MVP use
-- harden operational edges around cadence orchestration, retries, and alerting
-
-## 11. Immediate Next Steps
-1. Expand the Phase 5 regression pass from code checks into a documented Docker/manual smoke checklist.
-2. Harden retries, audit logging, and failure handling around ingestion, market-board refresh, and scoring cadence flows.
-3. Review acceptance criteria from the SRS against the delivered MVP surfaces and capture any remaining gaps.
-4. Produce a fuller internal rollout checklist on top of the new known-issues tracker and runbook.
-5. Run the first end-to-end release-candidate validation pass and record findings.
-
-## 12. Recommendation
-The best execution approach is to treat the product as a data-quality-first analytics system, not a model-first betting app. If Phase 1 is weak, everything downstream becomes misleading; if Phase 1 is strong, the rest of the roadmap becomes much safer and faster.
+## 10. Recommended Immediate Next Steps
+1. Create a route inventory from `backend/src/bookmaker_detector_api/api/admin_routes.py` and classify each endpoint into keep/move/delete buckets.
+2. Identify every `seed_demo`, `auto_*`, and runtime materialization toggle that currently affects request behavior.
+3. Extract the first stable analyst router from the current admin surface, starting with opportunity and backtest reads.
+4. Replace runtime schema creation in modeling flows with migration-owned setup.
+5. Rewrite `README.md` after the new route and runtime boundaries are in place.

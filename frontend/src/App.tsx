@@ -1,7 +1,24 @@
 import { useEffect, useState } from "react";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
-const defaultQuery = new URLSearchParams({
+const analystBacktestQuery = new URLSearchParams({
+  target_task: "spread_error_regression",
+  minimum_train_games: "1",
+  test_window_games: "1",
+  train_ratio: "0.5",
+  validation_ratio: "0.25"
+});
+
+const adminBacktestHistoryQuery = new URLSearchParams({
+  target_task: "spread_error_regression",
+  minimum_train_games: "1",
+  test_window_games: "1",
+  train_ratio: "0.5",
+  validation_ratio: "0.25",
+  recent_limit: "6"
+});
+
+const adminBacktestMutationQuery = new URLSearchParams({
   repository_mode: "in_memory",
   seed_demo: "true",
   auto_run_demo: "true",
@@ -13,12 +30,26 @@ const defaultQuery = new URLSearchParams({
   recent_limit: "6"
 });
 
-const defaultOpportunityQuery = new URLSearchParams({
-  repository_mode: "in_memory",
-  seed_demo: "true",
-  auto_train_demo: "true",
-  auto_select_demo: "true",
-  auto_materialize_demo: "true",
+const analystOpportunityQuery = new URLSearchParams({
+  target_task: "spread_error_regression",
+  team_code: "LAL",
+  season_label: "2024-2025",
+  canonical_game_id: "3",
+  train_ratio: "0.5",
+  validation_ratio: "0.25"
+});
+
+const adminOpportunityHistoryQuery = new URLSearchParams({
+  target_task: "spread_error_regression",
+  team_code: "LAL",
+  season_label: "2024-2025",
+  canonical_game_id: "3",
+  train_ratio: "0.5",
+  validation_ratio: "0.25",
+  recent_limit: "6"
+});
+
+const adminOpportunityMutationQuery = new URLSearchParams({
   target_task: "spread_error_regression",
   team_code: "LAL",
   season_label: "2024-2025",
@@ -29,9 +60,6 @@ const defaultOpportunityQuery = new URLSearchParams({
 });
 
 const defaultModelArtifactQuery = new URLSearchParams({
-  repository_mode: "in_memory",
-  seed_demo: "true",
-  auto_train_demo: "true",
   target_task: "spread_error_regression",
   train_ratio: "0.5",
   validation_ratio: "0.25"
@@ -347,7 +375,7 @@ type ProvenanceInspectorData = {
 };
 
 async function fetchBacktestHistory(): Promise<BacktestHistoryResponse> {
-  const response = await fetch(`${apiBaseUrl}/api/v1/admin/models/backtests/history?${defaultQuery}`);
+  const response = await fetch(`${apiBaseUrl}/api/v1/admin/models/backtests/history?${adminBacktestHistoryQuery}`);
   if (!response.ok) {
     throw new Error(`Failed to load backtest history (${response.status})`);
   }
@@ -355,7 +383,7 @@ async function fetchBacktestHistory(): Promise<BacktestHistoryResponse> {
 }
 
 async function runBacktest(): Promise<BacktestRunResponse> {
-  const runQuery = new URLSearchParams(defaultQuery);
+  const runQuery = new URLSearchParams(adminBacktestMutationQuery);
   runQuery.delete("auto_run_demo");
   runQuery.delete("recent_limit");
   const response = await fetch(`${apiBaseUrl}/api/v1/admin/models/backtests/run?${runQuery}`, {
@@ -369,7 +397,7 @@ async function runBacktest(): Promise<BacktestRunResponse> {
 
 async function fetchBacktestRunDetail(backtestRunId: number): Promise<BacktestRunResponse> {
   const response = await fetch(
-    `${apiBaseUrl}/api/v1/admin/models/backtests/${backtestRunId}?${defaultQuery}`
+    `${apiBaseUrl}/api/v1/analyst/backtests/${backtestRunId}?${analystBacktestQuery}`
   );
   if (!response.ok) {
     throw new Error(`Failed to load backtest run (${response.status})`);
@@ -379,7 +407,7 @@ async function fetchBacktestRunDetail(backtestRunId: number): Promise<BacktestRu
 
 async function fetchOpportunityHistory(): Promise<OpportunityHistoryResponse> {
   const response = await fetch(
-    `${apiBaseUrl}/api/v1/admin/models/opportunities/history?${defaultOpportunityQuery}`
+    `${apiBaseUrl}/api/v1/admin/models/opportunities/history?${adminOpportunityHistoryQuery}`
   );
   if (!response.ok) {
     throw new Error(`Failed to load opportunity history (${response.status})`);
@@ -388,7 +416,7 @@ async function fetchOpportunityHistory(): Promise<OpportunityHistoryResponse> {
 }
 
 async function fetchOpportunities(): Promise<OpportunityListResponse> {
-  const response = await fetch(`${apiBaseUrl}/api/v1/admin/models/opportunities?${defaultOpportunityQuery}`);
+  const response = await fetch(`${apiBaseUrl}/api/v1/analyst/opportunities?${analystOpportunityQuery}`);
   if (!response.ok) {
     throw new Error(`Failed to load opportunities (${response.status})`);
   }
@@ -397,7 +425,7 @@ async function fetchOpportunities(): Promise<OpportunityListResponse> {
 
 async function fetchOpportunityDetail(opportunityId: number): Promise<OpportunityDetailResponse> {
   const response = await fetch(
-    `${apiBaseUrl}/api/v1/admin/models/opportunities/${opportunityId}?${defaultOpportunityQuery}`
+    `${apiBaseUrl}/api/v1/analyst/opportunities/${opportunityId}?${analystOpportunityQuery}`
   );
   if (!response.ok) {
     throw new Error(`Failed to load opportunity detail (${response.status})`);
@@ -406,7 +434,7 @@ async function fetchOpportunityDetail(opportunityId: number): Promise<Opportunit
 }
 
 async function materializeOpportunities(): Promise<OpportunityMaterializeResponse> {
-  const materializeQuery = new URLSearchParams(defaultOpportunityQuery);
+  const materializeQuery = new URLSearchParams(adminOpportunityMutationQuery);
   materializeQuery.delete("auto_materialize_demo");
   materializeQuery.delete("recent_limit");
   const response = await fetch(
@@ -477,18 +505,13 @@ async function fetchScoringRunDetail(
   scenario: Record<string, unknown>
 ): Promise<ScoringRunDetailResponse> {
   const query = new URLSearchParams({
-    repository_mode: "in_memory",
-    seed_demo: "true",
-    auto_train_demo: "true",
-    auto_select_demo: "true",
-    auto_materialize_demo: "true",
-    target_task: String(readNested(scenario, "target_task") ?? defaultOpportunityQuery.get("target_task") ?? "spread_error_regression"),
+    target_task: String(readNested(scenario, "target_task") ?? adminOpportunityMutationQuery.get("target_task") ?? "spread_error_regression"),
     season_label: String(readNested(scenario, "season_label") ?? "2025-2026"),
     game_date: String(readNested(scenario, "game_date") ?? "2026-04-20"),
     home_team_code: String(readNested(scenario, "home_team_code") ?? "LAL"),
     away_team_code: String(readNested(scenario, "away_team_code") ?? "BOS"),
-    train_ratio: defaultOpportunityQuery.get("train_ratio") ?? "0.5",
-    validation_ratio: defaultOpportunityQuery.get("validation_ratio") ?? "0.25"
+    train_ratio: adminOpportunityMutationQuery.get("train_ratio") ?? "0.5",
+    validation_ratio: adminOpportunityMutationQuery.get("validation_ratio") ?? "0.25"
   });
 
   const homeSpreadLine = readNested(scenario, "home_spread_line");
@@ -3112,8 +3135,8 @@ export default function App() {
         : "This view turns the Phase 3 scoring pipeline into an analyst workflow. It surfaces recent opportunities, keeps the evidence bundle attached, and lets you inspect why a case is only reviewable or strong enough to escalate.";
   const activeServicePath =
     route.name === "backtests"
-      ? `${apiBaseUrl}/api/v1/admin/models/backtests`
-      : `${apiBaseUrl}/api/v1/admin/models/opportunities`;
+      ? `${apiBaseUrl}/api/v1/analyst/backtests`
+      : `${apiBaseUrl}/api/v1/analyst/opportunities`;
   const backtestOverviewHref = routeHash({ name: "backtests" });
   const activeRunHref = activeRun ? routeHash({ name: "backtest-run", runId: activeRun.id }) : undefined;
   const activeOpportunityHref =

@@ -3,6 +3,7 @@ from datetime import date
 from fastapi import APIRouter, Body, Query
 from pydantic import BaseModel, Field
 
+from bookmaker_detector_api.config import settings
 from bookmaker_detector_api.db.postgres import postgres_connection
 from bookmaker_detector_api.demo import (
     run_phase_one_demo,
@@ -32,22 +33,14 @@ from bookmaker_detector_api.services.features import (
     get_feature_analysis_artifact_catalog_postgres,
     get_feature_analysis_artifact_history_in_memory,
     get_feature_analysis_artifact_history_postgres,
-    get_feature_comparable_cases_in_memory,
-    get_feature_comparable_cases_postgres,
     get_feature_dataset_in_memory,
     get_feature_dataset_postgres,
     get_feature_dataset_profile_in_memory,
     get_feature_dataset_profile_postgres,
     get_feature_dataset_splits_in_memory,
     get_feature_dataset_splits_postgres,
-    get_feature_evidence_bundle_in_memory,
-    get_feature_evidence_bundle_postgres,
-    get_feature_pattern_catalog_in_memory,
-    get_feature_pattern_catalog_postgres,
     get_feature_snapshot_catalog_in_memory,
     get_feature_snapshot_catalog_postgres,
-    get_feature_snapshot_summary_in_memory,
-    get_feature_snapshot_summary_postgres,
     get_feature_training_benchmark_in_memory,
     get_feature_training_benchmark_postgres,
     get_feature_training_bundle_in_memory,
@@ -62,8 +55,6 @@ from bookmaker_detector_api.services.features import (
     materialize_feature_analysis_artifacts_postgres,
 )
 from bookmaker_detector_api.services.models import (
-    get_model_backtest_detail_in_memory,
-    get_model_backtest_detail_postgres,
     get_model_backtest_history_in_memory,
     get_model_backtest_history_postgres,
     get_model_evaluation_history_in_memory,
@@ -94,8 +85,6 @@ from bookmaker_detector_api.services.models import (
     get_model_market_board_scoring_queue_postgres,
     get_model_market_board_source_run_history_in_memory,
     get_model_market_board_source_run_history_postgres,
-    get_model_opportunity_detail_in_memory,
-    get_model_opportunity_detail_postgres,
     get_model_opportunity_history_in_memory,
     get_model_opportunity_history_postgres,
     get_model_scoring_history_in_memory,
@@ -114,15 +103,11 @@ from bookmaker_detector_api.services.models import (
     get_model_training_run_detail_postgres,
     get_model_training_summary_in_memory,
     get_model_training_summary_postgres,
-    list_model_backtest_runs_in_memory,
-    list_model_backtest_runs_postgres,
     list_model_evaluation_snapshots_in_memory,
     list_model_evaluation_snapshots_postgres,
     list_model_market_board_sources,
     list_model_market_boards_in_memory,
     list_model_market_boards_postgres,
-    list_model_opportunities_in_memory,
-    list_model_opportunities_postgres,
     list_model_registry_in_memory,
     list_model_registry_postgres,
     list_model_scoring_runs_in_memory,
@@ -174,6 +159,404 @@ class FutureSlateGameRequest(BaseModel):
 class FutureSlateRequest(BaseModel):
     slate_label: str | None = None
     games: list[FutureSlateGameRequest] = Field(min_length=1, max_length=20)
+
+
+def _use_postgres_stable_read_mode() -> bool:
+    return settings.api_env.lower() == "production"
+
+
+def _prepare_in_memory_backtest_history_repository(
+    *,
+    feature_key: str,
+    target_task: str,
+    team_code: str | None,
+    season_label: str | None,
+    selection_policy_name: str,
+    minimum_train_games: int,
+    test_window_games: int,
+    train_ratio: float,
+    validation_ratio: float,
+) -> InMemoryIngestionRepository:
+    repository, _, _ = seed_phase_two_feature_in_memory()
+    run_model_backtest_in_memory(
+        repository,
+        feature_key=feature_key,
+        target_task=target_task,
+        team_code=team_code,
+        season_label=season_label,
+        selection_policy_name=selection_policy_name,
+        minimum_train_games=minimum_train_games,
+        test_window_games=test_window_games,
+        train_ratio=train_ratio,
+        validation_ratio=validation_ratio,
+    )
+    return repository
+
+
+def _prepare_in_memory_opportunity_history_repository(
+    *,
+    feature_key: str,
+    target_task: str | None,
+    team_code: str | None,
+    season_label: str | None,
+    canonical_game_id: int | None,
+    source_kind: str | None,
+    game_date: date,
+    home_team_code: str,
+    away_team_code: str,
+    home_spread_line: float | None,
+    total_line: float | None,
+    train_ratio: float,
+    validation_ratio: float,
+    limit: int,
+    include_evidence: bool,
+    dimensions: tuple[str, ...],
+    comparable_limit: int,
+    min_pattern_sample_size: int,
+) -> InMemoryIngestionRepository:
+    repository, _, _ = seed_phase_two_feature_in_memory()
+    if target_task is not None:
+        train_phase_three_models_in_memory(
+            repository,
+            feature_key=feature_key,
+            target_task=target_task,
+            team_code=None if source_kind == "future_scenario" else team_code,
+            season_label=None if source_kind == "future_scenario" else season_label,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+        promote_best_model_in_memory(repository, target_task=target_task)
+        if source_kind == "future_scenario":
+            materialize_model_future_opportunities_in_memory(
+                repository,
+                feature_key=feature_key,
+                target_task=target_task,
+                season_label=season_label or "2025-2026",
+                game_date=game_date,
+                home_team_code=home_team_code,
+                away_team_code=away_team_code,
+                home_spread_line=home_spread_line,
+                total_line=total_line,
+                include_evidence=include_evidence,
+                evidence_dimensions=dimensions,
+                comparable_limit=comparable_limit,
+                min_pattern_sample_size=min_pattern_sample_size,
+                train_ratio=train_ratio,
+                validation_ratio=validation_ratio,
+            )
+        else:
+            materialize_model_opportunities_in_memory(
+                repository,
+                feature_key=feature_key,
+                target_task=target_task,
+                team_code=team_code,
+                season_label=season_label,
+                canonical_game_id=canonical_game_id,
+                limit=limit,
+                include_evidence=include_evidence,
+                evidence_dimensions=dimensions,
+                comparable_limit=comparable_limit,
+                min_pattern_sample_size=min_pattern_sample_size,
+                train_ratio=train_ratio,
+                validation_ratio=validation_ratio,
+            )
+    return repository
+
+
+def _prepare_in_memory_phase_three_model_repository(
+    *,
+    feature_key: str,
+    target_task: str | None,
+    team_code: str | None,
+    season_label: str | None,
+    train_ratio: float,
+    validation_ratio: float,
+    promote_best: bool = False,
+) -> InMemoryIngestionRepository:
+    repository, _, _ = seed_phase_two_feature_in_memory()
+    if target_task is not None:
+        train_phase_three_models_in_memory(
+            repository,
+            feature_key=feature_key,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+        if promote_best:
+            promote_best_model_in_memory(repository, target_task=target_task)
+    return repository
+
+
+def _prepare_in_memory_future_game_scoring_repository(
+    *,
+    feature_key: str,
+    target_task: str | None,
+    season_label: str,
+    game_date: date,
+    home_team_code: str,
+    away_team_code: str,
+    home_spread_line: float | None,
+    total_line: float | None,
+    include_evidence: bool,
+    dimensions: tuple[str, ...],
+    comparable_limit: int,
+    min_pattern_sample_size: int,
+    train_ratio: float,
+    validation_ratio: float,
+    materialize_preview: bool = False,
+) -> InMemoryIngestionRepository:
+    repository = _prepare_in_memory_phase_three_model_repository(
+        feature_key=feature_key,
+        target_task=target_task,
+        team_code=None,
+        season_label=None,
+        train_ratio=train_ratio,
+        validation_ratio=validation_ratio,
+        promote_best=target_task is not None,
+    )
+    if materialize_preview and target_task is not None:
+        materialize_model_future_game_preview_in_memory(
+            repository,
+            feature_key=feature_key,
+            target_task=target_task,
+            season_label=season_label,
+            game_date=game_date,
+            home_team_code=home_team_code,
+            away_team_code=away_team_code,
+            home_spread_line=home_spread_line,
+            total_line=total_line,
+            include_evidence=include_evidence,
+            evidence_dimensions=dimensions,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+    return repository
+
+
+def _prepare_in_memory_future_slate_repository(
+    *,
+    feature_key: str,
+    target_task: str,
+    games: list[dict[str, object]],
+    slate_label: str | None,
+    include_evidence: bool,
+    dimensions: tuple[str, ...],
+    comparable_limit: int,
+    min_pattern_sample_size: int,
+    train_ratio: float,
+    validation_ratio: float,
+    materialize_slate: bool = False,
+) -> InMemoryIngestionRepository:
+    repository = _prepare_in_memory_phase_three_model_repository(
+        feature_key=feature_key,
+        target_task=target_task,
+        team_code=None,
+        season_label=None,
+        train_ratio=train_ratio,
+        validation_ratio=validation_ratio,
+        promote_best=True,
+    )
+    if materialize_slate:
+        materialize_model_future_slate_in_memory(
+            repository,
+            feature_key=feature_key,
+            target_task=target_task,
+            games=games,
+            slate_label=slate_label,
+            include_evidence=include_evidence,
+            evidence_dimensions=dimensions,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+    return repository
+
+
+def _prepare_in_memory_market_board_refresh_repository(
+    *,
+    target_task: str,
+    source_name: str,
+    season_label: str,
+    game_date: date,
+    slate_label: str | None,
+    game_count: int | None,
+    source_path: str | None = None,
+) -> InMemoryIngestionRepository:
+    repository = InMemoryIngestionRepository()
+    refresh_model_market_board_in_memory(
+        repository,
+        target_task=target_task,
+        source_name=source_name,
+        season_label=season_label,
+        game_date=game_date,
+        slate_label=slate_label,
+        game_count=game_count,
+        source_path=source_path,
+    )
+    return repository
+
+
+def _prepare_in_memory_market_board_materialized_repository(
+    *,
+    target_task: str | None,
+    season_label: str | None,
+    slate_label: str | None,
+    game_date: date,
+    home_team_code: str,
+    away_team_code: str,
+    home_spread_line: float | None,
+    total_line: float | None,
+) -> InMemoryIngestionRepository:
+    repository = InMemoryIngestionRepository()
+    if target_task is not None:
+        materialize_model_market_board_in_memory(
+            repository,
+            target_task=target_task,
+            slate_label=slate_label,
+            games=[
+                {
+                    "season_label": season_label or "2025-2026",
+                    "game_date": game_date,
+                    "home_team_code": home_team_code,
+                    "away_team_code": away_team_code,
+                    "home_spread_line": home_spread_line,
+                    "total_line": total_line,
+                }
+            ],
+        )
+    return repository
+
+
+def _prepare_in_memory_market_board_score_repository(
+    *,
+    board_id: int,
+    feature_key: str,
+    target_task: str,
+    season_label: str,
+    slate_label: str | None,
+    game_date: date,
+    home_team_code: str,
+    away_team_code: str,
+    home_spread_line: float | None,
+    total_line: float | None,
+    train_ratio: float,
+    validation_ratio: float,
+) -> tuple[InMemoryIngestionRepository, str]:
+    repository, _, _ = seed_phase_two_feature_in_memory()
+    materialize_model_market_board_in_memory(
+        repository,
+        target_task=target_task,
+        slate_label=slate_label,
+        games=[
+            {
+                "season_label": season_label,
+                "game_date": game_date,
+                "home_team_code": home_team_code,
+                "away_team_code": away_team_code,
+                "home_spread_line": home_spread_line,
+                "total_line": total_line,
+            }
+        ],
+    )
+    board = get_model_market_board_detail_in_memory(repository, board_id=board_id)
+    resolved_target_task = str(board["target_task"]) if board is not None else target_task
+    train_phase_three_models_in_memory(
+        repository,
+        feature_key=feature_key,
+        target_task=resolved_target_task,
+        team_code=None,
+        season_label=None,
+        train_ratio=train_ratio,
+        validation_ratio=validation_ratio,
+    )
+    promote_best_model_in_memory(repository, target_task=resolved_target_task)
+    return repository, resolved_target_task
+
+
+def _prepare_in_memory_market_board_orchestration_repository(
+    *,
+    target_task: str,
+    source_name: str | None,
+    season_label: str,
+    game_date: date,
+    slate_label: str | None,
+    game_count: int | None,
+    feature_key: str,
+    train_ratio: float,
+    validation_ratio: float,
+    refresh_freshness_status: str | None = None,
+    refresh_pending_only: bool = False,
+    scoring_freshness_status: str | None = "fresh",
+    scoring_pending_only: bool = True,
+    recent_limit: int = 10,
+    run_refresh_orchestration: bool = False,
+    run_scoring_orchestration: bool = False,
+    run_cadence_orchestration: bool = False,
+) -> InMemoryIngestionRepository:
+    repository, _, _ = seed_phase_two_feature_in_memory()
+    resolved_source_name = source_name or "demo_daily_lines_v1"
+    refresh_model_market_board_in_memory(
+        repository,
+        target_task=target_task,
+        source_name=resolved_source_name,
+        season_label=season_label,
+        game_date=game_date,
+        slate_label=slate_label,
+        game_count=game_count,
+    )
+    train_phase_three_models_in_memory(
+        repository,
+        feature_key=feature_key,
+        target_task=target_task,
+        team_code=None,
+        season_label=None,
+        train_ratio=train_ratio,
+        validation_ratio=validation_ratio,
+    )
+    promote_best_model_in_memory(repository, target_task=target_task)
+    if run_refresh_orchestration:
+        orchestrate_model_market_board_refresh_in_memory(
+            repository,
+            target_task=target_task,
+            season_label=season_label,
+            source_name=source_name,
+            freshness_status=refresh_freshness_status,
+            pending_only=refresh_pending_only,
+            recent_limit=recent_limit,
+        )
+    if run_scoring_orchestration:
+        orchestrate_model_market_board_scoring_in_memory(
+            repository,
+            feature_key=feature_key,
+            target_task=target_task,
+            season_label=season_label,
+            source_name=source_name,
+            freshness_status=scoring_freshness_status,
+            pending_only=scoring_pending_only,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+    if run_cadence_orchestration:
+        orchestrate_model_market_board_cadence_in_memory(
+            repository,
+            feature_key=feature_key,
+            target_task=target_task,
+            season_label=season_label,
+            source_name=source_name,
+            refresh_freshness_status=refresh_freshness_status,
+            refresh_pending_only=refresh_pending_only,
+            scoring_freshness_status=scoring_freshness_status,
+            scoring_pending_only=scoring_pending_only,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            recent_limit=recent_limit,
+        )
+    return repository
 
 
 @router.get("/providers")
@@ -348,82 +731,8 @@ def phase_four_model_backtest_run(
     }
 
 
-@router.get("/models/backtests")
-def phase_four_model_backtests(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_run_demo: bool = Query(default=True),
-    feature_key: str = Query(default="baseline_team_features_v1"),
-    target_task: str = Query(default="spread_error_regression"),
-    team_code: str | None = Query(default=None),
-    season_label: str | None = Query(default=None),
-    selection_policy_name: str = Query(default="validation_mae_candidate_v1"),
-    minimum_train_games: int = Query(default=1, ge=1),
-    test_window_games: int = Query(default=1, ge=1),
-    train_ratio: float = Query(default=0.7, gt=0, lt=1),
-    validation_ratio: float = Query(default=0.15, ge=0, lt=1),
-) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_run_demo:
-            run_model_backtest_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                selection_policy_name=selection_policy_name,
-                minimum_train_games=minimum_train_games,
-                test_window_games=test_window_games,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        runs = list_model_backtest_runs_in_memory(
-            repository,
-            target_task=target_task,
-            team_code=team_code,
-            season_label=season_label,
-        )
-    elif repository_mode == "postgres":
-        with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_run_demo:
-                run_model_backtest_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=team_code,
-                    season_label=season_label,
-                    selection_policy_name=selection_policy_name,
-                    minimum_train_games=minimum_train_games,
-                    test_window_games=test_window_games,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-            runs = list_model_backtest_runs_postgres(
-                connection,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-            )
-    else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
-
-    return {
-        "repository_mode": repository_mode,
-        "backtest_run_count": len(runs),
-        "backtest_runs": [run.payload | {"id": run.id} for run in runs],
-    }
-
-
 @router.get("/models/backtests/history")
 def phase_four_model_backtest_history(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_run_demo: bool = Query(default=True),
     feature_key: str = Query(default="baseline_team_features_v1"),
     target_task: str = Query(default="spread_error_regression"),
     team_code: str | None = Query(default=None),
@@ -435,47 +744,8 @@ def phase_four_model_backtest_history(
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_run_demo:
-            run_model_backtest_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                selection_policy_name=selection_policy_name,
-                minimum_train_games=minimum_train_games,
-                test_window_games=test_window_games,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        history = get_model_backtest_history_in_memory(
-            repository,
-            target_task=target_task,
-            team_code=team_code,
-            season_label=season_label,
-            recent_limit=recent_limit,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_run_demo:
-                run_model_backtest_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=team_code,
-                    season_label=season_label,
-                    selection_policy_name=selection_policy_name,
-                    minimum_train_games=minimum_train_games,
-                    test_window_games=test_window_games,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
             history = get_model_backtest_history_postgres(
                 connection,
                 target_task=target_task,
@@ -483,8 +753,27 @@ def phase_four_model_backtest_history(
                 season_label=season_label,
                 recent_limit=recent_limit,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_backtest_history_repository(
+            feature_key=feature_key,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            selection_policy_name=selection_policy_name,
+            minimum_train_games=minimum_train_games,
+            test_window_games=test_window_games,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+        history = get_model_backtest_history_in_memory(
+            repository,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            recent_limit=recent_limit,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
@@ -498,78 +787,8 @@ def phase_four_model_backtest_history(
     }
 
 
-@router.get("/models/backtests/{backtest_run_id}")
-def phase_four_model_backtest_detail(
-    backtest_run_id: int,
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_run_demo: bool = Query(default=True),
-    feature_key: str = Query(default="baseline_team_features_v1"),
-    target_task: str = Query(default="spread_error_regression"),
-    team_code: str | None = Query(default=None),
-    season_label: str | None = Query(default=None),
-    selection_policy_name: str = Query(default="validation_mae_candidate_v1"),
-    minimum_train_games: int = Query(default=1, ge=1),
-    test_window_games: int = Query(default=1, ge=1),
-    train_ratio: float = Query(default=0.7, gt=0, lt=1),
-    validation_ratio: float = Query(default=0.15, ge=0, lt=1),
-) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_run_demo:
-            run_model_backtest_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                selection_policy_name=selection_policy_name,
-                minimum_train_games=minimum_train_games,
-                test_window_games=test_window_games,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        backtest_run = get_model_backtest_detail_in_memory(
-            repository,
-            backtest_run_id=backtest_run_id,
-        )
-    elif repository_mode == "postgres":
-        with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_run_demo:
-                run_model_backtest_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=team_code,
-                    season_label=season_label,
-                    selection_policy_name=selection_policy_name,
-                    minimum_train_games=minimum_train_games,
-                    test_window_games=test_window_games,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-            backtest_run = get_model_backtest_detail_postgres(
-                connection,
-                backtest_run_id=backtest_run_id,
-            )
-    else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
-
-    return {
-        "repository_mode": repository_mode,
-        "backtest_run": backtest_run,
-    }
-
-
 @router.get("/models/registry")
 def phase_three_model_registry(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
     feature_key: str = Query(default="baseline_team_features_v1"),
     target_task: str | None = Query(default=None),
     team_code: str | None = Query(default=None),
@@ -577,44 +796,27 @@ def phase_three_model_registry(
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_train_demo and target_task is not None:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        registries = list_model_registry_in_memory(
-            repository,
-            target_task=target_task,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_train_demo and target_task is not None:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=team_code,
-                    season_label=season_label,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
             registries = list_model_registry_postgres(
                 connection,
                 target_task=target_task,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_phase_three_model_repository(
+            feature_key=feature_key,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+        registries = list_model_registry_in_memory(
+            repository,
+            target_task=target_task,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
@@ -623,7 +825,6 @@ def phase_three_model_registry(
             "target_task": target_task,
             "team_code": team_code,
             "season_label": season_label,
-            "auto_train_demo": auto_train_demo,
         },
         "model_registry_count": len(registries),
         "model_registry": [
@@ -644,9 +845,6 @@ def phase_three_model_registry(
 
 @router.get("/models/runs")
 def phase_three_model_runs(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
     feature_key: str = Query(default="baseline_team_features_v1"),
     target_task: str | None = Query(default="spread_error_regression"),
     team_code: str | None = Query(default=None),
@@ -654,48 +852,31 @@ def phase_three_model_runs(
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_train_demo and target_task is not None:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        runs = list_model_training_runs_in_memory(
-            repository,
-            target_task=target_task,
-            team_code=team_code,
-            season_label=season_label,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_train_demo and target_task is not None:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=team_code,
-                    season_label=season_label,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
             runs = list_model_training_runs_postgres(
                 connection,
                 target_task=target_task,
                 team_code=team_code,
                 season_label=season_label,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_phase_three_model_repository(
+            feature_key=feature_key,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+        runs = list_model_training_runs_in_memory(
+            repository,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
@@ -704,7 +885,6 @@ def phase_three_model_runs(
             "target_task": target_task,
             "team_code": team_code,
             "season_label": season_label,
-            "auto_train_demo": auto_train_demo,
         },
         "model_run_count": len(runs),
         "model_runs": [
@@ -733,9 +913,6 @@ def phase_three_model_runs(
 @router.get("/models/runs/{run_id}")
 def phase_three_model_run_detail(
     run_id: int,
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
     feature_key: str = Query(default="baseline_team_features_v1"),
     target_task: str | None = Query(default="spread_error_regression"),
     team_code: str | None = Query(default=None),
@@ -743,38 +920,21 @@ def phase_three_model_run_detail(
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_train_demo and target_task is not None:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        run = get_model_training_run_detail_in_memory(repository, run_id=run_id)
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_train_demo and target_task is not None:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=team_code,
-                    season_label=season_label,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
             run = get_model_training_run_detail_postgres(connection, run_id=run_id)
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_phase_three_model_repository(
+            feature_key=feature_key,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+        run = get_model_training_run_detail_in_memory(repository, run_id=run_id)
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
@@ -783,7 +943,6 @@ def phase_three_model_run_detail(
             "target_task": target_task,
             "team_code": team_code,
             "season_label": season_label,
-            "auto_train_demo": auto_train_demo,
             "run_id": run_id,
         },
         "model_run": (
@@ -810,9 +969,6 @@ def phase_three_model_run_detail(
 
 @router.get("/models/summary")
 def phase_three_model_summary(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
     feature_key: str = Query(default="baseline_team_features_v1"),
     target_task: str | None = Query(default="spread_error_regression"),
     team_code: str | None = Query(default=None),
@@ -820,48 +976,31 @@ def phase_three_model_summary(
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_train_demo and target_task is not None:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        summary = get_model_training_summary_in_memory(
-            repository,
-            target_task=target_task,
-            team_code=team_code,
-            season_label=season_label,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_train_demo and target_task is not None:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=team_code,
-                    season_label=season_label,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
             summary = get_model_training_summary_postgres(
                 connection,
                 target_task=target_task,
                 team_code=team_code,
                 season_label=season_label,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_phase_three_model_repository(
+            feature_key=feature_key,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+        summary = get_model_training_summary_in_memory(
+            repository,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
@@ -870,7 +1009,6 @@ def phase_three_model_summary(
             "target_task": target_task,
             "team_code": team_code,
             "season_label": season_label,
-            "auto_train_demo": auto_train_demo,
         },
         "model_summary": summary,
     }
@@ -878,9 +1016,6 @@ def phase_three_model_summary(
 
 @router.get("/models/history")
 def phase_three_model_history(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
     feature_key: str = Query(default="baseline_team_features_v1"),
     target_task: str | None = Query(default="spread_error_regression"),
     team_code: str | None = Query(default=None),
@@ -889,41 +1024,8 @@ def phase_three_model_history(
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_train_demo and target_task is not None:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        history = get_model_training_history_in_memory(
-            repository,
-            target_task=target_task,
-            team_code=team_code,
-            season_label=season_label,
-            recent_limit=recent_limit,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_train_demo and target_task is not None:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=team_code,
-                    season_label=season_label,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
             history = get_model_training_history_postgres(
                 connection,
                 target_task=target_task,
@@ -931,8 +1033,24 @@ def phase_three_model_history(
                 season_label=season_label,
                 recent_limit=recent_limit,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_phase_three_model_repository(
+            feature_key=feature_key,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+        history = get_model_training_history_in_memory(
+            repository,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            recent_limit=recent_limit,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
@@ -941,7 +1059,6 @@ def phase_three_model_history(
             "target_task": target_task,
             "team_code": team_code,
             "season_label": season_label,
-            "auto_train_demo": auto_train_demo,
             "recent_limit": recent_limit,
         },
         "model_history": history,
@@ -950,9 +1067,6 @@ def phase_three_model_history(
 
 @router.get("/models/evaluations")
 def phase_three_model_evaluations(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
     feature_key: str = Query(default="baseline_team_features_v1"),
     target_task: str | None = Query(default="spread_error_regression"),
     model_family: str | None = Query(default=None),
@@ -961,46 +1075,29 @@ def phase_three_model_evaluations(
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_train_demo and target_task is not None:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        snapshots = list_model_evaluation_snapshots_in_memory(
-            repository,
-            target_task=target_task,
-            model_family=model_family,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_train_demo and target_task is not None:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=team_code,
-                    season_label=season_label,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
             snapshots = list_model_evaluation_snapshots_postgres(
                 connection,
                 target_task=target_task,
                 model_family=model_family,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_phase_three_model_repository(
+            feature_key=feature_key,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+        snapshots = list_model_evaluation_snapshots_in_memory(
+            repository,
+            target_task=target_task,
+            model_family=model_family,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
@@ -1010,7 +1107,6 @@ def phase_three_model_evaluations(
             "model_family": model_family,
             "team_code": team_code,
             "season_label": season_label,
-            "auto_train_demo": auto_train_demo,
         },
         "evaluation_snapshot_count": len(snapshots),
         "evaluation_snapshots": [
@@ -1038,9 +1134,6 @@ def phase_three_model_evaluations(
 
 @router.get("/models/evaluations/history")
 def phase_three_model_evaluation_history(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
     feature_key: str = Query(default="baseline_team_features_v1"),
     target_task: str | None = Query(default="spread_error_regression"),
     model_family: str | None = Query(default=None),
@@ -1050,48 +1143,31 @@ def phase_three_model_evaluation_history(
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_train_demo and target_task is not None:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        history = get_model_evaluation_history_in_memory(
-            repository,
-            target_task=target_task,
-            model_family=model_family,
-            recent_limit=recent_limit,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_train_demo and target_task is not None:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=team_code,
-                    season_label=season_label,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
             history = get_model_evaluation_history_postgres(
                 connection,
                 target_task=target_task,
                 model_family=model_family,
                 recent_limit=recent_limit,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_phase_three_model_repository(
+            feature_key=feature_key,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+        history = get_model_evaluation_history_in_memory(
+            repository,
+            target_task=target_task,
+            model_family=model_family,
+            recent_limit=recent_limit,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
@@ -1101,7 +1177,6 @@ def phase_three_model_evaluation_history(
             "model_family": model_family,
             "team_code": team_code,
             "season_label": season_label,
-            "auto_train_demo": auto_train_demo,
             "recent_limit": recent_limit,
         },
         "model_evaluation_history": history,
@@ -1111,9 +1186,6 @@ def phase_three_model_evaluation_history(
 @router.get("/models/evaluations/{snapshot_id}")
 def phase_three_model_evaluation_detail(
     snapshot_id: int,
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
     feature_key: str = Query(default="baseline_team_features_v1"),
     target_task: str | None = Query(default="spread_error_regression"),
     model_family: str | None = Query(default=None),
@@ -1122,44 +1194,27 @@ def phase_three_model_evaluation_detail(
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_train_demo and target_task is not None:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        snapshot = get_model_evaluation_snapshot_detail_in_memory(
-            repository,
-            snapshot_id=snapshot_id,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_train_demo and target_task is not None:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=team_code,
-                    season_label=season_label,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
             snapshot = get_model_evaluation_snapshot_detail_postgres(
                 connection,
                 snapshot_id=snapshot_id,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_phase_three_model_repository(
+            feature_key=feature_key,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+        snapshot = get_model_evaluation_snapshot_detail_in_memory(
+            repository,
+            snapshot_id=snapshot_id,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
@@ -1169,7 +1224,6 @@ def phase_three_model_evaluation_detail(
             "model_family": model_family,
             "team_code": team_code,
             "season_label": season_label,
-            "auto_train_demo": auto_train_demo,
             "snapshot_id": snapshot_id,
         },
         "evaluation_snapshot": (
@@ -1268,9 +1322,6 @@ def phase_three_model_select(
 
 @router.get("/models/selections")
 def phase_three_model_selections(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
     feature_key: str = Query(default="baseline_team_features_v1"),
     target_task: str | None = Query(default="spread_error_regression"),
     team_code: str | None = Query(default=None),
@@ -1279,48 +1330,30 @@ def phase_three_model_selections(
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
     active_only: bool = Query(default=False),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_train_demo and target_task is not None:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-            promote_best_model_in_memory(repository, target_task=target_task)
-        selections = list_model_selection_snapshots_in_memory(
-            repository,
-            target_task=target_task,
-            active_only=active_only,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_train_demo and target_task is not None:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=team_code,
-                    season_label=season_label,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-                promote_best_model_postgres(connection, target_task=target_task)
             selections = list_model_selection_snapshots_postgres(
                 connection,
                 target_task=target_task,
                 active_only=active_only,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_phase_three_model_repository(
+            feature_key=feature_key,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            promote_best=True,
+        )
+        selections = list_model_selection_snapshots_in_memory(
+            repository,
+            target_task=target_task,
+            active_only=active_only,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
@@ -1329,7 +1362,6 @@ def phase_three_model_selections(
             "target_task": target_task,
             "team_code": team_code,
             "season_label": season_label,
-            "auto_train_demo": auto_train_demo,
             "active_only": active_only,
         },
         "selection_count": len(selections),
@@ -1356,9 +1388,6 @@ def phase_three_model_selections(
 
 @router.get("/models/selections/history")
 def phase_three_model_selection_history(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
     feature_key: str = Query(default="baseline_team_features_v1"),
     target_task: str | None = Query(default="spread_error_regression"),
     team_code: str | None = Query(default=None),
@@ -1367,48 +1396,30 @@ def phase_three_model_selection_history(
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_train_demo and target_task is not None:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-            promote_best_model_in_memory(repository, target_task=target_task)
-        history = get_model_selection_history_in_memory(
-            repository,
-            target_task=target_task,
-            recent_limit=recent_limit,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_train_demo and target_task is not None:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=team_code,
-                    season_label=season_label,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-                promote_best_model_postgres(connection, target_task=target_task)
             history = get_model_selection_history_postgres(
                 connection,
                 target_task=target_task,
                 recent_limit=recent_limit,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_phase_three_model_repository(
+            feature_key=feature_key,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            promote_best=True,
+        )
+        history = get_model_selection_history_in_memory(
+            repository,
+            target_task=target_task,
+            recent_limit=recent_limit,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
@@ -1417,7 +1428,6 @@ def phase_three_model_selection_history(
             "target_task": target_task,
             "team_code": team_code,
             "season_label": season_label,
-            "auto_train_demo": auto_train_demo,
             "recent_limit": recent_limit,
         },
         "model_selection_history": history,
@@ -1427,9 +1437,6 @@ def phase_three_model_selection_history(
 @router.get("/models/selections/{selection_id}")
 def phase_three_model_selection_detail(
     selection_id: int,
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
     feature_key: str = Query(default="baseline_team_features_v1"),
     target_task: str | None = Query(default="spread_error_regression"),
     team_code: str | None = Query(default=None),
@@ -1437,46 +1444,28 @@ def phase_three_model_selection_detail(
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_train_demo and target_task is not None:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-            promote_best_model_in_memory(repository, target_task=target_task)
-        selection = get_model_selection_snapshot_detail_in_memory(
-            repository,
-            selection_id=selection_id,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_train_demo and target_task is not None:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=team_code,
-                    season_label=season_label,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-                promote_best_model_postgres(connection, target_task=target_task)
             selection = get_model_selection_snapshot_detail_postgres(
                 connection,
                 selection_id=selection_id,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_phase_three_model_repository(
+            feature_key=feature_key,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            promote_best=True,
+        )
+        selection = get_model_selection_snapshot_detail_in_memory(
+            repository,
+            selection_id=selection_id,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
@@ -1485,7 +1474,6 @@ def phase_three_model_selection_detail(
             "target_task": target_task,
             "team_code": team_code,
             "season_label": season_label,
-            "auto_train_demo": auto_train_demo,
             "selection_id": selection_id,
         },
         "selection": (
@@ -1512,10 +1500,6 @@ def phase_three_model_selection_detail(
 
 @router.get("/models/score-preview")
 def phase_three_model_score_preview(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
-    auto_select_demo: bool = Query(default=True),
     feature_key: str = Query(default="baseline_team_features_v1"),
     target_task: str = Query(default="spread_error_regression"),
     team_code: str | None = Query(default=None),
@@ -1529,53 +1513,8 @@ def phase_three_model_score_preview(
     comparable_limit: int = Query(default=5, ge=1, le=50),
     min_pattern_sample_size: int = Query(default=1, ge=1, le=100),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_train_demo:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        if auto_select_demo:
-            promote_best_model_in_memory(repository, target_task=target_task)
-        scoring_preview = get_model_scoring_preview_in_memory(
-            repository,
-            feature_key=feature_key,
-            target_task=target_task,
-            team_code=team_code,
-            season_label=season_label,
-            canonical_game_id=canonical_game_id,
-            limit=limit,
-            include_evidence=include_evidence,
-            evidence_dimensions=dimensions,
-            comparable_limit=comparable_limit,
-            min_pattern_sample_size=min_pattern_sample_size,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_train_demo:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=team_code,
-                    season_label=season_label,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-            if auto_select_demo:
-                promote_best_model_postgres(connection, target_task=target_task)
             scoring_preview = get_model_scoring_preview_postgres(
                 connection,
                 feature_key=feature_key,
@@ -1591,8 +1530,33 @@ def phase_three_model_score_preview(
                 train_ratio=train_ratio,
                 validation_ratio=validation_ratio,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_phase_three_model_repository(
+            feature_key=feature_key,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            promote_best=True,
+        )
+        scoring_preview = get_model_scoring_preview_in_memory(
+            repository,
+            feature_key=feature_key,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            canonical_game_id=canonical_game_id,
+            limit=limit,
+            include_evidence=include_evidence,
+            evidence_dimensions=dimensions,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
@@ -1602,8 +1566,6 @@ def phase_three_model_score_preview(
             "team_code": team_code,
             "season_label": season_label,
             "canonical_game_id": canonical_game_id,
-            "auto_train_demo": auto_train_demo,
-            "auto_select_demo": auto_select_demo,
             "limit": limit,
             "include_evidence": include_evidence,
             "dimensions": list(dimensions),
@@ -1616,10 +1578,6 @@ def phase_three_model_score_preview(
 
 @router.get("/models/future-game-preview")
 def phase_three_model_future_game_preview(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
-    auto_select_demo: bool = Query(default=True),
     feature_key: str = Query(default="baseline_team_features_v1"),
     target_task: str = Query(default="spread_error_regression"),
     season_label: str = Query(default="2025-2026"),
@@ -1635,55 +1593,8 @@ def phase_three_model_future_game_preview(
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_train_demo:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=None,
-                season_label=None,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        if auto_select_demo:
-            promote_best_model_in_memory(repository, target_task=target_task)
-        preview = get_model_future_game_preview_in_memory(
-            repository,
-            feature_key=feature_key,
-            target_task=target_task,
-            season_label=season_label,
-            game_date=game_date,
-            home_team_code=home_team_code,
-            away_team_code=away_team_code,
-            home_spread_line=home_spread_line,
-            total_line=total_line,
-            include_evidence=include_evidence,
-            evidence_dimensions=dimensions,
-            comparable_limit=comparable_limit,
-            min_pattern_sample_size=min_pattern_sample_size,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_train_demo:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=None,
-                    season_label=None,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-            if auto_select_demo:
-                promote_best_model_postgres(connection, target_task=target_task)
             preview = get_model_future_game_preview_postgres(
                 connection,
                 feature_key=feature_key,
@@ -1701,8 +1612,42 @@ def phase_three_model_future_game_preview(
                 train_ratio=train_ratio,
                 validation_ratio=validation_ratio,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_future_game_scoring_repository(
+            feature_key=feature_key,
+            target_task=target_task,
+            season_label=season_label,
+            game_date=game_date,
+            home_team_code=home_team_code,
+            away_team_code=away_team_code,
+            home_spread_line=home_spread_line,
+            total_line=total_line,
+            include_evidence=include_evidence,
+            dimensions=dimensions,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+        preview = get_model_future_game_preview_in_memory(
+            repository,
+            feature_key=feature_key,
+            target_task=target_task,
+            season_label=season_label,
+            game_date=game_date,
+            home_team_code=home_team_code,
+            away_team_code=away_team_code,
+            home_spread_line=home_spread_line,
+            total_line=total_line,
+            include_evidence=include_evidence,
+            evidence_dimensions=dimensions,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
@@ -1715,8 +1660,6 @@ def phase_three_model_future_game_preview(
             "away_team_code": away_team_code,
             "home_spread_line": home_spread_line,
             "total_line": total_line,
-            "auto_train_demo": auto_train_demo,
-            "auto_select_demo": auto_select_demo,
             "include_evidence": include_evidence,
             "dimensions": list(dimensions),
             "comparable_limit": comparable_limit,
@@ -1840,11 +1783,6 @@ def phase_three_model_future_game_preview_materialize(
 
 @router.get("/models/future-game-preview/runs")
 def phase_three_model_future_game_preview_runs(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
-    auto_select_demo: bool = Query(default=True),
-    auto_materialize_demo: bool = Query(default=True),
     feature_key: str = Query(default="baseline_team_features_v1"),
     target_task: str | None = Query(default="spread_error_regression"),
     season_label: str = Query(default="2025-2026"),
@@ -1862,88 +1800,40 @@ def phase_three_model_future_game_preview_runs(
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
     limit: int = Query(default=10, ge=1, le=100),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_train_demo and target_task is not None:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=None,
-                season_label=None,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        if auto_select_demo and target_task is not None:
-            promote_best_model_in_memory(repository, target_task=target_task)
-        if auto_materialize_demo and target_task is not None:
-            materialize_model_future_game_preview_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                season_label=season_label,
-                game_date=game_date,
-                home_team_code=home_team_code,
-                away_team_code=away_team_code,
-                home_spread_line=home_spread_line,
-                total_line=total_line,
-                include_evidence=include_evidence,
-                evidence_dimensions=dimensions,
-                comparable_limit=comparable_limit,
-                min_pattern_sample_size=min_pattern_sample_size,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        scoring_runs = list_model_scoring_runs_in_memory(
-            repository,
-            target_task=target_task,
-            team_code=team_code,
-            season_label=season_label,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_train_demo and target_task is not None:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=None,
-                    season_label=None,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-            if auto_select_demo and target_task is not None:
-                promote_best_model_postgres(connection, target_task=target_task)
-            if auto_materialize_demo and target_task is not None:
-                materialize_model_future_game_preview_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    season_label=season_label,
-                    game_date=game_date,
-                    home_team_code=home_team_code,
-                    away_team_code=away_team_code,
-                    home_spread_line=home_spread_line,
-                    total_line=total_line,
-                    include_evidence=include_evidence,
-                    evidence_dimensions=dimensions,
-                    comparable_limit=comparable_limit,
-                    min_pattern_sample_size=min_pattern_sample_size,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
             scoring_runs = list_model_scoring_runs_postgres(
                 connection,
                 target_task=target_task,
                 team_code=team_code,
                 season_label=season_label,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_future_game_scoring_repository(
+            feature_key=feature_key,
+            target_task=target_task,
+            season_label=season_label,
+            game_date=game_date,
+            home_team_code=home_team_code,
+            away_team_code=away_team_code,
+            home_spread_line=home_spread_line,
+            total_line=total_line,
+            include_evidence=include_evidence,
+            dimensions=dimensions,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            materialize_preview=True,
+        )
+        scoring_runs = list_model_scoring_runs_in_memory(
+            repository,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
@@ -1957,9 +1847,6 @@ def phase_three_model_future_game_preview_runs(
             "away_team_code": away_team_code,
             "home_spread_line": home_spread_line,
             "total_line": total_line,
-            "auto_train_demo": auto_train_demo,
-            "auto_select_demo": auto_select_demo,
-            "auto_materialize_demo": auto_materialize_demo,
             "limit": limit,
         },
         "scoring_run_count": len(scoring_runs),
@@ -1995,11 +1882,6 @@ def phase_three_model_future_game_preview_runs(
 @router.get("/models/future-game-preview/runs/{scoring_run_id}")
 def phase_three_model_future_game_preview_run_detail(
     scoring_run_id: int,
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
-    auto_select_demo: bool = Query(default=True),
-    auto_materialize_demo: bool = Query(default=True),
     feature_key: str = Query(default="baseline_team_features_v1"),
     target_task: str | None = Query(default="spread_error_regression"),
     season_label: str = Query(default="2025-2026"),
@@ -2015,84 +1897,36 @@ def phase_three_model_future_game_preview_run_detail(
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_train_demo and target_task is not None:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=None,
-                season_label=None,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        if auto_select_demo and target_task is not None:
-            promote_best_model_in_memory(repository, target_task=target_task)
-        if auto_materialize_demo and target_task is not None:
-            materialize_model_future_game_preview_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                season_label=season_label,
-                game_date=game_date,
-                home_team_code=home_team_code,
-                away_team_code=away_team_code,
-                home_spread_line=home_spread_line,
-                total_line=total_line,
-                include_evidence=include_evidence,
-                evidence_dimensions=dimensions,
-                comparable_limit=comparable_limit,
-                min_pattern_sample_size=min_pattern_sample_size,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        scoring_run = get_model_scoring_run_detail_in_memory(
-            repository,
-            scoring_run_id=scoring_run_id,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_train_demo and target_task is not None:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=None,
-                    season_label=None,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-            if auto_select_demo and target_task is not None:
-                promote_best_model_postgres(connection, target_task=target_task)
-            if auto_materialize_demo and target_task is not None:
-                materialize_model_future_game_preview_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    season_label=season_label,
-                    game_date=game_date,
-                    home_team_code=home_team_code,
-                    away_team_code=away_team_code,
-                    home_spread_line=home_spread_line,
-                    total_line=total_line,
-                    include_evidence=include_evidence,
-                    evidence_dimensions=dimensions,
-                    comparable_limit=comparable_limit,
-                    min_pattern_sample_size=min_pattern_sample_size,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
             scoring_run = get_model_scoring_run_detail_postgres(
                 connection,
                 scoring_run_id=scoring_run_id,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_future_game_scoring_repository(
+            feature_key=feature_key,
+            target_task=target_task,
+            season_label=season_label,
+            game_date=game_date,
+            home_team_code=home_team_code,
+            away_team_code=away_team_code,
+            home_spread_line=home_spread_line,
+            total_line=total_line,
+            include_evidence=include_evidence,
+            dimensions=dimensions,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            materialize_preview=True,
+        )
+        scoring_run = get_model_scoring_run_detail_in_memory(
+            repository,
+            scoring_run_id=scoring_run_id,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
@@ -2105,9 +1939,6 @@ def phase_three_model_future_game_preview_run_detail(
             "away_team_code": away_team_code,
             "home_spread_line": home_spread_line,
             "total_line": total_line,
-            "auto_train_demo": auto_train_demo,
-            "auto_select_demo": auto_select_demo,
-            "auto_materialize_demo": auto_materialize_demo,
         },
         "scoring_run": scoring_run,
     }
@@ -2115,11 +1946,6 @@ def phase_three_model_future_game_preview_run_detail(
 
 @router.get("/models/future-game-preview/history")
 def phase_three_model_future_game_preview_history(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
-    auto_select_demo: bool = Query(default=True),
-    auto_materialize_demo: bool = Query(default=True),
     feature_key: str = Query(default="baseline_team_features_v1"),
     target_task: str | None = Query(default="spread_error_regression"),
     season_label: str = Query(default="2025-2026"),
@@ -2137,81 +1963,8 @@ def phase_three_model_future_game_preview_history(
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_train_demo and target_task is not None:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=None,
-                season_label=None,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        if auto_select_demo and target_task is not None:
-            promote_best_model_in_memory(repository, target_task=target_task)
-        if auto_materialize_demo and target_task is not None:
-            materialize_model_future_game_preview_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                season_label=season_label,
-                game_date=game_date,
-                home_team_code=home_team_code,
-                away_team_code=away_team_code,
-                home_spread_line=home_spread_line,
-                total_line=total_line,
-                include_evidence=include_evidence,
-                evidence_dimensions=dimensions,
-                comparable_limit=comparable_limit,
-                min_pattern_sample_size=min_pattern_sample_size,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        history = get_model_scoring_history_in_memory(
-            repository,
-            target_task=target_task,
-            team_code=team_code,
-            season_label=season_label,
-            recent_limit=recent_limit,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_train_demo and target_task is not None:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=None,
-                    season_label=None,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-            if auto_select_demo and target_task is not None:
-                promote_best_model_postgres(connection, target_task=target_task)
-            if auto_materialize_demo and target_task is not None:
-                materialize_model_future_game_preview_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    season_label=season_label,
-                    game_date=game_date,
-                    home_team_code=home_team_code,
-                    away_team_code=away_team_code,
-                    home_spread_line=home_spread_line,
-                    total_line=total_line,
-                    include_evidence=include_evidence,
-                    evidence_dimensions=dimensions,
-                    comparable_limit=comparable_limit,
-                    min_pattern_sample_size=min_pattern_sample_size,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
             history = get_model_scoring_history_postgres(
                 connection,
                 target_task=target_task,
@@ -2219,8 +1972,33 @@ def phase_three_model_future_game_preview_history(
                 season_label=season_label,
                 recent_limit=recent_limit,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_future_game_scoring_repository(
+            feature_key=feature_key,
+            target_task=target_task,
+            season_label=season_label,
+            game_date=game_date,
+            home_team_code=home_team_code,
+            away_team_code=away_team_code,
+            home_spread_line=home_spread_line,
+            total_line=total_line,
+            include_evidence=include_evidence,
+            dimensions=dimensions,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            materialize_preview=True,
+        )
+        history = get_model_scoring_history_in_memory(
+            repository,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            recent_limit=recent_limit,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
@@ -2234,9 +2012,6 @@ def phase_three_model_future_game_preview_history(
             "away_team_code": away_team_code,
             "home_spread_line": home_spread_line,
             "total_line": total_line,
-            "auto_train_demo": auto_train_demo,
-            "auto_select_demo": auto_select_demo,
-            "auto_materialize_demo": auto_materialize_demo,
             "recent_limit": recent_limit,
         },
         "model_scoring_history": history,
@@ -2303,8 +2078,6 @@ def phase_three_model_market_board_refresh(
 
 @router.get("/models/market-board/history")
 def phase_three_model_market_board_history(
-    repository_mode: str = Query(default="in_memory"),
-    auto_refresh_demo: bool = Query(default=True),
     target_task: str = Query(default="spread_error_regression"),
     source_name: str = Query(default="demo_daily_lines_v1"),
     season_label: str = Query(default="2025-2026"),
@@ -2314,51 +2087,36 @@ def phase_three_model_market_board_history(
     source_path: str | None = Query(default=None),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if auto_refresh_demo:
-            refresh_model_market_board_in_memory(
-                repository,
-                target_task=target_task,
-                source_name=source_name,
-                season_label=season_label,
-                game_date=game_date,
-                slate_label=slate_label,
-                game_count=game_count,
-                source_path=source_path,
-            )
-        history = get_model_market_board_refresh_history_in_memory(
-            repository,
-            target_task=target_task,
-            source_name=source_name,
-            recent_limit=recent_limit,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if auto_refresh_demo:
-                refresh_model_market_board_postgres(
-                    connection,
-                    target_task=target_task,
-                    source_name=source_name,
-                    season_label=season_label,
-                    game_date=game_date,
-                    slate_label=slate_label,
-                    game_count=game_count,
-                    source_path=source_path,
-                )
             history = get_model_market_board_refresh_history_postgres(
                 connection,
                 target_task=target_task,
                 source_name=source_name,
                 recent_limit=recent_limit,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_market_board_refresh_repository(
+            target_task=target_task,
+            source_name=source_name,
+            season_label=season_label,
+            game_date=game_date,
+            slate_label=slate_label,
+            game_count=game_count,
+            source_path=source_path,
+        )
+        history = get_model_market_board_refresh_history_in_memory(
+            repository,
+            target_task=target_task,
+            source_name=source_name,
+            recent_limit=recent_limit,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
         "filters": {
-            "auto_refresh_demo": auto_refresh_demo,
             "target_task": target_task,
             "source_name": source_name,
             "season_label": season_label,
@@ -2374,8 +2132,6 @@ def phase_three_model_market_board_history(
 
 @router.get("/models/market-board/source-runs")
 def phase_three_model_market_board_source_runs(
-    repository_mode: str = Query(default="in_memory"),
-    auto_refresh_demo: bool = Query(default=True),
     target_task: str = Query(default="spread_error_regression"),
     source_name: str | None = Query(default="demo_daily_lines_v1"),
     season_label: str = Query(default="2025-2026"),
@@ -2385,39 +2141,9 @@ def phase_three_model_market_board_source_runs(
     source_path: str | None = Query(default=None),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if auto_refresh_demo:
-            refresh_model_market_board_in_memory(
-                repository,
-                target_task=target_task,
-                source_name=source_name or "demo_daily_lines_v1",
-                season_label=season_label,
-                game_date=game_date,
-                slate_label=slate_label,
-                game_count=game_count,
-                source_path=source_path,
-            )
-        history = get_model_market_board_source_run_history_in_memory(
-            repository,
-            target_task=target_task,
-            source_name=source_name,
-            season_label=season_label,
-            recent_limit=recent_limit,
-        )
-    elif repository_mode == "postgres":
+    resolved_source_name = source_name or "demo_daily_lines_v1"
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if auto_refresh_demo:
-                refresh_model_market_board_postgres(
-                    connection,
-                    target_task=target_task,
-                    source_name=source_name or "demo_daily_lines_v1",
-                    season_label=season_label,
-                    game_date=game_date,
-                    slate_label=slate_label,
-                    game_count=game_count,
-                    source_path=source_path,
-                )
             history = get_model_market_board_source_run_history_postgres(
                 connection,
                 target_task=target_task,
@@ -2425,13 +2151,29 @@ def phase_three_model_market_board_source_runs(
                 season_label=season_label,
                 recent_limit=recent_limit,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_market_board_refresh_repository(
+            target_task=target_task,
+            source_name=resolved_source_name,
+            season_label=season_label,
+            game_date=game_date,
+            slate_label=slate_label,
+            game_count=game_count,
+            source_path=source_path,
+        )
+        history = get_model_market_board_source_run_history_in_memory(
+            repository,
+            target_task=target_task,
+            source_name=source_name,
+            season_label=season_label,
+            recent_limit=recent_limit,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
         "filters": {
-            "auto_refresh_demo": auto_refresh_demo,
             "target_task": target_task,
             "source_name": source_name,
             "season_label": season_label,
@@ -2447,8 +2189,6 @@ def phase_three_model_market_board_source_runs(
 
 @router.get("/models/market-board/refresh-queue")
 def phase_three_model_market_board_refresh_queue(
-    repository_mode: str = Query(default="in_memory"),
-    auto_refresh_demo: bool = Query(default=True),
     target_task: str = Query(default="spread_error_regression"),
     source_name: str | None = Query(default="demo_daily_lines_v1"),
     season_label: str = Query(default="2025-2026"),
@@ -2459,39 +2199,9 @@ def phase_three_model_market_board_refresh_queue(
     pending_only: bool = Query(default=False),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if auto_refresh_demo:
-            refresh_model_market_board_in_memory(
-                repository,
-                target_task=target_task,
-                source_name=source_name or "demo_daily_lines_v1",
-                season_label=season_label,
-                game_date=game_date,
-                slate_label=slate_label,
-                game_count=game_count,
-            )
-        queue = get_model_market_board_refresh_queue_in_memory(
-            repository,
-            target_task=target_task,
-            season_label=season_label,
-            source_name=source_name,
-            freshness_status=freshness_status,
-            pending_only=pending_only,
-            recent_limit=recent_limit,
-        )
-    elif repository_mode == "postgres":
+    resolved_source_name = source_name or "demo_daily_lines_v1"
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if auto_refresh_demo:
-                refresh_model_market_board_postgres(
-                    connection,
-                    target_task=target_task,
-                    source_name=source_name or "demo_daily_lines_v1",
-                    season_label=season_label,
-                    game_date=game_date,
-                    slate_label=slate_label,
-                    game_count=game_count,
-                )
             queue = get_model_market_board_refresh_queue_postgres(
                 connection,
                 target_task=target_task,
@@ -2501,13 +2211,30 @@ def phase_three_model_market_board_refresh_queue(
                 pending_only=pending_only,
                 recent_limit=recent_limit,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_market_board_refresh_repository(
+            target_task=target_task,
+            source_name=resolved_source_name,
+            season_label=season_label,
+            game_date=game_date,
+            slate_label=slate_label,
+            game_count=game_count,
+        )
+        queue = get_model_market_board_refresh_queue_in_memory(
+            repository,
+            target_task=target_task,
+            season_label=season_label,
+            source_name=source_name,
+            freshness_status=freshness_status,
+            pending_only=pending_only,
+            recent_limit=recent_limit,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
         "filters": {
-            "auto_refresh_demo": auto_refresh_demo,
             "target_task": target_task,
             "source_name": source_name,
             "season_label": season_label,
@@ -2524,8 +2251,6 @@ def phase_three_model_market_board_refresh_queue(
 
 @router.get("/models/market-board/queue")
 def phase_three_model_market_board_queue(
-    repository_mode: str = Query(default="in_memory"),
-    auto_refresh_demo: bool = Query(default=True),
     target_task: str = Query(default="spread_error_regression"),
     source_name: str | None = Query(default="demo_daily_lines_v1"),
     season_label: str = Query(default="2025-2026"),
@@ -2536,39 +2261,9 @@ def phase_three_model_market_board_queue(
     pending_only: bool = Query(default=False),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if auto_refresh_demo:
-            refresh_model_market_board_in_memory(
-                repository,
-                target_task=target_task,
-                source_name=source_name or "demo_daily_lines_v1",
-                season_label=season_label,
-                game_date=game_date,
-                slate_label=slate_label,
-                game_count=game_count,
-            )
-        queue = get_model_market_board_scoring_queue_in_memory(
-            repository,
-            target_task=target_task,
-            season_label=season_label,
-            source_name=source_name,
-            freshness_status=freshness_status,
-            pending_only=pending_only,
-            recent_limit=recent_limit,
-        )
-    elif repository_mode == "postgres":
+    resolved_source_name = source_name or "demo_daily_lines_v1"
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if auto_refresh_demo:
-                refresh_model_market_board_postgres(
-                    connection,
-                    target_task=target_task,
-                    source_name=source_name or "demo_daily_lines_v1",
-                    season_label=season_label,
-                    game_date=game_date,
-                    slate_label=slate_label,
-                    game_count=game_count,
-                )
             queue = get_model_market_board_scoring_queue_postgres(
                 connection,
                 target_task=target_task,
@@ -2578,13 +2273,30 @@ def phase_three_model_market_board_queue(
                 pending_only=pending_only,
                 recent_limit=recent_limit,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_market_board_refresh_repository(
+            target_task=target_task,
+            source_name=resolved_source_name,
+            season_label=season_label,
+            game_date=game_date,
+            slate_label=slate_label,
+            game_count=game_count,
+        )
+        queue = get_model_market_board_scoring_queue_in_memory(
+            repository,
+            target_task=target_task,
+            season_label=season_label,
+            source_name=source_name,
+            freshness_status=freshness_status,
+            pending_only=pending_only,
+            recent_limit=recent_limit,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
         "filters": {
-            "auto_refresh_demo": auto_refresh_demo,
             "target_task": target_task,
             "source_name": source_name,
             "season_label": season_label,
@@ -2601,8 +2313,6 @@ def phase_three_model_market_board_queue(
 
 @router.post("/models/market-board/orchestrate-refresh")
 def phase_three_model_market_board_orchestrate_refresh(
-    repository_mode: str = Query(default="in_memory"),
-    auto_refresh_demo: bool = Query(default=True),
     target_task: str = Query(default="spread_error_regression"),
     source_name: str | None = Query(default="demo_daily_lines_v1"),
     season_label: str = Query(default="2025-2026"),
@@ -2613,39 +2323,8 @@ def phase_three_model_market_board_orchestrate_refresh(
     pending_only: bool = Query(default=True),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if auto_refresh_demo:
-            refresh_model_market_board_in_memory(
-                repository,
-                target_task=target_task,
-                source_name=source_name or "demo_daily_lines_v1",
-                season_label=season_label,
-                game_date=game_date,
-                slate_label=slate_label,
-                game_count=game_count,
-            )
-        result = orchestrate_model_market_board_refresh_in_memory(
-            repository,
-            target_task=target_task,
-            season_label=season_label,
-            source_name=source_name,
-            freshness_status=freshness_status,
-            pending_only=pending_only,
-            recent_limit=recent_limit,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if auto_refresh_demo:
-                refresh_model_market_board_postgres(
-                    connection,
-                    target_task=target_task,
-                    source_name=source_name or "demo_daily_lines_v1",
-                    season_label=season_label,
-                    game_date=game_date,
-                    slate_label=slate_label,
-                    game_count=game_count,
-                )
             result = orchestrate_model_market_board_refresh_postgres(
                 connection,
                 target_task=target_task,
@@ -2655,13 +2334,30 @@ def phase_three_model_market_board_orchestrate_refresh(
                 pending_only=pending_only,
                 recent_limit=recent_limit,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_market_board_refresh_repository(
+            target_task=target_task,
+            source_name=source_name or "demo_daily_lines_v1",
+            season_label=season_label,
+            game_date=game_date,
+            slate_label=slate_label,
+            game_count=game_count,
+        )
+        result = orchestrate_model_market_board_refresh_in_memory(
+            repository,
+            target_task=target_task,
+            season_label=season_label,
+            source_name=source_name,
+            freshness_status=freshness_status,
+            pending_only=pending_only,
+            recent_limit=recent_limit,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
         "filters": {
-            "auto_refresh_demo": auto_refresh_demo,
             "target_task": target_task,
             "source_name": source_name,
             "season_label": season_label,
@@ -2678,11 +2374,6 @@ def phase_three_model_market_board_orchestrate_refresh(
 
 @router.post("/models/market-board/orchestrate-score")
 def phase_three_model_market_board_orchestrate_score(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_refresh_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
-    auto_select_demo: bool = Query(default=True),
     target_task: str = Query(default="spread_error_regression"),
     source_name: str | None = Query(default="demo_daily_lines_v1"),
     season_label: str = Query(default="2025-2026"),
@@ -2700,74 +2391,8 @@ def phase_three_model_market_board_orchestrate_score(
     pending_only: bool = Query(default=True),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_refresh_demo:
-            refresh_model_market_board_in_memory(
-                repository,
-                target_task=target_task,
-                source_name=source_name or "demo_daily_lines_v1",
-                season_label=season_label,
-                game_date=game_date,
-                slate_label=slate_label,
-                game_count=game_count,
-            )
-        if auto_train_demo:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=None,
-                season_label=None,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        if auto_select_demo:
-            promote_best_model_in_memory(repository, target_task=target_task)
-        result = orchestrate_model_market_board_scoring_in_memory(
-            repository,
-            feature_key=feature_key,
-            target_task=target_task,
-            season_label=season_label,
-            source_name=source_name,
-            freshness_status=freshness_status,
-            pending_only=pending_only,
-            include_evidence=include_evidence,
-            evidence_dimensions=dimensions,
-            comparable_limit=comparable_limit,
-            min_pattern_sample_size=min_pattern_sample_size,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-            recent_limit=recent_limit,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_refresh_demo:
-                refresh_model_market_board_postgres(
-                    connection,
-                    target_task=target_task,
-                    source_name=source_name or "demo_daily_lines_v1",
-                    season_label=season_label,
-                    game_date=game_date,
-                    slate_label=slate_label,
-                    game_count=game_count,
-                )
-            if auto_train_demo:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=None,
-                    season_label=None,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-            if auto_select_demo:
-                promote_best_model_postgres(connection, target_task=target_task)
             result = orchestrate_model_market_board_scoring_postgres(
                 connection,
                 feature_key=feature_key,
@@ -2784,16 +2409,40 @@ def phase_three_model_market_board_orchestrate_score(
                 validation_ratio=validation_ratio,
                 recent_limit=recent_limit,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_market_board_orchestration_repository(
+            target_task=target_task,
+            source_name=source_name,
+            season_label=season_label,
+            game_date=game_date,
+            slate_label=slate_label,
+            game_count=game_count,
+            feature_key=feature_key,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+        result = orchestrate_model_market_board_scoring_in_memory(
+            repository,
+            feature_key=feature_key,
+            target_task=target_task,
+            season_label=season_label,
+            source_name=source_name,
+            freshness_status=freshness_status,
+            pending_only=pending_only,
+            include_evidence=include_evidence,
+            evidence_dimensions=dimensions,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            recent_limit=recent_limit,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
         "filters": {
-            "seed_demo": seed_demo,
-            "auto_refresh_demo": auto_refresh_demo,
-            "auto_train_demo": auto_train_demo,
-            "auto_select_demo": auto_select_demo,
             "target_task": target_task,
             "source_name": source_name,
             "season_label": season_label,
@@ -2817,11 +2466,6 @@ def phase_three_model_market_board_orchestrate_score(
 
 @router.post("/models/market-board/orchestrate-cadence")
 def phase_three_model_market_board_orchestrate_cadence(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_refresh_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
-    auto_select_demo: bool = Query(default=True),
     target_task: str = Query(default="spread_error_regression"),
     source_name: str | None = Query(default="demo_daily_lines_v1"),
     season_label: str = Query(default="2025-2026"),
@@ -2841,76 +2485,8 @@ def phase_three_model_market_board_orchestrate_cadence(
     scoring_pending_only: bool = Query(default=True),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_refresh_demo:
-            refresh_model_market_board_in_memory(
-                repository,
-                target_task=target_task,
-                source_name=source_name or "demo_daily_lines_v1",
-                season_label=season_label,
-                game_date=game_date,
-                slate_label=slate_label,
-                game_count=game_count,
-            )
-        if auto_train_demo:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=None,
-                season_label=None,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        if auto_select_demo:
-            promote_best_model_in_memory(repository, target_task=target_task)
-        result = orchestrate_model_market_board_cadence_in_memory(
-            repository,
-            feature_key=feature_key,
-            target_task=target_task,
-            season_label=season_label,
-            source_name=source_name,
-            refresh_freshness_status=refresh_freshness_status,
-            refresh_pending_only=refresh_pending_only,
-            scoring_freshness_status=scoring_freshness_status,
-            scoring_pending_only=scoring_pending_only,
-            include_evidence=include_evidence,
-            evidence_dimensions=dimensions,
-            comparable_limit=comparable_limit,
-            min_pattern_sample_size=min_pattern_sample_size,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-            recent_limit=recent_limit,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_refresh_demo:
-                refresh_model_market_board_postgres(
-                    connection,
-                    target_task=target_task,
-                    source_name=source_name or "demo_daily_lines_v1",
-                    season_label=season_label,
-                    game_date=game_date,
-                    slate_label=slate_label,
-                    game_count=game_count,
-                )
-            if auto_train_demo:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=None,
-                    season_label=None,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-            if auto_select_demo:
-                promote_best_model_postgres(connection, target_task=target_task)
             result = orchestrate_model_market_board_cadence_postgres(
                 connection,
                 feature_key=feature_key,
@@ -2929,16 +2505,42 @@ def phase_three_model_market_board_orchestrate_cadence(
                 validation_ratio=validation_ratio,
                 recent_limit=recent_limit,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_market_board_orchestration_repository(
+            target_task=target_task,
+            source_name=source_name,
+            season_label=season_label,
+            game_date=game_date,
+            slate_label=slate_label,
+            game_count=game_count,
+            feature_key=feature_key,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+        result = orchestrate_model_market_board_cadence_in_memory(
+            repository,
+            feature_key=feature_key,
+            target_task=target_task,
+            season_label=season_label,
+            source_name=source_name,
+            refresh_freshness_status=refresh_freshness_status,
+            refresh_pending_only=refresh_pending_only,
+            scoring_freshness_status=scoring_freshness_status,
+            scoring_pending_only=scoring_pending_only,
+            include_evidence=include_evidence,
+            evidence_dimensions=dimensions,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            recent_limit=recent_limit,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
         "filters": {
-            "seed_demo": seed_demo,
-            "auto_refresh_demo": auto_refresh_demo,
-            "auto_train_demo": auto_train_demo,
-            "auto_select_demo": auto_select_demo,
             "target_task": target_task,
             "source_name": source_name,
             "season_label": season_label,
@@ -2964,9 +2566,6 @@ def phase_three_model_market_board_orchestrate_cadence(
 
 @router.get("/models/market-board/refresh-orchestration-history")
 def phase_three_model_market_board_refresh_orchestration_history(
-    repository_mode: str = Query(default="in_memory"),
-    auto_refresh_demo: bool = Query(default=True),
-    auto_orchestrate_demo: bool = Query(default=True),
     target_task: str = Query(default="spread_error_regression"),
     source_name: str | None = Query(default="demo_daily_lines_v1"),
     season_label: str = Query(default="2025-2026"),
@@ -2977,70 +2576,42 @@ def phase_three_model_market_board_refresh_orchestration_history(
     pending_only: bool = Query(default=False),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if auto_refresh_demo:
-            refresh_model_market_board_in_memory(
-                repository,
-                target_task=target_task,
-                source_name=source_name or "demo_daily_lines_v1",
-                season_label=season_label,
-                game_date=game_date,
-                slate_label=slate_label,
-                game_count=game_count,
-            )
-        if auto_orchestrate_demo:
-            orchestrate_model_market_board_refresh_in_memory(
-                repository,
-                target_task=target_task,
-                season_label=season_label,
-                source_name=source_name,
-                freshness_status=freshness_status,
-                pending_only=pending_only,
-                recent_limit=recent_limit,
-            )
-        history = get_model_market_board_refresh_batch_history_in_memory(
-            repository,
-            target_task=target_task,
-            source_name=source_name,
-            recent_limit=recent_limit,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if auto_refresh_demo:
-                refresh_model_market_board_postgres(
-                    connection,
-                    target_task=target_task,
-                    source_name=source_name or "demo_daily_lines_v1",
-                    season_label=season_label,
-                    game_date=game_date,
-                    slate_label=slate_label,
-                    game_count=game_count,
-                )
-            if auto_orchestrate_demo:
-                orchestrate_model_market_board_refresh_postgres(
-                    connection,
-                    target_task=target_task,
-                    season_label=season_label,
-                    source_name=source_name,
-                    freshness_status=freshness_status,
-                    pending_only=pending_only,
-                    recent_limit=recent_limit,
-                )
             history = get_model_market_board_refresh_batch_history_postgres(
                 connection,
                 target_task=target_task,
                 source_name=source_name,
                 recent_limit=recent_limit,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_market_board_orchestration_repository(
+            target_task=target_task,
+            source_name=source_name,
+            season_label=season_label,
+            game_date=game_date,
+            slate_label=slate_label,
+            game_count=game_count,
+            feature_key="baseline_team_features_v1",
+            train_ratio=0.7,
+            validation_ratio=0.15,
+            refresh_freshness_status=freshness_status,
+            refresh_pending_only=pending_only,
+            recent_limit=recent_limit,
+            run_refresh_orchestration=True,
+        )
+        history = get_model_market_board_refresh_batch_history_in_memory(
+            repository,
+            target_task=target_task,
+            source_name=source_name,
+            recent_limit=recent_limit,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
         "filters": {
-            "auto_refresh_demo": auto_refresh_demo,
-            "auto_orchestrate_demo": auto_orchestrate_demo,
             "target_task": target_task,
             "source_name": source_name,
             "season_label": season_label,
@@ -3057,12 +2628,6 @@ def phase_three_model_market_board_refresh_orchestration_history(
 
 @router.get("/models/market-board/cadence-history")
 def phase_three_model_market_board_cadence_history(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_refresh_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
-    auto_select_demo: bool = Query(default=True),
-    auto_orchestrate_demo: bool = Query(default=True),
     target_task: str = Query(default="spread_error_regression"),
     source_name: str | None = Query(default="demo_daily_lines_v1"),
     season_label: str = Query(default="2025-2026"),
@@ -3078,111 +2643,44 @@ def phase_three_model_market_board_cadence_history(
     scoring_pending_only: bool = Query(default=True),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_refresh_demo:
-            refresh_model_market_board_in_memory(
-                repository,
-                target_task=target_task,
-                source_name=source_name or "demo_daily_lines_v1",
-                season_label=season_label,
-                game_date=game_date,
-                slate_label=slate_label,
-                game_count=game_count,
-            )
-        if auto_train_demo:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=None,
-                season_label=None,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        if auto_select_demo:
-            promote_best_model_in_memory(repository, target_task=target_task)
-        if auto_orchestrate_demo:
-            orchestrate_model_market_board_cadence_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                season_label=season_label,
-                source_name=source_name,
-                refresh_freshness_status=refresh_freshness_status,
-                refresh_pending_only=refresh_pending_only,
-                scoring_freshness_status=scoring_freshness_status,
-                scoring_pending_only=scoring_pending_only,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-                recent_limit=recent_limit,
-            )
-        history = get_model_market_board_cadence_batch_history_in_memory(
-            repository,
-            target_task=target_task,
-            source_name=source_name,
-            recent_limit=recent_limit,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_refresh_demo:
-                refresh_model_market_board_postgres(
-                    connection,
-                    target_task=target_task,
-                    source_name=source_name or "demo_daily_lines_v1",
-                    season_label=season_label,
-                    game_date=game_date,
-                    slate_label=slate_label,
-                    game_count=game_count,
-                )
-            if auto_train_demo:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=None,
-                    season_label=None,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-            if auto_select_demo:
-                promote_best_model_postgres(connection, target_task=target_task)
-            if auto_orchestrate_demo:
-                orchestrate_model_market_board_cadence_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    season_label=season_label,
-                    source_name=source_name,
-                    refresh_freshness_status=refresh_freshness_status,
-                    refresh_pending_only=refresh_pending_only,
-                    scoring_freshness_status=scoring_freshness_status,
-                    scoring_pending_only=scoring_pending_only,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                    recent_limit=recent_limit,
-                )
             history = get_model_market_board_cadence_batch_history_postgres(
                 connection,
                 target_task=target_task,
                 source_name=source_name,
                 recent_limit=recent_limit,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_market_board_orchestration_repository(
+            target_task=target_task,
+            source_name=source_name,
+            season_label=season_label,
+            game_date=game_date,
+            slate_label=slate_label,
+            game_count=game_count,
+            feature_key=feature_key,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            refresh_freshness_status=refresh_freshness_status,
+            refresh_pending_only=refresh_pending_only,
+            scoring_freshness_status=scoring_freshness_status,
+            scoring_pending_only=scoring_pending_only,
+            recent_limit=recent_limit,
+            run_cadence_orchestration=True,
+        )
+        history = get_model_market_board_cadence_batch_history_in_memory(
+            repository,
+            target_task=target_task,
+            source_name=source_name,
+            recent_limit=recent_limit,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
         "filters": {
-            "seed_demo": seed_demo,
-            "auto_refresh_demo": auto_refresh_demo,
-            "auto_train_demo": auto_train_demo,
-            "auto_select_demo": auto_select_demo,
-            "auto_orchestrate_demo": auto_orchestrate_demo,
             "target_task": target_task,
             "source_name": source_name,
             "season_label": season_label,
@@ -3204,12 +2702,6 @@ def phase_three_model_market_board_cadence_history(
 
 @router.get("/models/market-board/orchestration-history")
 def phase_three_model_market_board_orchestration_history(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_refresh_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
-    auto_select_demo: bool = Query(default=True),
-    auto_orchestrate_demo: bool = Query(default=True),
     target_task: str = Query(default="spread_error_regression"),
     source_name: str | None = Query(default="demo_daily_lines_v1"),
     season_label: str = Query(default="2025-2026"),
@@ -3223,105 +2715,42 @@ def phase_three_model_market_board_orchestration_history(
     pending_only: bool = Query(default=True),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_refresh_demo:
-            refresh_model_market_board_in_memory(
-                repository,
-                target_task=target_task,
-                source_name=source_name or "demo_daily_lines_v1",
-                season_label=season_label,
-                game_date=game_date,
-                slate_label=slate_label,
-                game_count=game_count,
-            )
-        if auto_train_demo:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=None,
-                season_label=None,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        if auto_select_demo:
-            promote_best_model_in_memory(repository, target_task=target_task)
-        if auto_orchestrate_demo:
-            orchestrate_model_market_board_scoring_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                season_label=season_label,
-                source_name=source_name,
-                freshness_status=freshness_status,
-                pending_only=pending_only,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        history = get_model_market_board_scoring_batch_history_in_memory(
-            repository,
-            target_task=target_task,
-            source_name=source_name,
-            recent_limit=recent_limit,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_refresh_demo:
-                refresh_model_market_board_postgres(
-                    connection,
-                    target_task=target_task,
-                    source_name=source_name or "demo_daily_lines_v1",
-                    season_label=season_label,
-                    game_date=game_date,
-                    slate_label=slate_label,
-                    game_count=game_count,
-                )
-            if auto_train_demo:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=None,
-                    season_label=None,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-            if auto_select_demo:
-                promote_best_model_postgres(connection, target_task=target_task)
-            if auto_orchestrate_demo:
-                orchestrate_model_market_board_scoring_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    season_label=season_label,
-                    source_name=source_name,
-                    freshness_status=freshness_status,
-                    pending_only=pending_only,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
             history = get_model_market_board_scoring_batch_history_postgres(
                 connection,
                 target_task=target_task,
                 source_name=source_name,
                 recent_limit=recent_limit,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_market_board_orchestration_repository(
+            target_task=target_task,
+            source_name=source_name,
+            season_label=season_label,
+            game_date=game_date,
+            slate_label=slate_label,
+            game_count=game_count,
+            feature_key=feature_key,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            scoring_freshness_status=freshness_status,
+            scoring_pending_only=pending_only,
+            recent_limit=recent_limit,
+            run_scoring_orchestration=True,
+        )
+        history = get_model_market_board_scoring_batch_history_in_memory(
+            repository,
+            target_task=target_task,
+            source_name=source_name,
+            recent_limit=recent_limit,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
         "filters": {
-            "seed_demo": seed_demo,
-            "auto_refresh_demo": auto_refresh_demo,
-            "auto_train_demo": auto_train_demo,
-            "auto_select_demo": auto_select_demo,
-            "auto_orchestrate_demo": auto_orchestrate_demo,
             "target_task": target_task,
             "source_name": source_name,
             "season_label": season_label,
@@ -3341,12 +2770,6 @@ def phase_three_model_market_board_orchestration_history(
 
 @router.get("/models/market-board/cadence")
 def phase_three_model_market_board_cadence(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_refresh_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
-    auto_select_demo: bool = Query(default=True),
-    auto_orchestrate_demo: bool = Query(default=True),
     target_task: str = Query(default="spread_error_regression"),
     source_name: str | None = Query(default="demo_daily_lines_v1"),
     season_label: str = Query(default="2025-2026"),
@@ -3360,89 +2783,8 @@ def phase_three_model_market_board_cadence(
     pending_only: bool = Query(default=True),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_refresh_demo:
-            refresh_model_market_board_in_memory(
-                repository,
-                target_task=target_task,
-                source_name=source_name or "demo_daily_lines_v1",
-                season_label=season_label,
-                game_date=game_date,
-                slate_label=slate_label,
-                game_count=game_count,
-            )
-        if auto_train_demo:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=None,
-                season_label=None,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        if auto_select_demo:
-            promote_best_model_in_memory(repository, target_task=target_task)
-        if auto_orchestrate_demo:
-            orchestrate_model_market_board_scoring_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                season_label=season_label,
-                source_name=source_name,
-                freshness_status=freshness_status,
-                pending_only=pending_only,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        dashboard = get_model_market_board_cadence_dashboard_in_memory(
-            repository,
-            target_task=target_task,
-            season_label=season_label,
-            source_name=source_name,
-            recent_limit=recent_limit,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_refresh_demo:
-                refresh_model_market_board_postgres(
-                    connection,
-                    target_task=target_task,
-                    source_name=source_name or "demo_daily_lines_v1",
-                    season_label=season_label,
-                    game_date=game_date,
-                    slate_label=slate_label,
-                    game_count=game_count,
-                )
-            if auto_train_demo:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=None,
-                    season_label=None,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-            if auto_select_demo:
-                promote_best_model_postgres(connection, target_task=target_task)
-            if auto_orchestrate_demo:
-                orchestrate_model_market_board_scoring_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    season_label=season_label,
-                    source_name=source_name,
-                    freshness_status=freshness_status,
-                    pending_only=pending_only,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
             dashboard = get_model_market_board_cadence_dashboard_postgres(
                 connection,
                 target_task=target_task,
@@ -3450,17 +2792,35 @@ def phase_three_model_market_board_cadence(
                 source_name=source_name,
                 recent_limit=recent_limit,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_market_board_orchestration_repository(
+            target_task=target_task,
+            source_name=source_name,
+            season_label=season_label,
+            game_date=game_date,
+            slate_label=slate_label,
+            game_count=game_count,
+            feature_key=feature_key,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            scoring_freshness_status=freshness_status,
+            scoring_pending_only=pending_only,
+            recent_limit=recent_limit,
+            run_scoring_orchestration=True,
+        )
+        dashboard = get_model_market_board_cadence_dashboard_in_memory(
+            repository,
+            target_task=target_task,
+            season_label=season_label,
+            source_name=source_name,
+            recent_limit=recent_limit,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
         "filters": {
-            "seed_demo": seed_demo,
-            "auto_refresh_demo": auto_refresh_demo,
-            "auto_train_demo": auto_train_demo,
-            "auto_select_demo": auto_select_demo,
-            "auto_orchestrate_demo": auto_orchestrate_demo,
             "target_task": target_task,
             "source_name": source_name,
             "season_label": season_label,
@@ -3481,19 +2841,10 @@ def phase_three_model_market_board_cadence(
 @router.post("/models/market-board/materialize")
 def phase_three_model_market_board_materialize(
     request: FutureSlateRequest = Body(...),
-    repository_mode: str = Query(default="in_memory"),
     target_task: str = Query(default="spread_error_regression"),
 ) -> dict[str, object]:
     games = [game.model_dump() for game in request.games]
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        board_result = materialize_model_market_board_in_memory(
-            repository,
-            target_task=target_task,
-            games=games,
-            slate_label=request.slate_label,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
             board_result = materialize_model_market_board_postgres(
                 connection,
@@ -3501,8 +2852,16 @@ def phase_three_model_market_board_materialize(
                 games=games,
                 slate_label=request.slate_label,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = InMemoryIngestionRepository()
+        board_result = materialize_model_market_board_in_memory(
+            repository,
+            target_task=target_task,
+            games=games,
+            slate_label=request.slate_label,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
@@ -3516,8 +2875,6 @@ def phase_three_model_market_board_materialize(
 
 @router.get("/models/market-board")
 def phase_three_model_market_boards(
-    repository_mode: str = Query(default="in_memory"),
-    auto_materialize_demo: bool = Query(default=True),
     target_task: str | None = Query(default=None),
     season_label: str | None = Query(default=None),
     slate_label: str | None = Query(default="demo-market-board"),
@@ -3527,59 +2884,35 @@ def phase_three_model_market_boards(
     home_spread_line: float | None = Query(default=None),
     total_line: float | None = Query(default=None),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if auto_materialize_demo and target_task is not None:
-            materialize_model_market_board_in_memory(
-                repository,
-                target_task=target_task,
-                slate_label=slate_label,
-                games=[
-                    {
-                        "season_label": season_label or "2025-2026",
-                        "game_date": game_date,
-                        "home_team_code": home_team_code,
-                        "away_team_code": away_team_code,
-                        "home_spread_line": home_spread_line,
-                        "total_line": total_line,
-                    }
-                ],
-            )
-        boards = list_model_market_boards_in_memory(
-            repository,
-            target_task=target_task,
-            season_label=season_label,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if auto_materialize_demo and target_task is not None:
-                materialize_model_market_board_postgres(
-                    connection,
-                    target_task=target_task,
-                    slate_label=slate_label,
-                    games=[
-                        {
-                            "season_label": season_label or "2025-2026",
-                            "game_date": game_date,
-                            "home_team_code": home_team_code,
-                            "away_team_code": away_team_code,
-                            "home_spread_line": home_spread_line,
-                            "total_line": total_line,
-                        }
-                    ],
-                )
             boards = list_model_market_boards_postgres(
                 connection,
                 target_task=target_task,
                 season_label=season_label,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_market_board_materialized_repository(
+            target_task=target_task,
+            season_label=season_label,
+            slate_label=slate_label,
+            game_date=game_date,
+            home_team_code=home_team_code,
+            away_team_code=away_team_code,
+            home_spread_line=home_spread_line,
+            total_line=total_line,
+        )
+        boards = list_model_market_boards_in_memory(
+            repository,
+            target_task=target_task,
+            season_label=season_label,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
         "filters": {
-            "auto_materialize_demo": auto_materialize_demo,
             "target_task": target_task,
             "season_label": season_label,
         },
@@ -3591,8 +2924,6 @@ def phase_three_model_market_boards(
 @router.get("/models/market-board/{board_id}")
 def phase_three_model_market_board_detail(
     board_id: int,
-    repository_mode: str = Query(default="in_memory"),
-    auto_materialize_demo: bool = Query(default=True),
     target_task: str = Query(default="spread_error_regression"),
     season_label: str = Query(default="2025-2026"),
     slate_label: str | None = Query(default="demo-market-board"),
@@ -3602,51 +2933,27 @@ def phase_three_model_market_board_detail(
     home_spread_line: float | None = Query(default=None),
     total_line: float | None = Query(default=None),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if auto_materialize_demo:
-            materialize_model_market_board_in_memory(
-                repository,
-                target_task=target_task,
-                slate_label=slate_label,
-                games=[
-                    {
-                        "season_label": season_label,
-                        "game_date": game_date,
-                        "home_team_code": home_team_code,
-                        "away_team_code": away_team_code,
-                        "home_spread_line": home_spread_line,
-                        "total_line": total_line,
-                    }
-                ],
-            )
-        board = get_model_market_board_detail_in_memory(repository, board_id=board_id)
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if auto_materialize_demo:
-                materialize_model_market_board_postgres(
-                    connection,
-                    target_task=target_task,
-                    slate_label=slate_label,
-                    games=[
-                        {
-                            "season_label": season_label,
-                            "game_date": game_date,
-                            "home_team_code": home_team_code,
-                            "away_team_code": away_team_code,
-                            "home_spread_line": home_spread_line,
-                            "total_line": total_line,
-                        }
-                    ],
-                )
             board = get_model_market_board_detail_postgres(connection, board_id=board_id)
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_market_board_materialized_repository(
+            target_task=target_task,
+            season_label=season_label,
+            slate_label=slate_label,
+            game_date=game_date,
+            home_team_code=home_team_code,
+            away_team_code=away_team_code,
+            home_spread_line=home_spread_line,
+            total_line=total_line,
+        )
+        board = get_model_market_board_detail_in_memory(repository, board_id=board_id)
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
         "filters": {
-            "auto_materialize_demo": auto_materialize_demo,
             "target_task": target_task,
             "season_label": season_label,
         },
@@ -3657,12 +2964,6 @@ def phase_three_model_market_board_detail(
 @router.get("/models/market-board/{board_id}/operations")
 def phase_three_model_market_board_operations(
     board_id: int,
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_refresh_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
-    auto_select_demo: bool = Query(default=True),
-    auto_orchestrate_demo: bool = Query(default=True),
     target_task: str = Query(default="spread_error_regression"),
     source_name: str | None = Query(default="demo_daily_lines_v1"),
     season_label: str = Query(default="2025-2026"),
@@ -3676,103 +2977,40 @@ def phase_three_model_market_board_operations(
     pending_only: bool = Query(default=True),
     recent_limit: int = Query(default=5, ge=1, le=20),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_refresh_demo:
-            refresh_model_market_board_in_memory(
-                repository,
-                target_task=target_task,
-                source_name=source_name or "demo_daily_lines_v1",
-                season_label=season_label,
-                game_date=game_date,
-                slate_label=slate_label,
-                game_count=game_count,
-            )
-        if auto_train_demo:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=None,
-                season_label=None,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        if auto_select_demo:
-            promote_best_model_in_memory(repository, target_task=target_task)
-        if auto_orchestrate_demo:
-            orchestrate_model_market_board_scoring_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                season_label=season_label,
-                source_name=source_name,
-                freshness_status=freshness_status,
-                pending_only=pending_only,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        operations = get_model_market_board_operations_in_memory(
-            repository,
-            board_id=board_id,
-            recent_limit=recent_limit,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_refresh_demo:
-                refresh_model_market_board_postgres(
-                    connection,
-                    target_task=target_task,
-                    source_name=source_name or "demo_daily_lines_v1",
-                    season_label=season_label,
-                    game_date=game_date,
-                    slate_label=slate_label,
-                    game_count=game_count,
-                )
-            if auto_train_demo:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=None,
-                    season_label=None,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-            if auto_select_demo:
-                promote_best_model_postgres(connection, target_task=target_task)
-            if auto_orchestrate_demo:
-                orchestrate_model_market_board_scoring_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    season_label=season_label,
-                    source_name=source_name,
-                    freshness_status=freshness_status,
-                    pending_only=pending_only,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
             operations = get_model_market_board_operations_postgres(
                 connection,
                 board_id=board_id,
                 recent_limit=recent_limit,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_market_board_orchestration_repository(
+            target_task=target_task,
+            source_name=source_name,
+            season_label=season_label,
+            game_date=game_date,
+            slate_label=slate_label,
+            game_count=game_count,
+            feature_key=feature_key,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            scoring_freshness_status=freshness_status,
+            scoring_pending_only=pending_only,
+            recent_limit=recent_limit,
+            run_scoring_orchestration=True,
+        )
+        operations = get_model_market_board_operations_in_memory(
+            repository,
+            board_id=board_id,
+            recent_limit=recent_limit,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
         "filters": {
-            "seed_demo": seed_demo,
-            "auto_refresh_demo": auto_refresh_demo,
-            "auto_train_demo": auto_train_demo,
-            "auto_select_demo": auto_select_demo,
-            "auto_orchestrate_demo": auto_orchestrate_demo,
             "target_task": target_task,
             "source_name": source_name,
             "season_label": season_label,
@@ -3793,11 +3031,6 @@ def phase_three_model_market_board_operations(
 @router.post("/models/market-board/{board_id}/score")
 def phase_three_model_market_board_score(
     board_id: int,
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_materialize_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
-    auto_select_demo: bool = Query(default=True),
     target_task: str = Query(default="spread_error_regression"),
     season_label: str = Query(default="2025-2026"),
     slate_label: str | None = Query(default="demo-market-board"),
@@ -3814,87 +3047,8 @@ def phase_three_model_market_board_score(
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_materialize_demo:
-            materialize_model_market_board_in_memory(
-                repository,
-                target_task=target_task,
-                slate_label=slate_label,
-                games=[
-                    {
-                        "season_label": season_label,
-                        "game_date": game_date,
-                        "home_team_code": home_team_code,
-                        "away_team_code": away_team_code,
-                        "home_spread_line": home_spread_line,
-                        "total_line": total_line,
-                    }
-                ],
-            )
-        board = get_model_market_board_detail_in_memory(repository, board_id=board_id)
-        resolved_target_task = (
-            str(board["target_task"]) if board is not None else target_task
-        )
-        if auto_train_demo:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=resolved_target_task,
-                team_code=None,
-                season_label=None,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        if auto_select_demo:
-            promote_best_model_in_memory(repository, target_task=resolved_target_task)
-        result = score_model_market_board_in_memory(
-            repository,
-            board_id=board_id,
-            feature_key=feature_key,
-            include_evidence=include_evidence,
-            evidence_dimensions=dimensions,
-            comparable_limit=comparable_limit,
-            min_pattern_sample_size=min_pattern_sample_size,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_materialize_demo:
-                materialize_model_market_board_postgres(
-                    connection,
-                    target_task=target_task,
-                    slate_label=slate_label,
-                    games=[
-                        {
-                            "season_label": season_label,
-                            "game_date": game_date,
-                            "home_team_code": home_team_code,
-                            "away_team_code": away_team_code,
-                            "home_spread_line": home_spread_line,
-                            "total_line": total_line,
-                        }
-                    ],
-                )
-            board = get_model_market_board_detail_postgres(connection, board_id=board_id)
-            resolved_target_task = str(board["target_task"]) if board is not None else target_task
-            if auto_train_demo:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=resolved_target_task,
-                    team_code=None,
-                    season_label=None,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-            if auto_select_demo:
-                promote_best_model_postgres(connection, target_task=resolved_target_task)
             result = score_model_market_board_postgres(
                 connection,
                 board_id=board_id,
@@ -3906,17 +3060,43 @@ def phase_three_model_market_board_score(
                 train_ratio=train_ratio,
                 validation_ratio=validation_ratio,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository, _ = _prepare_in_memory_market_board_score_repository(
+            board_id=board_id,
+            feature_key=feature_key,
+            target_task=target_task,
+            season_label=season_label,
+            slate_label=slate_label,
+            game_date=game_date,
+            home_team_code=home_team_code,
+            away_team_code=away_team_code,
+            home_spread_line=home_spread_line,
+            total_line=total_line,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+        result = score_model_market_board_in_memory(
+            repository,
+            board_id=board_id,
+            feature_key=feature_key,
+            include_evidence=include_evidence,
+            evidence_dimensions=dimensions,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
         "filters": {
             "board_id": board_id,
+            "target_task": target_task,
+            "season_label": season_label,
+            "slate_label": slate_label,
             "feature_key": feature_key,
-            "auto_materialize_demo": auto_materialize_demo,
-            "auto_train_demo": auto_train_demo,
-            "auto_select_demo": auto_select_demo,
             "include_evidence": include_evidence,
             "dimensions": list(dimensions),
             "comparable_limit": comparable_limit,
@@ -3929,10 +3109,6 @@ def phase_three_model_market_board_score(
 @router.post("/models/future-slate/preview")
 def phase_three_model_future_slate_preview(
     request: FutureSlateRequest = Body(...),
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
-    auto_select_demo: bool = Query(default=True),
     feature_key: str = Query(default="baseline_team_features_v1"),
     target_task: str = Query(default="spread_error_regression"),
     include_evidence: bool = Query(default=True),
@@ -3943,51 +3119,8 @@ def phase_three_model_future_slate_preview(
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> dict[str, object]:
     games = [game.model_dump() for game in request.games]
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_train_demo:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=None,
-                season_label=None,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        if auto_select_demo:
-            promote_best_model_in_memory(repository, target_task=target_task)
-        preview = get_model_future_slate_preview_in_memory(
-            repository,
-            feature_key=feature_key,
-            target_task=target_task,
-            games=games,
-            slate_label=request.slate_label,
-            include_evidence=include_evidence,
-            evidence_dimensions=dimensions,
-            comparable_limit=comparable_limit,
-            min_pattern_sample_size=min_pattern_sample_size,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_train_demo:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=None,
-                    season_label=None,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-            if auto_select_demo:
-                promote_best_model_postgres(connection, target_task=target_task)
             preview = get_model_future_slate_preview_postgres(
                 connection,
                 feature_key=feature_key,
@@ -4001,60 +3134,21 @@ def phase_three_model_future_slate_preview(
                 train_ratio=train_ratio,
                 validation_ratio=validation_ratio,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
-
-    return {
-        "repository_mode": repository_mode,
-        "filters": {
-            "feature_key": feature_key,
-            "target_task": target_task,
-            "slate_label": request.slate_label,
-            "auto_train_demo": auto_train_demo,
-            "auto_select_demo": auto_select_demo,
-            "include_evidence": include_evidence,
-            "dimensions": list(dimensions),
-            "comparable_limit": comparable_limit,
-            "min_pattern_sample_size": min_pattern_sample_size,
-        },
-        **preview,
-    }
-
-
-@router.post("/models/future-slate/materialize")
-def phase_three_model_future_slate_materialize(
-    request: FutureSlateRequest = Body(...),
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
-    auto_select_demo: bool = Query(default=True),
-    feature_key: str = Query(default="baseline_team_features_v1"),
-    target_task: str = Query(default="spread_error_regression"),
-    include_evidence: bool = Query(default=True),
-    dimensions: tuple[str, ...] = Query(default=("venue", "days_rest_bucket")),
-    comparable_limit: int = Query(default=5, ge=1, le=50),
-    min_pattern_sample_size: int = Query(default=1, ge=1, le=100),
-    train_ratio: float = Query(default=0.7, gt=0, lt=1),
-    validation_ratio: float = Query(default=0.15, ge=0, lt=1),
-) -> dict[str, object]:
-    games = [game.model_dump() for game in request.games]
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_train_demo:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=None,
-                season_label=None,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        if auto_select_demo:
-            promote_best_model_in_memory(repository, target_task=target_task)
-        materialized = materialize_model_future_slate_in_memory(
+        repository = _prepare_in_memory_future_slate_repository(
+            feature_key=feature_key,
+            target_task=target_task,
+            games=games,
+            slate_label=request.slate_label,
+            include_evidence=include_evidence,
+            dimensions=dimensions,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+        preview = get_model_future_slate_preview_in_memory(
             repository,
             feature_key=feature_key,
             target_task=target_task,
@@ -4067,22 +3161,38 @@ def phase_three_model_future_slate_materialize(
             train_ratio=train_ratio,
             validation_ratio=validation_ratio,
         )
-    elif repository_mode == "postgres":
+        repository_mode = "in_memory"
+
+    return {
+        "repository_mode": repository_mode,
+        "filters": {
+            "feature_key": feature_key,
+            "target_task": target_task,
+            "slate_label": request.slate_label,
+            "include_evidence": include_evidence,
+            "dimensions": list(dimensions),
+            "comparable_limit": comparable_limit,
+            "min_pattern_sample_size": min_pattern_sample_size,
+        },
+        **preview,
+    }
+
+
+@router.post("/models/future-slate/materialize")
+def phase_three_model_future_slate_materialize(
+    request: FutureSlateRequest = Body(...),
+    feature_key: str = Query(default="baseline_team_features_v1"),
+    target_task: str = Query(default="spread_error_regression"),
+    include_evidence: bool = Query(default=True),
+    dimensions: tuple[str, ...] = Query(default=("venue", "days_rest_bucket")),
+    comparable_limit: int = Query(default=5, ge=1, le=50),
+    min_pattern_sample_size: int = Query(default=1, ge=1, le=100),
+    train_ratio: float = Query(default=0.7, gt=0, lt=1),
+    validation_ratio: float = Query(default=0.15, ge=0, lt=1),
+) -> dict[str, object]:
+    games = [game.model_dump() for game in request.games]
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_train_demo:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=None,
-                    season_label=None,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-            if auto_select_demo:
-                promote_best_model_postgres(connection, target_task=target_task)
             materialized = materialize_model_future_slate_postgres(
                 connection,
                 feature_key=feature_key,
@@ -4096,8 +3206,34 @@ def phase_three_model_future_slate_materialize(
                 train_ratio=train_ratio,
                 validation_ratio=validation_ratio,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_future_slate_repository(
+            feature_key=feature_key,
+            target_task=target_task,
+            games=games,
+            slate_label=request.slate_label,
+            include_evidence=include_evidence,
+            dimensions=dimensions,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+        materialized = materialize_model_future_slate_in_memory(
+            repository,
+            feature_key=feature_key,
+            target_task=target_task,
+            games=games,
+            slate_label=request.slate_label,
+            include_evidence=include_evidence,
+            evidence_dimensions=dimensions,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
@@ -4105,8 +3241,6 @@ def phase_three_model_future_slate_materialize(
             "feature_key": feature_key,
             "target_task": target_task,
             "slate_label": request.slate_label,
-            "auto_train_demo": auto_train_demo,
-            "auto_select_demo": auto_select_demo,
             "include_evidence": include_evidence,
             "dimensions": list(dimensions),
             "comparable_limit": comparable_limit,
@@ -4118,10 +3252,6 @@ def phase_three_model_future_slate_materialize(
 
 @router.post("/models/future-game-preview/opportunities/materialize")
 def phase_three_model_future_opportunity_materialize(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
-    auto_select_demo: bool = Query(default=True),
     feature_key: str = Query(default="baseline_team_features_v1"),
     target_task: str = Query(default="spread_error_regression"),
     season_label: str = Query(default="2025-2026"),
@@ -4137,55 +3267,8 @@ def phase_three_model_future_opportunity_materialize(
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_train_demo:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=None,
-                season_label=None,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        if auto_select_demo:
-            promote_best_model_in_memory(repository, target_task=target_task)
-        materialized = materialize_model_future_opportunities_in_memory(
-            repository,
-            feature_key=feature_key,
-            target_task=target_task,
-            season_label=season_label,
-            game_date=game_date,
-            home_team_code=home_team_code,
-            away_team_code=away_team_code,
-            home_spread_line=home_spread_line,
-            total_line=total_line,
-            include_evidence=include_evidence,
-            evidence_dimensions=dimensions,
-            comparable_limit=comparable_limit,
-            min_pattern_sample_size=min_pattern_sample_size,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_train_demo:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=None,
-                    season_label=None,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-            if auto_select_demo:
-                promote_best_model_postgres(connection, target_task=target_task)
             materialized = materialize_model_future_opportunities_postgres(
                 connection,
                 feature_key=feature_key,
@@ -4203,8 +3286,35 @@ def phase_three_model_future_opportunity_materialize(
                 train_ratio=train_ratio,
                 validation_ratio=validation_ratio,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_phase_three_model_repository(
+            feature_key=feature_key,
+            target_task=target_task,
+            team_code=None,
+            season_label=None,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            promote_best=True,
+        )
+        materialized = materialize_model_future_opportunities_in_memory(
+            repository,
+            feature_key=feature_key,
+            target_task=target_task,
+            season_label=season_label,
+            game_date=game_date,
+            home_team_code=home_team_code,
+            away_team_code=away_team_code,
+            home_spread_line=home_spread_line,
+            total_line=total_line,
+            include_evidence=include_evidence,
+            evidence_dimensions=dimensions,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
@@ -4217,8 +3327,6 @@ def phase_three_model_future_opportunity_materialize(
             "away_team_code": away_team_code,
             "home_spread_line": home_spread_line,
             "total_line": total_line,
-            "auto_train_demo": auto_train_demo,
-            "auto_select_demo": auto_select_demo,
             "include_evidence": include_evidence,
             "dimensions": list(dimensions),
             "comparable_limit": comparable_limit,
@@ -4230,10 +3338,6 @@ def phase_three_model_future_opportunity_materialize(
 
 @router.post("/models/opportunities/materialize")
 def phase_three_model_opportunity_materialize(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
-    auto_select_demo: bool = Query(default=True),
     feature_key: str = Query(default="baseline_team_features_v1"),
     target_task: str = Query(default="spread_error_regression"),
     team_code: str | None = Query(default=None),
@@ -4247,53 +3351,8 @@ def phase_three_model_opportunity_materialize(
     comparable_limit: int = Query(default=5, ge=1, le=50),
     min_pattern_sample_size: int = Query(default=1, ge=1, le=100),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_train_demo:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        if auto_select_demo:
-            promote_best_model_in_memory(repository, target_task=target_task)
-        materialized = materialize_model_opportunities_in_memory(
-            repository,
-            feature_key=feature_key,
-            target_task=target_task,
-            team_code=team_code,
-            season_label=season_label,
-            canonical_game_id=canonical_game_id,
-            limit=limit,
-            include_evidence=include_evidence,
-            evidence_dimensions=dimensions,
-            comparable_limit=comparable_limit,
-            min_pattern_sample_size=min_pattern_sample_size,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_train_demo:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=team_code,
-                    season_label=season_label,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-            if auto_select_demo:
-                promote_best_model_postgres(connection, target_task=target_task)
             materialized = materialize_model_opportunities_postgres(
                 connection,
                 feature_key=feature_key,
@@ -4309,8 +3368,33 @@ def phase_three_model_opportunity_materialize(
                 train_ratio=train_ratio,
                 validation_ratio=validation_ratio,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_phase_three_model_repository(
+            feature_key=feature_key,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            promote_best=True,
+        )
+        materialized = materialize_model_opportunities_in_memory(
+            repository,
+            feature_key=feature_key,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            canonical_game_id=canonical_game_id,
+            limit=limit,
+            include_evidence=include_evidence,
+            evidence_dimensions=dimensions,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
@@ -4320,8 +3404,6 @@ def phase_three_model_opportunity_materialize(
             "team_code": team_code,
             "season_label": season_label,
             "canonical_game_id": canonical_game_id,
-            "auto_train_demo": auto_train_demo,
-            "auto_select_demo": auto_select_demo,
             "limit": limit,
             "include_evidence": include_evidence,
             "dimensions": list(dimensions),
@@ -4332,221 +3414,8 @@ def phase_three_model_opportunity_materialize(
     }
 
 
-@router.get("/models/opportunities")
-def phase_three_model_opportunities(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
-    auto_select_demo: bool = Query(default=True),
-    auto_materialize_demo: bool = Query(default=True),
-    feature_key: str = Query(default="baseline_team_features_v1"),
-    target_task: str | None = Query(default="spread_error_regression"),
-    team_code: str | None = Query(default=None),
-    season_label: str | None = Query(default=None),
-    canonical_game_id: int | None = Query(default=None, ge=1),
-    source_kind: str | None = Query(default=None),
-    scenario_key: str | None = Query(default=None),
-    game_date: date = Query(default=date(2026, 4, 20)),
-    home_team_code: str = Query(default="LAL"),
-    away_team_code: str = Query(default="BOS"),
-    home_spread_line: float | None = Query(default=None),
-    total_line: float | None = Query(default=None),
-    train_ratio: float = Query(default=0.7, gt=0, lt=1),
-    validation_ratio: float = Query(default=0.15, ge=0, lt=1),
-    status: str | None = Query(default=None),
-    limit: int = Query(default=10, ge=1, le=100),
-    include_evidence: bool = Query(default=True),
-    dimensions: tuple[str, ...] = Query(default=("venue", "days_rest_bucket")),
-    comparable_limit: int = Query(default=5, ge=1, le=50),
-    min_pattern_sample_size: int = Query(default=1, ge=1, le=100),
-) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_train_demo and target_task is not None:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=None if source_kind == "future_scenario" else team_code,
-                season_label=None if source_kind == "future_scenario" else season_label,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        if auto_select_demo and target_task is not None:
-            promote_best_model_in_memory(repository, target_task=target_task)
-        if auto_materialize_demo and target_task is not None:
-            if source_kind == "future_scenario":
-                materialize_model_future_opportunities_in_memory(
-                    repository,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    season_label=season_label or "2025-2026",
-                    game_date=game_date,
-                    home_team_code=home_team_code,
-                    away_team_code=away_team_code,
-                    home_spread_line=home_spread_line,
-                    total_line=total_line,
-                    include_evidence=include_evidence,
-                    evidence_dimensions=dimensions,
-                    comparable_limit=comparable_limit,
-                    min_pattern_sample_size=min_pattern_sample_size,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-            else:
-                materialize_model_opportunities_in_memory(
-                    repository,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=team_code,
-                    season_label=season_label,
-                    canonical_game_id=canonical_game_id,
-                    limit=limit,
-                    include_evidence=include_evidence,
-                    evidence_dimensions=dimensions,
-                    comparable_limit=comparable_limit,
-                    min_pattern_sample_size=min_pattern_sample_size,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-        opportunities = list_model_opportunities_in_memory(
-            repository,
-            target_task=target_task,
-            team_code=team_code,
-            status=status,
-            season_label=season_label,
-            source_kind=source_kind,
-            scenario_key=scenario_key,
-        )
-    elif repository_mode == "postgres":
-        with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_train_demo and target_task is not None:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=None if source_kind == "future_scenario" else team_code,
-                    season_label=None if source_kind == "future_scenario" else season_label,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-            if auto_select_demo and target_task is not None:
-                promote_best_model_postgres(connection, target_task=target_task)
-            if auto_materialize_demo and target_task is not None:
-                if source_kind == "future_scenario":
-                    materialize_model_future_opportunities_postgres(
-                        connection,
-                        feature_key=feature_key,
-                        target_task=target_task,
-                        season_label=season_label or "2025-2026",
-                        game_date=game_date,
-                        home_team_code=home_team_code,
-                        away_team_code=away_team_code,
-                        home_spread_line=home_spread_line,
-                        total_line=total_line,
-                        include_evidence=include_evidence,
-                        evidence_dimensions=dimensions,
-                        comparable_limit=comparable_limit,
-                        min_pattern_sample_size=min_pattern_sample_size,
-                        train_ratio=train_ratio,
-                        validation_ratio=validation_ratio,
-                    )
-                else:
-                    materialize_model_opportunities_postgres(
-                        connection,
-                        feature_key=feature_key,
-                        target_task=target_task,
-                        team_code=team_code,
-                        season_label=season_label,
-                        canonical_game_id=canonical_game_id,
-                        limit=limit,
-                        include_evidence=include_evidence,
-                        evidence_dimensions=dimensions,
-                        comparable_limit=comparable_limit,
-                        min_pattern_sample_size=min_pattern_sample_size,
-                        train_ratio=train_ratio,
-                        validation_ratio=validation_ratio,
-                    )
-            opportunities = list_model_opportunities_postgres(
-                connection,
-                target_task=target_task,
-                team_code=team_code,
-                status=status,
-                season_label=season_label,
-                source_kind=source_kind,
-                scenario_key=scenario_key,
-            )
-    else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
-
-    return {
-        "repository_mode": repository_mode,
-        "filters": {
-            "feature_key": feature_key,
-            "target_task": target_task,
-            "team_code": team_code,
-            "season_label": season_label,
-            "canonical_game_id": canonical_game_id,
-            "source_kind": source_kind,
-            "scenario_key": scenario_key,
-            "game_date": game_date,
-            "home_team_code": home_team_code,
-            "away_team_code": away_team_code,
-            "home_spread_line": home_spread_line,
-            "total_line": total_line,
-            "auto_train_demo": auto_train_demo,
-            "auto_select_demo": auto_select_demo,
-            "auto_materialize_demo": auto_materialize_demo,
-            "status": status,
-            "limit": limit,
-        },
-        "opportunity_count": len(opportunities),
-        "opportunities": [
-            {
-                "id": opportunity.id,
-                "model_scoring_run_id": opportunity.model_scoring_run_id,
-                "model_selection_snapshot_id": opportunity.model_selection_snapshot_id,
-                "model_evaluation_snapshot_id": opportunity.model_evaluation_snapshot_id,
-                "feature_version_id": opportunity.feature_version_id,
-                "target_task": opportunity.target_task,
-                "source_kind": opportunity.source_kind,
-                "scenario_key": opportunity.scenario_key,
-                "opportunity_key": opportunity.opportunity_key,
-                "team_code": opportunity.team_code,
-                "opponent_code": opportunity.opponent_code,
-                "season_label": opportunity.season_label,
-                "canonical_game_id": opportunity.canonical_game_id,
-                "game_date": opportunity.game_date.isoformat(),
-                "policy_name": opportunity.policy_name,
-                "status": opportunity.status,
-                "prediction_value": opportunity.prediction_value,
-                "signal_strength": opportunity.signal_strength,
-                "evidence_rating": opportunity.evidence_rating,
-                "recommendation_status": opportunity.recommendation_status,
-                "payload": opportunity.payload,
-                "created_at": opportunity.created_at.isoformat()
-                if opportunity.created_at
-                else None,
-                "updated_at": opportunity.updated_at.isoformat()
-                if opportunity.updated_at
-                else None,
-            }
-            for opportunity in opportunities[:limit]
-        ],
-    }
-
-
 @router.get("/models/opportunities/history")
 def phase_three_model_opportunity_history(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
-    auto_select_demo: bool = Query(default=True),
-    auto_materialize_demo: bool = Query(default=True),
     feature_key: str = Query(default="baseline_team_features_v1"),
     target_task: str | None = Query(default="spread_error_regression"),
     team_code: str | None = Query(default=None),
@@ -4568,117 +3437,8 @@ def phase_three_model_opportunity_history(
     comparable_limit: int = Query(default=5, ge=1, le=50),
     min_pattern_sample_size: int = Query(default=1, ge=1, le=100),
 ) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_train_demo and target_task is not None:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=None if source_kind == "future_scenario" else team_code,
-                season_label=None if source_kind == "future_scenario" else season_label,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        if auto_select_demo and target_task is not None:
-            promote_best_model_in_memory(repository, target_task=target_task)
-        if auto_materialize_demo and target_task is not None:
-            if source_kind == "future_scenario":
-                materialize_model_future_opportunities_in_memory(
-                    repository,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    season_label=season_label or "2025-2026",
-                    game_date=game_date,
-                    home_team_code=home_team_code,
-                    away_team_code=away_team_code,
-                    home_spread_line=home_spread_line,
-                    total_line=total_line,
-                    include_evidence=include_evidence,
-                    evidence_dimensions=dimensions,
-                    comparable_limit=comparable_limit,
-                    min_pattern_sample_size=min_pattern_sample_size,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-            else:
-                materialize_model_opportunities_in_memory(
-                    repository,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=team_code,
-                    season_label=season_label,
-                    canonical_game_id=canonical_game_id,
-                    limit=limit,
-                    include_evidence=include_evidence,
-                    evidence_dimensions=dimensions,
-                    comparable_limit=comparable_limit,
-                    min_pattern_sample_size=min_pattern_sample_size,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-        history = get_model_opportunity_history_in_memory(
-            repository,
-            target_task=target_task,
-            team_code=team_code,
-            season_label=season_label,
-            source_kind=source_kind,
-            scenario_key=scenario_key,
-            recent_limit=recent_limit,
-        )
-    elif repository_mode == "postgres":
+    if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_train_demo and target_task is not None:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=None if source_kind == "future_scenario" else team_code,
-                    season_label=None if source_kind == "future_scenario" else season_label,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-            if auto_select_demo and target_task is not None:
-                promote_best_model_postgres(connection, target_task=target_task)
-            if auto_materialize_demo and target_task is not None:
-                if source_kind == "future_scenario":
-                    materialize_model_future_opportunities_postgres(
-                        connection,
-                        feature_key=feature_key,
-                        target_task=target_task,
-                        season_label=season_label or "2025-2026",
-                        game_date=game_date,
-                        home_team_code=home_team_code,
-                        away_team_code=away_team_code,
-                        home_spread_line=home_spread_line,
-                        total_line=total_line,
-                        include_evidence=include_evidence,
-                        evidence_dimensions=dimensions,
-                        comparable_limit=comparable_limit,
-                        min_pattern_sample_size=min_pattern_sample_size,
-                        train_ratio=train_ratio,
-                        validation_ratio=validation_ratio,
-                    )
-                else:
-                    materialize_model_opportunities_postgres(
-                        connection,
-                        feature_key=feature_key,
-                        target_task=target_task,
-                        team_code=team_code,
-                        season_label=season_label,
-                        canonical_game_id=canonical_game_id,
-                        limit=limit,
-                        include_evidence=include_evidence,
-                        evidence_dimensions=dimensions,
-                        comparable_limit=comparable_limit,
-                        min_pattern_sample_size=min_pattern_sample_size,
-                        train_ratio=train_ratio,
-                        validation_ratio=validation_ratio,
-                    )
             history = get_model_opportunity_history_postgres(
                 connection,
                 target_task=target_task,
@@ -4688,8 +3448,38 @@ def phase_three_model_opportunity_history(
                 scenario_key=scenario_key,
                 recent_limit=recent_limit,
             )
+        repository_mode = "postgres"
     else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
+        repository = _prepare_in_memory_opportunity_history_repository(
+            feature_key=feature_key,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            canonical_game_id=canonical_game_id,
+            source_kind=source_kind,
+            game_date=game_date,
+            home_team_code=home_team_code,
+            away_team_code=away_team_code,
+            home_spread_line=home_spread_line,
+            total_line=total_line,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            limit=limit,
+            include_evidence=include_evidence,
+            dimensions=dimensions,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+        )
+        history = get_model_opportunity_history_in_memory(
+            repository,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            source_kind=source_kind,
+            scenario_key=scenario_key,
+            recent_limit=recent_limit,
+        )
+        repository_mode = "in_memory"
 
     return {
         "repository_mode": repository_mode,
@@ -4706,176 +3496,9 @@ def phase_three_model_opportunity_history(
             "away_team_code": away_team_code,
             "home_spread_line": home_spread_line,
             "total_line": total_line,
-            "auto_train_demo": auto_train_demo,
-            "auto_select_demo": auto_select_demo,
-            "auto_materialize_demo": auto_materialize_demo,
             "recent_limit": recent_limit,
         },
         "model_opportunity_history": history,
-    }
-
-
-@router.get("/models/opportunities/{opportunity_id}")
-def phase_three_model_opportunity_detail(
-    opportunity_id: int,
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    auto_train_demo: bool = Query(default=True),
-    auto_select_demo: bool = Query(default=True),
-    auto_materialize_demo: bool = Query(default=True),
-    feature_key: str = Query(default="baseline_team_features_v1"),
-    target_task: str = Query(default="spread_error_regression"),
-    team_code: str | None = Query(default=None),
-    season_label: str | None = Query(default=None),
-    canonical_game_id: int | None = Query(default=None, ge=1),
-    source_kind: str | None = Query(default=None),
-    scenario_key: str | None = Query(default=None),
-    game_date: date = Query(default=date(2026, 4, 20)),
-    home_team_code: str = Query(default="LAL"),
-    away_team_code: str = Query(default="BOS"),
-    home_spread_line: float | None = Query(default=None),
-    total_line: float | None = Query(default=None),
-    train_ratio: float = Query(default=0.7, gt=0, lt=1),
-    validation_ratio: float = Query(default=0.15, ge=0, lt=1),
-    limit: int = Query(default=10, ge=1, le=100),
-    include_evidence: bool = Query(default=True),
-    dimensions: tuple[str, ...] = Query(default=("venue", "days_rest_bucket")),
-    comparable_limit: int = Query(default=5, ge=1, le=50),
-    min_pattern_sample_size: int = Query(default=1, ge=1, le=100),
-) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        if auto_train_demo:
-            train_phase_three_models_in_memory(
-                repository,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=None if source_kind == "future_scenario" else team_code,
-                season_label=None if source_kind == "future_scenario" else season_label,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        if auto_select_demo:
-            promote_best_model_in_memory(repository, target_task=target_task)
-        if auto_materialize_demo:
-            if source_kind == "future_scenario":
-                materialize_model_future_opportunities_in_memory(
-                    repository,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    season_label=season_label or "2025-2026",
-                    game_date=game_date,
-                    home_team_code=home_team_code,
-                    away_team_code=away_team_code,
-                    home_spread_line=home_spread_line,
-                    total_line=total_line,
-                    include_evidence=include_evidence,
-                    evidence_dimensions=dimensions,
-                    comparable_limit=comparable_limit,
-                    min_pattern_sample_size=min_pattern_sample_size,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-            else:
-                materialize_model_opportunities_in_memory(
-                    repository,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=team_code,
-                    season_label=season_label,
-                    canonical_game_id=canonical_game_id,
-                    limit=limit,
-                    include_evidence=include_evidence,
-                    evidence_dimensions=dimensions,
-                    comparable_limit=comparable_limit,
-                    min_pattern_sample_size=min_pattern_sample_size,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-        opportunity = get_model_opportunity_detail_in_memory(
-            repository,
-            opportunity_id=opportunity_id,
-        )
-    elif repository_mode == "postgres":
-        with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            if auto_train_demo:
-                train_phase_three_models_postgres(
-                    connection,
-                    feature_key=feature_key,
-                    target_task=target_task,
-                    team_code=None if source_kind == "future_scenario" else team_code,
-                    season_label=None if source_kind == "future_scenario" else season_label,
-                    train_ratio=train_ratio,
-                    validation_ratio=validation_ratio,
-                )
-            if auto_select_demo:
-                promote_best_model_postgres(connection, target_task=target_task)
-            if auto_materialize_demo:
-                if source_kind == "future_scenario":
-                    materialize_model_future_opportunities_postgres(
-                        connection,
-                        feature_key=feature_key,
-                        target_task=target_task,
-                        season_label=season_label or "2025-2026",
-                        game_date=game_date,
-                        home_team_code=home_team_code,
-                        away_team_code=away_team_code,
-                        home_spread_line=home_spread_line,
-                        total_line=total_line,
-                        include_evidence=include_evidence,
-                        evidence_dimensions=dimensions,
-                        comparable_limit=comparable_limit,
-                        min_pattern_sample_size=min_pattern_sample_size,
-                        train_ratio=train_ratio,
-                        validation_ratio=validation_ratio,
-                    )
-                else:
-                    materialize_model_opportunities_postgres(
-                        connection,
-                        feature_key=feature_key,
-                        target_task=target_task,
-                        team_code=team_code,
-                        season_label=season_label,
-                        canonical_game_id=canonical_game_id,
-                        limit=limit,
-                        include_evidence=include_evidence,
-                        evidence_dimensions=dimensions,
-                        comparable_limit=comparable_limit,
-                        min_pattern_sample_size=min_pattern_sample_size,
-                        train_ratio=train_ratio,
-                        validation_ratio=validation_ratio,
-                    )
-            opportunity = get_model_opportunity_detail_postgres(
-                connection,
-                opportunity_id=opportunity_id,
-            )
-    else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
-
-    return {
-        "repository_mode": repository_mode,
-        "filters": {
-            "feature_key": feature_key,
-            "target_task": target_task,
-            "team_code": team_code,
-            "season_label": season_label,
-            "canonical_game_id": canonical_game_id,
-            "source_kind": source_kind,
-            "scenario_key": scenario_key,
-            "game_date": game_date,
-            "home_team_code": home_team_code,
-            "away_team_code": away_team_code,
-            "home_spread_line": home_spread_line,
-            "total_line": total_line,
-            "auto_train_demo": auto_train_demo,
-            "auto_select_demo": auto_select_demo,
-            "auto_materialize_demo": auto_materialize_demo,
-        },
-        "opportunity": opportunity,
     }
 
 
@@ -4926,48 +3549,6 @@ def feature_snapshots(
             "offset": offset,
         },
         **snapshot_result,
-    }
-
-
-@router.get("/features/summary")
-def feature_summary(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    feature_key: str = Query(default="baseline_team_features_v1"),
-    team_code: str | None = Query(default=None),
-    season_label: str | None = Query(default=None),
-) -> dict[str, object]:
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        summary_result = get_feature_snapshot_summary_in_memory(
-            repository,
-            feature_key=feature_key,
-            team_code=team_code,
-            season_label=season_label,
-        )
-    elif repository_mode == "postgres":
-        with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            summary_result = get_feature_snapshot_summary_postgres(
-                connection,
-                feature_key=feature_key,
-                team_code=team_code,
-                season_label=season_label,
-            )
-    else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
-
-    return {
-        "repository_mode": repository_mode,
-        "filters": {
-            "feature_key": feature_key,
-            "team_code": team_code,
-            "season_label": season_label,
-        },
-        **summary_result,
     }
 
 
@@ -5060,235 +3641,6 @@ def feature_dataset_profile(
             "season_label": season_label,
         },
         **profile_result,
-    }
-
-
-@router.get("/features/patterns")
-def feature_patterns(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    feature_key: str = Query(default="baseline_team_features_v1"),
-    target_task: str = Query(default="spread_error_regression"),
-    team_code: str | None = Query(default=None),
-    season_label: str | None = Query(default=None),
-    dimensions: str = Query(default="venue,days_rest_bucket"),
-    min_sample_size: int = Query(default=2, ge=1, le=100),
-    limit: int = Query(default=50, ge=1, le=200),
-) -> dict[str, object]:
-    parsed_dimensions = tuple(
-        dimension.strip() for dimension in dimensions.split(",") if dimension.strip()
-    )
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        pattern_result = get_feature_pattern_catalog_in_memory(
-            repository,
-            feature_key=feature_key,
-            target_task=target_task,
-            team_code=team_code,
-            season_label=season_label,
-            dimensions=parsed_dimensions,
-            min_sample_size=min_sample_size,
-            limit=limit,
-        )
-    elif repository_mode == "postgres":
-        with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            pattern_result = get_feature_pattern_catalog_postgres(
-                connection,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                dimensions=parsed_dimensions,
-                min_sample_size=min_sample_size,
-                limit=limit,
-            )
-    else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
-
-    return {
-        "repository_mode": repository_mode,
-        "filters": {
-            "feature_key": feature_key,
-            "target_task": target_task,
-            "team_code": team_code,
-            "season_label": season_label,
-            "dimensions": list(parsed_dimensions),
-            "min_sample_size": min_sample_size,
-            "limit": limit,
-        },
-        **pattern_result,
-    }
-
-
-@router.get("/features/comparables")
-def feature_comparables(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    feature_key: str = Query(default="baseline_team_features_v1"),
-    target_task: str = Query(default="spread_error_regression"),
-    team_code: str | None = Query(default=None),
-    season_label: str | None = Query(default=None),
-    dimensions: str = Query(default="venue,days_rest_bucket"),
-    canonical_game_id: int | None = Query(default=None, ge=1),
-    condition_values: str | None = Query(default=None),
-    pattern_key: str | None = Query(default=None),
-    limit: int = Query(default=20, ge=1, le=100),
-) -> dict[str, object]:
-    parsed_dimensions = tuple(
-        dimension.strip() for dimension in dimensions.split(",") if dimension.strip()
-    )
-    parsed_condition_values = (
-        tuple(value.strip() for value in condition_values.split(","))
-        if condition_values is not None
-        else None
-    )
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        comparable_result = get_feature_comparable_cases_in_memory(
-            repository,
-            feature_key=feature_key,
-            target_task=target_task,
-            team_code=team_code,
-            season_label=season_label,
-            dimensions=parsed_dimensions,
-            canonical_game_id=canonical_game_id,
-            condition_values=parsed_condition_values,
-            pattern_key=pattern_key,
-            limit=limit,
-        )
-    elif repository_mode == "postgres":
-        with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            comparable_result = get_feature_comparable_cases_postgres(
-                connection,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                dimensions=parsed_dimensions,
-                canonical_game_id=canonical_game_id,
-                condition_values=parsed_condition_values,
-                pattern_key=pattern_key,
-                limit=limit,
-            )
-    else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
-
-    return {
-        "repository_mode": repository_mode,
-        "filters": {
-            "feature_key": feature_key,
-            "target_task": target_task,
-            "team_code": team_code,
-            "season_label": season_label,
-            "dimensions": list(parsed_dimensions),
-            "canonical_game_id": canonical_game_id,
-            "condition_values": list(parsed_condition_values)
-            if parsed_condition_values is not None
-            else None,
-            "pattern_key": pattern_key,
-            "limit": limit,
-        },
-        **comparable_result,
-    }
-
-
-@router.get("/features/evidence")
-def feature_evidence(
-    repository_mode: str = Query(default="in_memory"),
-    seed_demo: bool = Query(default=True),
-    feature_key: str = Query(default="baseline_team_features_v1"),
-    target_task: str = Query(default="spread_error_regression"),
-    team_code: str | None = Query(default=None),
-    season_label: str | None = Query(default=None),
-    dimensions: str = Query(default="venue,days_rest_bucket"),
-    canonical_game_id: int | None = Query(default=None, ge=1),
-    condition_values: str | None = Query(default=None),
-    pattern_key: str | None = Query(default=None),
-    comparable_limit: int = Query(default=10, ge=1, le=100),
-    min_pattern_sample_size: int = Query(default=1, ge=1, le=100),
-    train_ratio: float = Query(default=0.7, gt=0, lt=1),
-    validation_ratio: float = Query(default=0.15, ge=0, lt=1),
-    drop_null_targets: bool = Query(default=True),
-) -> dict[str, object]:
-    parsed_dimensions = tuple(
-        dimension.strip() for dimension in dimensions.split(",") if dimension.strip()
-    )
-    parsed_condition_values = (
-        tuple(value.strip() for value in condition_values.split(","))
-        if condition_values is not None
-        else None
-    )
-    if repository_mode == "in_memory":
-        repository = InMemoryIngestionRepository()
-        if seed_demo:
-            repository, _, _ = seed_phase_two_feature_in_memory()
-        evidence_result = get_feature_evidence_bundle_in_memory(
-            repository,
-            feature_key=feature_key,
-            target_task=target_task,
-            team_code=team_code,
-            season_label=season_label,
-            dimensions=parsed_dimensions,
-            canonical_game_id=canonical_game_id,
-            condition_values=parsed_condition_values,
-            pattern_key=pattern_key,
-            comparable_limit=comparable_limit,
-            min_pattern_sample_size=min_pattern_sample_size,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-            drop_null_targets=drop_null_targets,
-        )
-    elif repository_mode == "postgres":
-        with postgres_connection() as connection:
-            if seed_demo:
-                seed_phase_two_feature_postgres(connection)
-            evidence_result = get_feature_evidence_bundle_postgres(
-                connection,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                dimensions=parsed_dimensions,
-                canonical_game_id=canonical_game_id,
-                condition_values=parsed_condition_values,
-                pattern_key=pattern_key,
-                comparable_limit=comparable_limit,
-                min_pattern_sample_size=min_pattern_sample_size,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-                drop_null_targets=drop_null_targets,
-            )
-    else:
-        raise ValueError(f"Unsupported repository mode: {repository_mode}")
-
-    return {
-        "repository_mode": repository_mode,
-        "filters": {
-            "feature_key": feature_key,
-            "target_task": target_task,
-            "team_code": team_code,
-            "season_label": season_label,
-            "dimensions": list(parsed_dimensions),
-            "canonical_game_id": canonical_game_id,
-            "condition_values": list(parsed_condition_values)
-            if parsed_condition_values is not None
-            else None,
-            "pattern_key": pattern_key,
-            "comparable_limit": comparable_limit,
-            "min_pattern_sample_size": min_pattern_sample_size,
-            "train_ratio": train_ratio,
-            "validation_ratio": validation_ratio,
-            "drop_null_targets": drop_null_targets,
-        },
-        **evidence_result,
     }
 
 

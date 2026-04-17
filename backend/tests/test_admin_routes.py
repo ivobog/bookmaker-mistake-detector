@@ -166,8 +166,7 @@ def test_phase_three_model_train_endpoint_returns_ranked_baseline_runs() -> None
 def test_phase_three_model_registry_endpoint_returns_seeded_registry_rows() -> None:
     response = client.get(
         "/api/v1/admin/models/registry"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
-        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+        "?target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
     )
 
     assert response.status_code == 200
@@ -184,8 +183,7 @@ def test_phase_three_model_registry_endpoint_returns_seeded_registry_rows() -> N
 def test_phase_three_model_runs_endpoint_returns_persisted_training_runs() -> None:
     response = client.get(
         "/api/v1/admin/models/runs"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
-        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+        "?target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
     )
 
     assert response.status_code == 200
@@ -207,8 +205,7 @@ def test_phase_three_model_runs_endpoint_returns_persisted_training_runs() -> No
 def test_phase_three_model_run_detail_endpoint_returns_payload() -> None:
     response = client.get(
         "/api/v1/admin/models/runs/1"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
-        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+        "?target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
     )
 
     assert response.status_code == 200
@@ -226,8 +223,7 @@ def test_phase_three_model_run_detail_endpoint_returns_payload() -> None:
 def test_phase_three_model_summary_endpoint_returns_best_and_latest_runs() -> None:
     response = client.get(
         "/api/v1/admin/models/summary"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
-        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+        "?target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
     )
 
     assert response.status_code == 200
@@ -248,8 +244,7 @@ def test_phase_three_model_summary_endpoint_returns_best_and_latest_runs() -> No
 def test_phase_three_model_history_endpoint_returns_rollup() -> None:
     response = client.get(
         "/api/v1/admin/models/history"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
-        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+        "?target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
         "&recent_limit=5"
     )
 
@@ -270,8 +265,7 @@ def test_phase_three_model_history_endpoint_returns_rollup() -> None:
 def test_phase_three_model_evaluations_endpoint_returns_snapshots() -> None:
     response = client.get(
         "/api/v1/admin/models/evaluations"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
-        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+        "?target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
     )
 
     assert response.status_code == 200
@@ -287,8 +281,7 @@ def test_phase_three_model_evaluations_endpoint_returns_snapshots() -> None:
 def test_phase_three_model_evaluation_detail_endpoint_returns_payload() -> None:
     response = client.get(
         "/api/v1/admin/models/evaluations/1"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
-        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+        "?target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
     )
 
     assert response.status_code == 200
@@ -306,8 +299,7 @@ def test_phase_three_model_evaluation_detail_endpoint_returns_payload() -> None:
 def test_phase_three_model_evaluation_history_endpoint_returns_rollup() -> None:
     response = client.get(
         "/api/v1/admin/models/evaluations/history"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
-        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+        "?target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
         "&recent_limit=5"
     )
 
@@ -341,8 +333,7 @@ def test_phase_three_model_select_endpoint_promotes_linear_candidate() -> None:
 def test_phase_three_model_selections_endpoint_returns_active_selection() -> None:
     response = client.get(
         "/api/v1/admin/models/selections"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
-        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+        "?target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
         "&active_only=true"
     )
 
@@ -357,8 +348,7 @@ def test_phase_three_model_selections_endpoint_returns_active_selection() -> Non
 def test_phase_three_model_selection_detail_endpoint_returns_payload() -> None:
     response = client.get(
         "/api/v1/admin/models/selections/1"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
-        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+        "?target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
     )
 
     assert response.status_code == 200
@@ -373,8 +363,7 @@ def test_phase_three_model_selection_detail_endpoint_returns_payload() -> None:
 def test_phase_three_model_selection_history_endpoint_returns_rollup() -> None:
     response = client.get(
         "/api/v1/admin/models/selections/history"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
-        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+        "?target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
         "&recent_limit=5"
     )
 
@@ -392,8 +381,7 @@ def test_phase_three_model_selection_history_endpoint_returns_rollup() -> None:
 def test_phase_three_model_score_preview_endpoint_returns_scored_predictions() -> None:
     response = client.get(
         "/api/v1/admin/models/score-preview"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true&auto_select_demo=true"
-        "&target_task=spread_error_regression&team_code=LAL&season_label=2024-2025"
+        "?target_task=spread_error_regression&team_code=LAL&season_label=2024-2025"
         "&canonical_game_id=3&train_ratio=0.5&validation_ratio=0.25&limit=5"
     )
 
@@ -417,8 +405,7 @@ def test_phase_three_model_score_preview_endpoint_returns_scored_predictions() -
 def test_phase_three_model_future_game_preview_endpoint_returns_scenario_predictions() -> None:
     response = client.get(
         "/api/v1/admin/models/future-game-preview"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true&auto_select_demo=true"
-        "&target_task=spread_error_regression&season_label=2025-2026&game_date=2026-04-20"
+        "?target_task=spread_error_regression&season_label=2025-2026&game_date=2026-04-20"
         "&home_team_code=LAL&away_team_code=BOS&home_spread_line=-3.5&total_line=228.5"
         "&train_ratio=0.5&validation_ratio=0.25"
     )
@@ -455,9 +442,7 @@ def test_phase_three_model_future_game_preview_materialize_endpoint_returns_scor
 def test_phase_three_model_future_game_preview_runs_endpoint_returns_materialized_runs() -> None:
     response = client.get(
         "/api/v1/admin/models/future-game-preview/runs"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
-        "&auto_select_demo=true&auto_materialize_demo=true"
-        "&target_task=spread_error_regression&season_label=2025-2026&game_date=2026-04-20"
+        "?target_task=spread_error_regression&season_label=2025-2026&game_date=2026-04-20"
         "&team_code=LAL&home_team_code=LAL&away_team_code=BOS&home_spread_line=-3.5"
         "&total_line=228.5&train_ratio=0.5&validation_ratio=0.25"
     )
@@ -472,9 +457,7 @@ def test_phase_three_model_future_game_preview_runs_endpoint_returns_materialize
 def test_phase_three_model_future_game_preview_run_detail_endpoint_returns_payload() -> None:
     response = client.get(
         "/api/v1/admin/models/future-game-preview/runs/1"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
-        "&auto_select_demo=true&auto_materialize_demo=true"
-        "&target_task=spread_error_regression&season_label=2025-2026&game_date=2026-04-20"
+        "?target_task=spread_error_regression&season_label=2025-2026&game_date=2026-04-20"
         "&home_team_code=LAL&away_team_code=BOS&home_spread_line=-3.5&total_line=228.5"
         "&train_ratio=0.5&validation_ratio=0.25"
     )
@@ -490,9 +473,7 @@ def test_phase_three_model_future_game_preview_run_detail_endpoint_returns_paylo
 def test_phase_three_model_future_game_preview_history_endpoint_returns_rollup() -> None:
     response = client.get(
         "/api/v1/admin/models/future-game-preview/history"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
-        "&auto_select_demo=true&auto_materialize_demo=true"
-        "&target_task=spread_error_regression&season_label=2025-2026&game_date=2026-04-20"
+        "?target_task=spread_error_regression&season_label=2025-2026&game_date=2026-04-20"
         "&team_code=LAL&home_team_code=LAL&away_team_code=BOS&home_spread_line=-3.5"
         "&total_line=228.5&train_ratio=0.5&validation_ratio=0.25&recent_limit=5"
     )
@@ -510,8 +491,7 @@ def test_phase_three_model_future_game_preview_history_endpoint_returns_rollup()
 def test_phase_three_model_future_opportunity_materialize_endpoint_returns_future_rows() -> None:
     response = client.post(
         "/api/v1/admin/models/future-game-preview/opportunities/materialize"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true&auto_select_demo=true"
-        "&target_task=spread_error_regression&season_label=2025-2026&game_date=2026-04-20"
+        "?target_task=spread_error_regression&season_label=2025-2026&game_date=2026-04-20"
         "&home_team_code=LAL&away_team_code=BOS&home_spread_line=-3.5&total_line=228.5"
         "&train_ratio=0.5&validation_ratio=0.25"
     )
@@ -529,8 +509,7 @@ def test_phase_three_model_future_opportunity_materialize_endpoint_returns_futur
 def test_phase_three_model_future_slate_preview_endpoint_returns_batch_summary() -> None:
     response = client.post(
         "/api/v1/admin/models/future-slate/preview"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true&auto_select_demo=true"
-        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25",
+        "?target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25",
         json={
             "slate_label": "demo-slate",
             "games": [
@@ -567,8 +546,7 @@ def test_phase_three_model_future_slate_preview_endpoint_returns_batch_summary()
 def test_phase_three_model_future_slate_materialize_endpoint_persists_batch_results() -> None:
     response = client.post(
         "/api/v1/admin/models/future-slate/materialize"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true&auto_select_demo=true"
-        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25",
+        "?target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25",
         json={
             "slate_label": "demo-slate",
             "games": [
@@ -604,8 +582,7 @@ def test_phase_three_model_future_slate_materialize_endpoint_persists_batch_resu
 
 def test_phase_three_model_market_board_materialize_endpoint_persists_board() -> None:
     response = client.post(
-        "/api/v1/admin/models/market-board/materialize"
-        "?repository_mode=in_memory&target_task=spread_error_regression",
+        "/api/v1/admin/models/market-board/materialize?target_task=spread_error_regression",
         json={
             "slate_label": "demo-market-board",
             "games": [
@@ -773,8 +750,7 @@ def test_phase_three_model_market_board_refresh_endpoint_supports_external_odds_
 def test_phase_three_model_market_board_history_endpoint_returns_refresh_rollup() -> None:
     response = client.get(
         "/api/v1/admin/models/market-board/history"
-        "?repository_mode=in_memory&auto_refresh_demo=true"
-        "&target_task=spread_error_regression&source_name=demo_daily_lines_v1"
+        "?target_task=spread_error_regression&source_name=demo_daily_lines_v1"
         "&season_label=2025-2026&game_date=2026-04-20&slate_label=demo-refresh-board"
         "&game_count=2&recent_limit=5"
     )
@@ -798,8 +774,7 @@ def test_phase_three_model_market_board_history_endpoint_returns_refresh_rollup(
 def test_phase_three_model_market_board_source_runs_endpoint_returns_source_history() -> None:
     response = client.get(
         "/api/v1/admin/models/market-board/source-runs"
-        "?repository_mode=in_memory&auto_refresh_demo=true"
-        "&target_task=spread_error_regression&source_name=demo_daily_lines_v1"
+        "?target_task=spread_error_regression&source_name=demo_daily_lines_v1"
         "&season_label=2025-2026&game_date=2026-04-20&slate_label=demo-refresh-board"
         "&game_count=2&recent_limit=5"
     )
@@ -816,8 +791,7 @@ def test_phase_three_model_market_board_source_runs_endpoint_returns_source_hist
 def test_phase_three_model_market_board_source_runs_endpoint_returns_failed_history() -> None:
     response = client.get(
         "/api/v1/admin/models/market-board/source-runs"
-        "?repository_mode=in_memory&auto_refresh_demo=true"
-        "&target_task=spread_error_regression&source_name=demo_source_failure_v1"
+        "?target_task=spread_error_regression&source_name=demo_source_failure_v1"
         "&season_label=2025-2026&game_date=2026-04-20&slate_label=demo-failing-refresh-board"
         "&game_count=2&recent_limit=5"
     )
@@ -834,8 +808,7 @@ def test_phase_three_model_market_board_source_runs_endpoint_returns_failed_hist
 def test_phase_three_model_market_board_source_runs_endpoint_returns_validation_history() -> None:
     response = client.get(
         "/api/v1/admin/models/market-board/source-runs"
-        "?repository_mode=in_memory&auto_refresh_demo=true"
-        "&target_task=spread_error_regression&source_name=demo_partial_lines_v1"
+        "?target_task=spread_error_regression&source_name=demo_partial_lines_v1"
         "&season_label=2025-2026&game_date=2026-04-20&slate_label=demo-partial-refresh-board"
         "&game_count=3&recent_limit=5"
     )
@@ -857,8 +830,7 @@ def test_phase_three_model_market_board_source_runs_endpoint_returns_validation_
 def test_phase_three_model_market_board_refresh_queue_endpoint_returns_refreshable_board() -> None:
     response = client.get(
         "/api/v1/admin/models/market-board/refresh-queue"
-        "?repository_mode=in_memory&auto_refresh_demo=true"
-        "&target_task=spread_error_regression&source_name=demo_daily_lines_v1"
+        "?target_task=spread_error_regression&source_name=demo_daily_lines_v1"
         "&season_label=2025-2026&game_date=2026-04-20&slate_label=demo-refresh-board"
         "&game_count=2&pending_only=false"
     )
@@ -876,8 +848,7 @@ def test_phase_three_model_market_board_refresh_queue_endpoint_returns_refreshab
 def test_phase_three_model_market_board_queue_endpoint_returns_pending_board() -> None:
     response = client.get(
         "/api/v1/admin/models/market-board/queue"
-        "?repository_mode=in_memory&auto_refresh_demo=true"
-        "&target_task=spread_error_regression&source_name=demo_daily_lines_v1"
+        "?target_task=spread_error_regression&source_name=demo_daily_lines_v1"
         "&season_label=2025-2026&game_date=2026-04-20&slate_label=demo-refresh-board"
         "&game_count=2&freshness_status=fresh&pending_only=true"
     )
@@ -894,8 +865,7 @@ def test_phase_three_model_market_board_queue_endpoint_returns_pending_board() -
 def test_phase_three_model_market_board_refresh_orchestrate_endpoint_refreshes_board() -> None:
     response = client.post(
         "/api/v1/admin/models/market-board/orchestrate-refresh"
-        "?repository_mode=in_memory&auto_refresh_demo=true"
-        "&target_task=spread_error_regression&source_name=demo_daily_lines_v1"
+        "?target_task=spread_error_regression&source_name=demo_daily_lines_v1"
         "&season_label=2025-2026&game_date=2026-04-20&slate_label=demo-refresh-board"
         "&game_count=2&pending_only=false&recent_limit=5"
     )
@@ -913,9 +883,7 @@ def test_phase_three_model_market_board_refresh_orchestrate_endpoint_refreshes_b
 def test_phase_three_model_market_board_orchestrate_endpoint_scores_pending_board() -> None:
     response = client.post(
         "/api/v1/admin/models/market-board/orchestrate-score"
-        "?repository_mode=in_memory&seed_demo=true&auto_refresh_demo=true"
-        "&auto_train_demo=true&auto_select_demo=true"
-        "&target_task=spread_error_regression&source_name=demo_daily_lines_v1"
+        "?target_task=spread_error_regression&source_name=demo_daily_lines_v1"
         "&season_label=2025-2026&game_date=2026-04-20&slate_label=demo-refresh-board"
         "&game_count=2&freshness_status=fresh&pending_only=true"
         "&train_ratio=0.5&validation_ratio=0.25"
@@ -935,9 +903,7 @@ def test_phase_three_model_market_board_orchestrate_endpoint_scores_pending_boar
 def test_phase_three_model_market_board_orchestrate_cadence_endpoint_runs_full_cycle() -> None:
     response = client.post(
         "/api/v1/admin/models/market-board/orchestrate-cadence"
-        "?repository_mode=in_memory&seed_demo=true&auto_refresh_demo=true"
-        "&auto_train_demo=true&auto_select_demo=true"
-        "&target_task=spread_error_regression&source_name=demo_daily_lines_v1"
+        "?target_task=spread_error_regression&source_name=demo_daily_lines_v1"
         "&season_label=2025-2026&game_date=2026-04-20&game_count=2"
         "&refresh_pending_only=false"
         "&scoring_freshness_status=fresh&scoring_pending_only=true"
@@ -957,8 +923,7 @@ def test_phase_three_model_market_board_refresh_orchestration_history_endpoint_r
 ) -> None:
     response = client.get(
         "/api/v1/admin/models/market-board/refresh-orchestration-history"
-        "?repository_mode=in_memory&auto_refresh_demo=true&auto_orchestrate_demo=true"
-        "&target_task=spread_error_regression&source_name=demo_daily_lines_v1"
+        "?target_task=spread_error_regression&source_name=demo_daily_lines_v1"
         "&season_label=2025-2026&game_date=2026-04-20&game_count=2"
         "&pending_only=false&recent_limit=5"
     )
@@ -976,9 +941,7 @@ def test_phase_three_model_market_board_refresh_orchestration_history_endpoint_r
 def test_phase_three_model_market_board_cadence_history_endpoint_returns_batches() -> None:
     response = client.get(
         "/api/v1/admin/models/market-board/cadence-history"
-        "?repository_mode=in_memory&seed_demo=true&auto_refresh_demo=true"
-        "&auto_train_demo=true&auto_select_demo=true&auto_orchestrate_demo=true"
-        "&target_task=spread_error_regression&source_name=demo_daily_lines_v1"
+        "?target_task=spread_error_regression&source_name=demo_daily_lines_v1"
         "&season_label=2025-2026&game_date=2026-04-20&game_count=2"
         "&refresh_pending_only=false"
         "&scoring_freshness_status=fresh&scoring_pending_only=true"
@@ -998,9 +961,7 @@ def test_phase_three_model_market_board_cadence_history_endpoint_returns_batches
 def test_phase_three_model_market_board_orchestration_history_endpoint_returns_batches() -> None:
     response = client.get(
         "/api/v1/admin/models/market-board/orchestration-history"
-        "?repository_mode=in_memory&seed_demo=true&auto_refresh_demo=true"
-        "&auto_train_demo=true&auto_select_demo=true&auto_orchestrate_demo=true"
-        "&target_task=spread_error_regression&source_name=demo_daily_lines_v1"
+        "?target_task=spread_error_regression&source_name=demo_daily_lines_v1"
         "&season_label=2025-2026&game_date=2026-04-20&game_count=2"
         "&freshness_status=fresh&pending_only=true&train_ratio=0.5&validation_ratio=0.25"
     )
@@ -1018,9 +979,7 @@ def test_phase_three_model_market_board_orchestration_history_endpoint_returns_b
 def test_phase_three_model_market_board_operations_endpoint_returns_summary() -> None:
     response = client.get(
         "/api/v1/admin/models/market-board/1/operations"
-        "?repository_mode=in_memory&seed_demo=true&auto_refresh_demo=true"
-        "&auto_train_demo=true&auto_select_demo=true&auto_orchestrate_demo=true"
-        "&target_task=spread_error_regression&source_name=demo_daily_lines_v1"
+        "?target_task=spread_error_regression&source_name=demo_daily_lines_v1"
         "&season_label=2025-2026&game_date=2026-04-20&game_count=2"
         "&freshness_status=fresh&pending_only=true&train_ratio=0.5&validation_ratio=0.25"
     )
@@ -1043,9 +1002,7 @@ def test_phase_three_model_market_board_operations_endpoint_returns_summary() ->
 def test_phase_three_model_market_board_cadence_endpoint_returns_dashboard() -> None:
     response = client.get(
         "/api/v1/admin/models/market-board/cadence"
-        "?repository_mode=in_memory&seed_demo=true&auto_refresh_demo=true"
-        "&auto_train_demo=true&auto_select_demo=true&auto_orchestrate_demo=true"
-        "&target_task=spread_error_regression&source_name=demo_daily_lines_v1"
+        "?target_task=spread_error_regression&source_name=demo_daily_lines_v1"
         "&season_label=2025-2026&game_date=2026-04-20&game_count=2"
         "&freshness_status=fresh&pending_only=true&train_ratio=0.5&validation_ratio=0.25"
     )
@@ -1062,8 +1019,8 @@ def test_phase_three_model_market_board_cadence_endpoint_returns_dashboard() -> 
 def test_phase_three_model_market_board_list_and_detail_endpoints_return_board() -> None:
     list_response = client.get(
         "/api/v1/admin/models/market-board"
-        "?repository_mode=in_memory&target_task=spread_error_regression"
-        "&season_label=2025-2026&auto_materialize_demo=true&slate_label=demo-market-board"
+        "?target_task=spread_error_regression"
+        "&season_label=2025-2026&slate_label=demo-market-board"
         "&game_date=2026-04-20&home_team_code=LAL&away_team_code=BOS"
         "&home_spread_line=-3.5&total_line=228.5"
     )
@@ -1076,8 +1033,7 @@ def test_phase_three_model_market_board_list_and_detail_endpoints_return_board()
 
     detail_response = client.get(
         "/api/v1/admin/models/market-board/1"
-        "?repository_mode=in_memory&auto_materialize_demo=true"
-        "&target_task=spread_error_regression&season_label=2025-2026"
+        "?target_task=spread_error_regression&season_label=2025-2026"
         "&slate_label=demo-market-board&game_date=2026-04-20"
         "&home_team_code=LAL&away_team_code=BOS&home_spread_line=-3.5&total_line=228.5"
     )
@@ -1092,9 +1048,7 @@ def test_phase_three_model_market_board_list_and_detail_endpoints_return_board()
 def test_phase_three_model_market_board_score_endpoint_materializes_slate() -> None:
     response = client.post(
         "/api/v1/admin/models/market-board/1/score"
-        "?repository_mode=in_memory&seed_demo=true&auto_materialize_demo=true"
-        "&auto_train_demo=true&auto_select_demo=true"
-        "&target_task=spread_error_regression&season_label=2025-2026"
+        "?target_task=spread_error_regression&season_label=2025-2026"
         "&slate_label=demo-market-board&game_date=2026-04-20"
         "&home_team_code=LAL&away_team_code=BOS&home_spread_line=-3.5&total_line=228.5"
         "&train_ratio=0.5&validation_ratio=0.25"
@@ -1111,8 +1065,7 @@ def test_phase_three_model_market_board_score_endpoint_materializes_slate() -> N
 def test_phase_three_model_opportunity_materialize_endpoint_returns_opportunities() -> None:
     response = client.post(
         "/api/v1/admin/models/opportunities/materialize"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true&auto_select_demo=true"
-        "&target_task=spread_error_regression&team_code=LAL&season_label=2024-2025"
+        "?target_task=spread_error_regression&team_code=LAL&season_label=2024-2025"
         "&canonical_game_id=3&train_ratio=0.5&validation_ratio=0.25&limit=5"
     )
 
@@ -1127,10 +1080,8 @@ def test_phase_three_model_opportunity_materialize_endpoint_returns_opportunitie
 
 def test_phase_three_model_opportunities_endpoint_returns_materialized_rows() -> None:
     response = client.get(
-        "/api/v1/admin/models/opportunities"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
-        "&auto_select_demo=true&auto_materialize_demo=true"
-        "&target_task=spread_error_regression&team_code=LAL&season_label=2024-2025"
+        "/api/v1/analyst/opportunities"
+        "?target_task=spread_error_regression&team_code=LAL&season_label=2024-2025"
         "&canonical_game_id=3&train_ratio=0.5&validation_ratio=0.25&status=review_manually"
     )
 
@@ -1144,10 +1095,8 @@ def test_phase_three_model_opportunities_endpoint_returns_materialized_rows() ->
 
 def test_phase_three_model_opportunities_endpoint_returns_future_materialized_rows() -> None:
     response = client.get(
-        "/api/v1/admin/models/opportunities"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
-        "&auto_select_demo=true&auto_materialize_demo=true"
-        "&target_task=spread_error_regression&season_label=2025-2026"
+        "/api/v1/analyst/opportunities"
+        "?target_task=spread_error_regression&season_label=2025-2026"
         "&source_kind=future_scenario&team_code=LAL&game_date=2026-04-20"
         "&home_team_code=LAL&away_team_code=BOS&home_spread_line=-3.5&total_line=228.5"
         "&train_ratio=0.5&validation_ratio=0.25"
@@ -1163,10 +1112,8 @@ def test_phase_three_model_opportunities_endpoint_returns_future_materialized_ro
 
 def test_phase_three_model_opportunity_detail_endpoint_returns_payload() -> None:
     response = client.get(
-        "/api/v1/admin/models/opportunities/1"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
-        "&auto_select_demo=true&auto_materialize_demo=true"
-        "&target_task=spread_error_regression&team_code=LAL&season_label=2024-2025"
+        "/api/v1/analyst/opportunities/1"
+        "?target_task=spread_error_regression&team_code=LAL&season_label=2024-2025"
         "&canonical_game_id=3&train_ratio=0.5&validation_ratio=0.25"
     )
 
@@ -1180,10 +1127,8 @@ def test_phase_three_model_opportunity_detail_endpoint_returns_payload() -> None
 
 def test_phase_three_model_opportunity_detail_endpoint_returns_future_payload() -> None:
     response = client.get(
-        "/api/v1/admin/models/opportunities/1"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
-        "&auto_select_demo=true&auto_materialize_demo=true"
-        "&target_task=spread_error_regression&season_label=2025-2026"
+        "/api/v1/analyst/opportunities/1"
+        "?target_task=spread_error_regression&season_label=2025-2026"
         "&source_kind=future_scenario&game_date=2026-04-20"
         "&home_team_code=LAL&away_team_code=BOS&home_spread_line=-3.5&total_line=228.5"
         "&train_ratio=0.5&validation_ratio=0.25"
@@ -1200,9 +1145,7 @@ def test_phase_three_model_opportunity_detail_endpoint_returns_future_payload() 
 def test_phase_three_model_opportunity_history_endpoint_returns_rollup() -> None:
     response = client.get(
         "/api/v1/admin/models/opportunities/history"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
-        "&auto_select_demo=true&auto_materialize_demo=true"
-        "&target_task=spread_error_regression&team_code=LAL&season_label=2024-2025"
+        "?target_task=spread_error_regression&team_code=LAL&season_label=2024-2025"
         "&canonical_game_id=3&train_ratio=0.5&validation_ratio=0.25&recent_limit=5"
     )
 
@@ -1219,9 +1162,7 @@ def test_phase_three_model_opportunity_history_endpoint_returns_rollup() -> None
 def test_phase_three_model_opportunity_history_endpoint_returns_future_rollup() -> None:
     response = client.get(
         "/api/v1/admin/models/opportunities/history"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
-        "&auto_select_demo=true&auto_materialize_demo=true"
-        "&target_task=spread_error_regression&season_label=2025-2026"
+        "?target_task=spread_error_regression&season_label=2025-2026"
         "&source_kind=future_scenario&team_code=LAL&game_date=2026-04-20"
         "&home_team_code=LAL&away_team_code=BOS&home_spread_line=-3.5&total_line=228.5"
         "&train_ratio=0.5&validation_ratio=0.25&recent_limit=5"
@@ -1265,8 +1206,8 @@ def test_feature_snapshots_endpoint_returns_filtered_phase_two_snapshots() -> No
 
 def test_feature_summary_endpoint_returns_team_rollup() -> None:
     response = client.get(
-        "/api/v1/admin/features/summary"
-        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+        "/api/v1/analyst/trends/summary"
+        "?team_code=LAL&season_label=2024-2025"
     )
 
     assert response.status_code == 200
@@ -1335,8 +1276,8 @@ def test_feature_dataset_profile_endpoint_returns_dataset_health_summary() -> No
 
 def test_feature_patterns_endpoint_returns_bucketed_pattern_summaries() -> None:
     response = client.get(
-        "/api/v1/admin/features/patterns"
-        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+        "/api/v1/analyst/patterns"
+        "?team_code=LAL&season_label=2024-2025"
         "&target_task=spread_error_regression&dimensions=venue,days_rest_bucket"
         "&min_sample_size=1&limit=10"
     )
@@ -1357,8 +1298,8 @@ def test_feature_patterns_endpoint_returns_bucketed_pattern_summaries() -> None:
 
 def test_feature_comparables_endpoint_returns_matching_cases() -> None:
     response = client.get(
-        "/api/v1/admin/features/comparables"
-        "?repository_mode=in_memory&seed_demo=true&season_label=2024-2025"
+        "/api/v1/analyst/comparables"
+        "?season_label=2024-2025"
         "&target_task=spread_error_regression&dimensions=venue,days_rest_bucket"
         "&condition_values=home,unknown_rest&limit=10"
     )
@@ -1378,8 +1319,8 @@ def test_feature_comparables_endpoint_returns_matching_cases() -> None:
 
 def test_feature_comparables_endpoint_accepts_pattern_key() -> None:
     response = client.get(
-        "/api/v1/admin/features/comparables"
-        "?repository_mode=in_memory&seed_demo=true&season_label=2024-2025"
+        "/api/v1/analyst/comparables"
+        "?season_label=2024-2025"
         "&target_task=spread_error_regression&pattern_key=venue=home|days_rest_bucket=unknown_rest"
         "&limit=10"
     )
@@ -1393,8 +1334,8 @@ def test_feature_comparables_endpoint_accepts_pattern_key() -> None:
 
 def test_feature_evidence_endpoint_returns_unified_analysis_payload() -> None:
     response = client.get(
-        "/api/v1/admin/features/evidence"
-        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+        "/api/v1/analyst/evidence"
+        "?team_code=LAL&season_label=2024-2025"
         "&target_task=spread_error_regression&canonical_game_id=3"
         "&dimensions=venue,days_rest_bucket&comparable_limit=5"
         "&min_pattern_sample_size=1&train_ratio=0.5&validation_ratio=0.25"
@@ -2308,9 +2249,6 @@ def test_phase_four_model_backtest_history_endpoint_returns_recent_runs() -> Non
     response = client.get(
         "/api/v1/admin/models/backtests/history",
         params={
-            "repository_mode": "in_memory",
-            "seed_demo": True,
-            "auto_run_demo": True,
             "target_task": "spread_error_regression",
             "minimum_train_games": 1,
             "test_window_games": 1,
@@ -2325,3 +2263,41 @@ def test_phase_four_model_backtest_history_endpoint_returns_recent_runs() -> Non
     assert payload["model_backtest_history"]["overview"]["latest_run"]["target_task"] == (
         "spread_error_regression"
     )
+
+
+def test_phase_four_model_backtests_endpoint_returns_runs() -> None:
+    response = client.get(
+        "/api/v1/analyst/backtests",
+        params={
+            "target_task": "spread_error_regression",
+            "minimum_train_games": 1,
+            "test_window_games": 1,
+            "train_ratio": 0.5,
+            "validation_ratio": 0.25,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["backtest_run_count"] >= 1
+    assert payload["backtest_runs"][0]["target_task"] == "spread_error_regression"
+
+
+def test_phase_four_model_backtest_detail_endpoint_returns_payload() -> None:
+    response = client.get(
+        "/api/v1/analyst/backtests/1",
+        params={
+            "target_task": "spread_error_regression",
+            "minimum_train_games": 1,
+            "test_window_games": 1,
+            "train_ratio": 0.5,
+            "validation_ratio": 0.25,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["repository_mode"] == "in_memory"
+    assert payload["backtest_run"] is not None
+    assert payload["backtest_run"]["id"] == 1

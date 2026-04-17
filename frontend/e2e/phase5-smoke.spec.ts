@@ -2,10 +2,15 @@ import { expect, test } from "@playwright/test";
 
 const backendBaseUrl = process.env.PLAYWRIGHT_BACKEND_URL ?? "http://127.0.0.1:8000";
 
-const backtestQuery = new URLSearchParams({
-  repository_mode: "in_memory",
-  seed_demo: "true",
-  auto_run_demo: "true",
+const analystBacktestQuery = new URLSearchParams({
+  target_task: "spread_error_regression",
+  minimum_train_games: "1",
+  test_window_games: "1",
+  train_ratio: "0.5",
+  validation_ratio: "0.25"
+});
+
+const adminBacktestHistoryQuery = new URLSearchParams({
   target_task: "spread_error_regression",
   minimum_train_games: "1",
   test_window_games: "1",
@@ -14,12 +19,16 @@ const backtestQuery = new URLSearchParams({
   recent_limit: "6"
 });
 
-const opportunityQuery = new URLSearchParams({
-  repository_mode: "in_memory",
-  seed_demo: "true",
-  auto_train_demo: "true",
-  auto_select_demo: "true",
-  auto_materialize_demo: "true",
+const analystOpportunityQuery = new URLSearchParams({
+  target_task: "spread_error_regression",
+  team_code: "LAL",
+  season_label: "2024-2025",
+  canonical_game_id: "3",
+  train_ratio: "0.5",
+  validation_ratio: "0.25"
+});
+
+const adminOpportunityHistoryQuery = new URLSearchParams({
   target_task: "spread_error_regression",
   team_code: "LAL",
   season_label: "2024-2025",
@@ -58,20 +67,20 @@ async function fetchJson<T>(path: string): Promise<T> {
 
 async function getSeededRouteIds() {
   const history = await fetchJson<BacktestHistoryResponse>(
-    `/api/v1/admin/models/backtests/history?${backtestQuery.toString()}`
+    `/api/v1/admin/models/backtests/history?${adminBacktestHistoryQuery.toString()}`
   );
   const runId = history.model_backtest_history.recent_runs[0]?.id;
   expect(runId).toBeTruthy();
 
   const runDetail = await fetchJson<BacktestRunResponse>(
-    `/api/v1/admin/models/backtests/${runId}?${backtestQuery.toString()}`
+    `/api/v1/analyst/backtests/${runId}?${analystBacktestQuery.toString()}`
   );
   const foldIndex = runDetail.backtest_run?.payload.folds[0]?.fold_index;
   expect(foldIndex).not.toBeUndefined();
   expect(foldIndex).not.toBeNull();
 
   const opportunityHistory = await fetchJson<OpportunityHistoryResponse>(
-    `/api/v1/admin/models/opportunities/history?${opportunityQuery.toString()}`
+    `/api/v1/admin/models/opportunities/history?${adminOpportunityHistoryQuery.toString()}`
   );
   const opportunityId = opportunityHistory.model_opportunity_history.recent_opportunities[0]?.id;
   expect(opportunityId).toBeTruthy();
