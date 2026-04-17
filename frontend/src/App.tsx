@@ -19,9 +19,6 @@ const adminBacktestHistoryQuery = new URLSearchParams({
 });
 
 const adminBacktestMutationQuery = new URLSearchParams({
-  repository_mode: "in_memory",
-  seed_demo: "true",
-  auto_run_demo: "true",
   target_task: "spread_error_regression",
   minimum_train_games: "1",
   test_window_games: "1",

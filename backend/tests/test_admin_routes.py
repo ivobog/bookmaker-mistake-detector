@@ -99,22 +99,18 @@ def test_phase_one_fetch_reporting_demo_endpoint_exposes_reporting_summary(monke
         fake_fetch_reporting_demo,
     )
 
-    response = client.get(
-        "/api/v1/admin/phase-1-fetch-reporting-demo?repository_mode=postgres"
-    )
+    response = client.get("/api/v1/admin/phase-1-fetch-reporting-demo")
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["repository_mode"] == "postgres"
+    assert payload["repository_mode"] == "in_memory"
     assert payload["fetch_result"]["status"] == "COMPLETED"
     assert payload["retrieval_trends"]["overview"]["retrieval_count"] == 1
     assert payload["quality_trends"]["overview"]["parse_valid_count"] == 3
 
 
 def test_phase_one_fetch_reporting_demo_endpoint_isolates_labeled_run() -> None:
-    response = client.get(
-        "/api/v1/admin/phase-1-fetch-reporting-demo?repository_mode=in_memory"
-    )
+    response = client.get("/api/v1/admin/phase-1-fetch-reporting-demo")
 
     assert response.status_code == 200
     payload = response.json()
@@ -129,7 +125,7 @@ def test_phase_one_fetch_reporting_demo_endpoint_isolates_labeled_run() -> None:
 
 
 def test_phase_two_feature_demo_endpoint_exposes_feature_snapshot_summary() -> None:
-    response = client.get("/api/v1/admin/phase-2-feature-demo?repository_mode=in_memory")
+    response = client.get("/api/v1/admin/phase-2-feature-demo")
 
     assert response.status_code == 200
     payload = response.json()
@@ -147,8 +143,7 @@ def test_phase_two_feature_demo_endpoint_exposes_feature_snapshot_summary() -> N
 def test_phase_three_model_train_endpoint_returns_ranked_baseline_runs() -> None:
     response = client.post(
         "/api/v1/admin/models/train"
-        "?repository_mode=in_memory&seed_demo=true"
-        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+        "?target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
     )
 
     assert response.status_code == 200
@@ -317,8 +312,7 @@ def test_phase_three_model_evaluation_history_endpoint_returns_rollup() -> None:
 def test_phase_three_model_select_endpoint_promotes_linear_candidate() -> None:
     response = client.post(
         "/api/v1/admin/models/select"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true"
-        "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
+        "?target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
     )
 
     assert response.status_code == 200
@@ -424,8 +418,7 @@ def test_phase_three_model_future_game_preview_endpoint_returns_scenario_predict
 def test_phase_three_model_future_game_preview_materialize_endpoint_returns_scoring_run() -> None:
     response = client.post(
         "/api/v1/admin/models/future-game-preview/materialize"
-        "?repository_mode=in_memory&seed_demo=true&auto_train_demo=true&auto_select_demo=true"
-        "&target_task=spread_error_regression&season_label=2025-2026&game_date=2026-04-20"
+        "?target_task=spread_error_regression&season_label=2025-2026&game_date=2026-04-20"
         "&home_team_code=LAL&away_team_code=BOS&home_spread_line=-3.5&total_line=228.5"
         "&train_ratio=0.5&validation_ratio=0.25"
     )
@@ -621,8 +614,7 @@ def test_phase_three_model_market_board_sources_endpoint_lists_builtin_sources()
 def test_phase_three_model_market_board_refresh_endpoint_persists_source_board() -> None:
     response = client.post(
         "/api/v1/admin/models/market-board/refresh"
-        "?repository_mode=in_memory&target_task=spread_error_regression"
-        "&source_name=demo_daily_lines_v1&season_label=2025-2026"
+        "?target_task=spread_error_regression&source_name=demo_daily_lines_v1&season_label=2025-2026"
         "&game_date=2026-04-20&slate_label=demo-refresh-board&game_count=2"
     )
 
@@ -641,8 +633,7 @@ def test_phase_three_model_market_board_refresh_endpoint_persists_source_board()
 def test_phase_three_model_market_board_refresh_endpoint_returns_source_failure() -> None:
     response = client.post(
         "/api/v1/admin/models/market-board/refresh"
-        "?repository_mode=in_memory&target_task=spread_error_regression"
-        "&source_name=demo_source_failure_v1&season_label=2025-2026"
+        "?target_task=spread_error_regression&source_name=demo_source_failure_v1&season_label=2025-2026"
         "&game_date=2026-04-20&slate_label=demo-failing-refresh-board&game_count=2"
     )
 
@@ -660,8 +651,7 @@ def test_phase_three_model_market_board_refresh_endpoint_returns_source_failure(
 def test_phase_three_model_market_board_refresh_endpoint_normalizes_partial_source() -> None:
     response = client.post(
         "/api/v1/admin/models/market-board/refresh"
-        "?repository_mode=in_memory&target_task=spread_error_regression"
-        "&source_name=demo_partial_lines_v1&season_label=2025-2026"
+        "?target_task=spread_error_regression&source_name=demo_partial_lines_v1&season_label=2025-2026"
         "&game_date=2026-04-20&slate_label=demo-partial-refresh-board&game_count=3"
     )
 
@@ -679,8 +669,7 @@ def test_phase_three_model_market_board_refresh_endpoint_normalizes_partial_sour
 def test_phase_three_model_market_board_refresh_endpoint_supports_file_source() -> None:
     response = client.post(
         "/api/v1/admin/models/market-board/refresh"
-        "?repository_mode=in_memory&target_task=spread_error_regression"
-        "&source_name=file_market_board_v1&season_label=2025-2026"
+        "?target_task=spread_error_regression&source_name=file_market_board_v1&season_label=2025-2026"
         "&game_date=2026-04-20&slate_label=demo-file-refresh-board"
         "&source_path=fixture://demo_market_board_file_source.json"
     )
@@ -734,8 +723,7 @@ def test_phase_three_model_market_board_refresh_endpoint_supports_external_odds_
 
     response = client.post(
         "/api/v1/admin/models/market-board/refresh"
-        "?repository_mode=in_memory&target_task=spread_error_regression"
-        "&source_name=the_odds_api_v4_nba&season_label=2025-2026"
+        "?target_task=spread_error_regression&source_name=the_odds_api_v4_nba&season_label=2025-2026"
         "&game_date=2026-04-20&slate_label=demo-odds-api-refresh-board"
     )
 
@@ -1179,8 +1167,7 @@ def test_phase_three_model_opportunity_history_endpoint_returns_future_rollup() 
 
 def test_feature_snapshots_endpoint_returns_filtered_phase_two_snapshots() -> None:
     response = client.get(
-        "/api/v1/admin/features/snapshots"
-        "?repository_mode=in_memory&seed_demo=true&team_code=MIA&season_label=2024-2025"
+        "/api/v1/admin/features/snapshots?team_code=MIA&season_label=2024-2025"
     )
 
     assert response.status_code == 200
@@ -1230,8 +1217,7 @@ def test_feature_summary_endpoint_returns_team_rollup() -> None:
 
 def test_feature_dataset_endpoint_returns_flattened_rows() -> None:
     response = client.get(
-        "/api/v1/admin/features/dataset"
-        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+        "/api/v1/admin/features/dataset?team_code=LAL&season_label=2024-2025"
     )
 
     assert response.status_code == 200
@@ -1252,8 +1238,7 @@ def test_feature_dataset_endpoint_returns_flattened_rows() -> None:
 
 def test_feature_dataset_profile_endpoint_returns_dataset_health_summary() -> None:
     response = client.get(
-        "/api/v1/admin/features/dataset/profile"
-        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+        "/api/v1/admin/features/dataset/profile?team_code=LAL&season_label=2024-2025"
     )
 
     assert response.status_code == 200
@@ -1369,7 +1354,7 @@ def test_feature_evidence_endpoint_returns_unified_analysis_payload() -> None:
 def test_feature_analysis_materialize_endpoint_persists_pattern_and_evidence_artifacts() -> None:
     response = client.post(
         "/api/v1/admin/features/analysis/materialize"
-        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+        "?team_code=LAL&season_label=2024-2025"
         "&target_task=spread_error_regression&canonical_game_id=3"
         "&dimensions=venue,days_rest_bucket&min_sample_size=1"
         "&comparable_limit=5&train_ratio=0.5&validation_ratio=0.25"
@@ -1394,7 +1379,7 @@ def test_feature_analysis_materialize_endpoint_persists_pattern_and_evidence_art
 def test_feature_analysis_artifacts_endpoint_lists_materialized_artifacts() -> None:
     response = client.get(
         "/api/v1/admin/features/analysis/artifacts"
-        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+        "?team_code=LAL&season_label=2024-2025"
         "&target_task=spread_error_regression&canonical_game_id=3"
         "&dimensions=venue,days_rest_bucket&min_sample_size=1"
         "&comparable_limit=5&train_ratio=0.5&validation_ratio=0.25"
@@ -1418,7 +1403,7 @@ def test_feature_analysis_artifacts_endpoint_lists_materialized_artifacts() -> N
 def test_feature_analysis_history_endpoint_returns_artifact_rollup() -> None:
     response = client.get(
         "/api/v1/admin/features/analysis/history"
-        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+        "?team_code=LAL&season_label=2024-2025"
         "&target_task=spread_error_regression&canonical_game_id=3"
         "&dimensions=venue,days_rest_bucket&min_sample_size=1"
         "&comparable_limit=5&train_ratio=0.5&validation_ratio=0.25"
@@ -1437,7 +1422,7 @@ def test_feature_analysis_history_endpoint_returns_artifact_rollup() -> None:
 def test_feature_dataset_splits_endpoint_returns_chronological_split_summary() -> None:
     response = client.get(
         "/api/v1/admin/features/dataset/splits"
-        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+        "?team_code=LAL&season_label=2024-2025"
         "&train_ratio=0.5&validation_ratio=0.25&preview_limit=2"
     )
 
@@ -1460,7 +1445,7 @@ def test_feature_dataset_splits_endpoint_returns_chronological_split_summary() -
 def test_feature_dataset_training_view_endpoint_returns_target_projection() -> None:
     response = client.get(
         "/api/v1/admin/features/dataset/training-view"
-        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+        "?team_code=LAL&season_label=2024-2025"
         "&target_task=spread_error_regression"
     )
 
@@ -1481,7 +1466,7 @@ def test_feature_dataset_training_view_endpoint_returns_target_projection() -> N
 def test_feature_dataset_training_manifest_endpoint_returns_schema_summary() -> None:
     response = client.get(
         "/api/v1/admin/features/dataset/training-manifest"
-        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+        "?team_code=LAL&season_label=2024-2025"
         "&target_task=spread_error_regression"
     )
 
@@ -1498,7 +1483,7 @@ def test_feature_dataset_training_manifest_endpoint_returns_schema_summary() -> 
 def test_feature_dataset_training_bundle_endpoint_returns_split_task_package() -> None:
     response = client.get(
         "/api/v1/admin/features/dataset/training-bundle"
-        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+        "?team_code=LAL&season_label=2024-2025"
         "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
         "&preview_limit=1"
     )
@@ -1519,7 +1504,7 @@ def test_feature_dataset_training_bundle_endpoint_returns_split_task_package() -
 def test_feature_dataset_training_benchmark_endpoint_returns_baseline_scores() -> None:
     response = client.get(
         "/api/v1/admin/features/dataset/training-benchmark"
-        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+        "?team_code=LAL&season_label=2024-2025"
         "&target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25"
     )
 
@@ -1537,7 +1522,7 @@ def test_feature_dataset_training_benchmark_endpoint_returns_baseline_scores() -
 def test_feature_dataset_training_task_matrix_endpoint_returns_task_comparison() -> None:
     response = client.get(
         "/api/v1/admin/features/dataset/training-task-matrix"
-        "?repository_mode=in_memory&seed_demo=true&team_code=LAL&season_label=2024-2025"
+        "?team_code=LAL&season_label=2024-2025"
         "&train_ratio=0.5&validation_ratio=0.25"
     )
 
@@ -1588,7 +1573,7 @@ def test_phase_one_fetch_reporting_demo_uses_distinct_ingestion_source_url(monke
 
 
 def test_recent_job_runs_endpoint_returns_repository_backed_rows() -> None:
-    response = client.get("/api/v1/admin/jobs/recent?repository_mode=in_memory&seed_demo=true")
+    response = client.get("/api/v1/admin/jobs/recent")
 
     assert response.status_code == 200
     payload = response.json()
@@ -1600,7 +1585,7 @@ def test_recent_job_runs_endpoint_returns_repository_backed_rows() -> None:
 
 
 def test_recent_ingestion_issues_endpoint_returns_failed_retrievals() -> None:
-    response = client.get("/api/v1/admin/ingestion/issues?repository_mode=in_memory&seed_demo=true")
+    response = client.get("/api/v1/admin/ingestion/issues")
 
     assert response.status_code == 200
     payload = response.json()
@@ -1611,9 +1596,7 @@ def test_recent_ingestion_issues_endpoint_returns_failed_retrievals() -> None:
 
 
 def test_recent_job_runs_endpoint_supports_offset() -> None:
-    response = client.get(
-        "/api/v1/admin/jobs/recent?repository_mode=in_memory&seed_demo=true&limit=1&offset=1"
-    )
+    response = client.get("/api/v1/admin/jobs/recent?limit=1&offset=1")
 
     assert response.status_code == 200
     payload = response.json()
@@ -1622,10 +1605,7 @@ def test_recent_job_runs_endpoint_supports_offset() -> None:
 
 
 def test_recent_job_runs_endpoint_supports_team_and_season_filters() -> None:
-    response = client.get(
-        "/api/v1/admin/jobs/recent"
-        "?repository_mode=in_memory&seed_demo=true&team_code=NYK&season_label=2023-2024"
-    )
+    response = client.get("/api/v1/admin/jobs/recent?team_code=NYK&season_label=2023-2024")
 
     assert response.status_code == 200
     payload = response.json()
@@ -1637,9 +1617,7 @@ def test_recent_job_runs_endpoint_supports_team_and_season_filters() -> None:
 
 
 def test_data_quality_issues_endpoint_returns_seeded_quality_issues() -> None:
-    response = client.get(
-        "/api/v1/admin/data-quality/issues?repository_mode=in_memory&seed_demo=true"
-    )
+    response = client.get("/api/v1/admin/data-quality/issues")
 
     assert response.status_code == 200
     payload = response.json()
@@ -1650,8 +1628,7 @@ def test_data_quality_issues_endpoint_returns_seeded_quality_issues() -> None:
 
 def test_data_quality_issues_endpoint_supports_issue_type_filter() -> None:
     response = client.get(
-        "/api/v1/admin/data-quality/issues"
-        "?repository_mode=in_memory&seed_demo=true&issue_type=canonical.single_team_perspective_only"
+        "/api/v1/admin/data-quality/issues?issue_type=canonical.single_team_perspective_only"
     )
 
     assert response.status_code == 200
@@ -1660,10 +1637,7 @@ def test_data_quality_issues_endpoint_supports_issue_type_filter() -> None:
 
 
 def test_data_quality_issues_endpoint_supports_severity_filter() -> None:
-    response = client.get(
-        "/api/v1/admin/data-quality/issues"
-        "?repository_mode=in_memory&seed_demo=true&severity=error"
-    )
+    response = client.get("/api/v1/admin/data-quality/issues?severity=error")
 
     assert response.status_code == 200
     payload = response.json()
@@ -1675,10 +1649,7 @@ def test_data_quality_issues_endpoint_supports_severity_filter() -> None:
 
 
 def test_data_quality_issues_endpoint_supports_scope_filters() -> None:
-    response = client.get(
-        "/api/v1/admin/data-quality/issues"
-        "?repository_mode=in_memory&seed_demo=true&team_code=NYK&season_label=2023-2024"
-    )
+    response = client.get("/api/v1/admin/data-quality/issues?team_code=NYK&season_label=2023-2024")
 
     assert response.status_code == 200
     payload = response.json()
@@ -1730,7 +1701,7 @@ def test_data_quality_issues_endpoint_supports_run_label_filter() -> None:
 
 
 def test_ingestion_stats_endpoint_returns_breakdowns() -> None:
-    response = client.get("/api/v1/admin/ingestion/stats?repository_mode=in_memory&seed_demo=true")
+    response = client.get("/api/v1/admin/ingestion/stats")
 
     assert response.status_code == 200
     payload = response.json()
@@ -1750,7 +1721,7 @@ def test_ingestion_stats_endpoint_returns_breakdowns() -> None:
 def test_ingestion_issues_endpoint_supports_scope_filters() -> None:
     response = client.get(
         "/api/v1/admin/ingestion/issues"
-        "?repository_mode=in_memory&seed_demo=true&status=SUCCESS&team_code=NYK&season_label=2023-2024"
+        "?status=SUCCESS&team_code=NYK&season_label=2023-2024"
     )
 
     assert response.status_code == 200
@@ -1778,7 +1749,7 @@ def test_recent_job_runs_endpoint_forwards_run_label_filter(monkeypatch) -> None
     )
 
     response = client.get(
-        "/api/v1/admin/jobs/recent?repository_mode=in_memory&seed_demo=false&run_label=validation-demo"
+        "/api/v1/admin/jobs/recent?run_label=validation-demo"
     )
 
     assert response.status_code == 200
@@ -1788,8 +1759,7 @@ def test_recent_job_runs_endpoint_forwards_run_label_filter(monkeypatch) -> None
 
 def test_ingestion_stats_endpoint_supports_scope_filters() -> None:
     response = client.get(
-        "/api/v1/admin/ingestion/stats"
-        "?repository_mode=in_memory&seed_demo=true&team_code=NYK&season_label=2023-2024"
+        "/api/v1/admin/ingestion/stats?team_code=NYK&season_label=2023-2024"
     )
 
     assert response.status_code == 200
@@ -1861,7 +1831,7 @@ def test_ingestion_stats_endpoint_forwards_run_label_filter(monkeypatch) -> None
     )
 
     response = client.get(
-        "/api/v1/admin/ingestion/stats?repository_mode=in_memory&seed_demo=false&run_label=validation-demo"
+        "/api/v1/admin/ingestion/stats?run_label=validation-demo"
     )
 
     assert response.status_code == 200
@@ -1984,8 +1954,7 @@ def test_validation_run_comparison_endpoint_forwards_filters(monkeypatch) -> Non
     )
 
     response = client.get(
-        "/api/v1/admin/validation-runs/compare"
-        "?repository_mode=in_memory&seed_demo=false&run_label=validation-demo&limit=6"
+        "/api/v1/admin/validation-runs/compare?run_label=validation-demo&limit=6"
     )
 
     assert response.status_code == 200
@@ -1998,8 +1967,7 @@ def test_validation_run_comparison_endpoint_forwards_filters(monkeypatch) -> Non
 
 def test_ingestion_stats_endpoint_supports_provider_filter() -> None:
     response = client.get(
-        "/api/v1/admin/ingestion/stats"
-        "?repository_mode=in_memory&seed_demo=true&provider_name=missing-provider"
+        "/api/v1/admin/ingestion/stats?provider_name=missing-provider"
     )
 
     assert response.status_code == 200
@@ -2012,9 +1980,7 @@ def test_ingestion_stats_endpoint_supports_provider_filter() -> None:
 
 
 def test_ingestion_trends_endpoint_returns_recent_run_rollup() -> None:
-    response = client.get(
-        "/api/v1/admin/ingestion/trends?repository_mode=in_memory&seed_demo=true&limit=10"
-    )
+    response = client.get("/api/v1/admin/ingestion/trends?limit=10")
 
     assert response.status_code == 200
     payload = response.json()
@@ -2035,10 +2001,7 @@ def test_ingestion_trends_endpoint_returns_recent_run_rollup() -> None:
 
 
 def test_ingestion_trends_endpoint_supports_scope_filters() -> None:
-    response = client.get(
-        "/api/v1/admin/ingestion/trends"
-        "?repository_mode=in_memory&seed_demo=true&team_code=NYK&season_label=2023-2024"
-    )
+    response = client.get("/api/v1/admin/ingestion/trends?team_code=NYK&season_label=2023-2024")
 
     assert response.status_code == 200
     payload = response.json()
@@ -2062,10 +2025,7 @@ def test_ingestion_trends_endpoint_supports_scope_filters() -> None:
 
 
 def test_ingestion_trends_endpoint_supports_day_window() -> None:
-    response = client.get(
-        "/api/v1/admin/ingestion/trends"
-        "?repository_mode=in_memory&seed_demo=true&days=2"
-    )
+    response = client.get("/api/v1/admin/ingestion/trends?days=2")
 
     assert response.status_code == 200
     payload = response.json()
@@ -2078,10 +2038,7 @@ def test_ingestion_trends_endpoint_supports_day_window() -> None:
 
 
 def test_ingestion_trends_overview_uses_full_window_not_recent_run_limit() -> None:
-    response = client.get(
-        "/api/v1/admin/ingestion/trends"
-        "?repository_mode=in_memory&seed_demo=true&limit=2&days=7"
-    )
+    response = client.get("/api/v1/admin/ingestion/trends?limit=2&days=7")
 
     assert response.status_code == 200
     payload = response.json()
@@ -2091,9 +2048,7 @@ def test_ingestion_trends_overview_uses_full_window_not_recent_run_limit() -> No
 
 
 def test_retrieval_trends_endpoint_returns_rollup() -> None:
-    response = client.get(
-        "/api/v1/admin/retrieval/trends?repository_mode=in_memory&seed_demo=true&days=7"
-    )
+    response = client.get("/api/v1/admin/retrieval/trends?days=7")
 
     assert response.status_code == 200
     payload = response.json()
@@ -2108,10 +2063,7 @@ def test_retrieval_trends_endpoint_returns_rollup() -> None:
 
 
 def test_retrieval_trends_endpoint_supports_status_filter() -> None:
-    response = client.get(
-        "/api/v1/admin/retrieval/trends"
-        "?repository_mode=in_memory&seed_demo=true&status=FAILED&days=7"
-    )
+    response = client.get("/api/v1/admin/retrieval/trends?status=FAILED&days=7")
 
     assert response.status_code == 200
     payload = response.json()
@@ -2123,9 +2075,7 @@ def test_retrieval_trends_endpoint_supports_status_filter() -> None:
 
 
 def test_ingestion_quality_trends_endpoint_returns_rollup() -> None:
-    response = client.get(
-        "/api/v1/admin/ingestion/quality-trends?repository_mode=in_memory&seed_demo=true&days=7"
-    )
+    response = client.get("/api/v1/admin/ingestion/quality-trends?days=7")
 
     assert response.status_code == 200
     payload = response.json()
@@ -2146,8 +2096,7 @@ def test_ingestion_quality_trends_endpoint_returns_rollup() -> None:
 
 def test_ingestion_quality_trends_endpoint_supports_scope_filters() -> None:
     response = client.get(
-        "/api/v1/admin/ingestion/quality-trends"
-        "?repository_mode=in_memory&seed_demo=true&team_code=NYK&season_label=2023-2024"
+        "/api/v1/admin/ingestion/quality-trends?team_code=NYK&season_label=2023-2024"
     )
 
     assert response.status_code == 200
@@ -2167,13 +2116,12 @@ def test_ingestion_quality_trends_endpoint_supports_scope_filters() -> None:
 
 def test_recent_job_runs_endpoint_supports_started_window() -> None:
     response = client.get(
-        "/api/v1/admin/jobs/recent"
-        "?repository_mode=in_memory&seed_demo=true&started_from=2026-04-15&started_to=2026-04-16"
+        "/api/v1/admin/jobs/recent?started_from=2026-04-15&started_to=2026-04-16"
     )
 
     assert response.status_code == 200
     payload = response.json()
-    assert len(payload["job_runs"]) == 3
+    assert len(payload["job_runs"]) == 2
     assert payload["filters"]["started_from"].startswith("2026-04-15T00:00:00")
     assert payload["filters"]["started_to"].startswith("2026-04-16T23:59:59")
 
@@ -2209,12 +2157,12 @@ def test_normalize_data_quality_issue_taxonomy_endpoint_returns_summary(monkeypa
 
     response = client.post(
         "/api/v1/admin/data-quality/normalize-taxonomy"
-        "?repository_mode=postgres&team_code=LAL&season_label=2024-2025&dry_run=false"
+        "?team_code=LAL&season_label=2024-2025&dry_run=false"
     )
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["repository_mode"] == "postgres"
+    assert payload["repository_mode"] == "in_memory"
     assert payload["dry_run"] is False
     assert payload["filters"]["team_code"] == "LAL"
     assert payload["filters"]["season_label"] == "2024-2025"
@@ -2225,8 +2173,6 @@ def test_phase_four_model_backtest_run_endpoint_returns_walk_forward_summary() -
     response = client.post(
         "/api/v1/admin/models/backtests/run",
         params={
-            "repository_mode": "in_memory",
-            "seed_demo": True,
             "target_task": "spread_error_regression",
             "minimum_train_games": 1,
             "test_window_games": 1,
