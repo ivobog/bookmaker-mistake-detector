@@ -5,9 +5,11 @@ from bookmaker_detector_api.demo import (
     run_phase_one_demo,
     run_phase_one_fetch_demo,
     run_phase_one_fetch_failure_demo,
-    run_phase_one_fetch_reporting_demo as run_phase_one_fetch_reporting_demo_job,
     run_phase_one_persistence_demo,
     run_phase_one_worker_demo,
+)
+from bookmaker_detector_api.demo import (
+    run_phase_one_fetch_reporting_demo as run_phase_one_fetch_reporting_demo_job,
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"])

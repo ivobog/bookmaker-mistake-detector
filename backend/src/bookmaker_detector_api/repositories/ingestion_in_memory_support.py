@@ -37,7 +37,9 @@ def issue_matches_scope(
 
     canonical_game_id = issue["canonical_game_id"]
     if canonical_game_id is not None:
-        canonical_game = next((game for game in canonical_games if game["id"] == canonical_game_id), None)
+        canonical_game = next(
+            (game for game in canonical_games if game["id"] == canonical_game_id), None
+        )
         return canonical_game is not None and canonical_game_matches_scope(
             canonical_game,
             raw_rows=raw_rows,
@@ -50,10 +52,7 @@ def issue_matches_scope(
         )
 
     return (
-        provider_name is None
-        and team_code is None
-        and season_label is None
-        and run_label is None
+        provider_name is None and team_code is None and season_label is None and run_label is None
     )
 
 
@@ -165,10 +164,15 @@ def page_retrieval_has_run_label(
 ) -> bool:
     if page_retrieval_id is None:
         return False
-    page_retrieval = next((entry for entry in page_retrievals if entry["id"] == page_retrieval_id), None)
+    page_retrieval = next(
+        (entry for entry in page_retrievals if entry["id"] == page_retrieval_id), None
+    )
     if page_retrieval is None:
         return False
-    job_run = next((entry for entry in job_runs if entry["id"] == page_retrieval["job_id"]), None)
+    job_run = next(
+        (entry for entry in job_runs if entry["id"] == page_retrieval["job_id"]),
+        None,
+    )
     return job_run is not None and job_run.get("payload", {}).get("run_label") == run_label
 
 

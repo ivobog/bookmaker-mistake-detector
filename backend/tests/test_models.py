@@ -3,8 +3,9 @@ from datetime import date, datetime, timedelta, timezone
 import pytest
 
 from bookmaker_detector_api.demo import seed_phase_two_feature_in_memory
-from bookmaker_detector_api.services import model_market_board_sources as market_board_sources_module
-from bookmaker_detector_api.services import models as models_module
+from bookmaker_detector_api.services import (
+    model_market_board_sources as market_board_sources_module,
+)
 from bookmaker_detector_api.services.models import (
     get_model_backtest_detail_in_memory,
     get_model_backtest_history_in_memory,
@@ -702,9 +703,10 @@ def test_refresh_model_market_board_in_memory_uses_builtin_source() -> None:
     assert result["change_summary"]["added_game_count"] == 2
     assert result["change_summary"]["changed_game_count"] == 0
     assert result["source_payload_fingerprints"]["raw_game_count"] == 2
-    assert result["change_summary"]["source_fingerprint_comparison"][
-        "previous_fingerprints_available"
-    ] is False
+    assert (
+        result["change_summary"]["source_fingerprint_comparison"]["previous_fingerprints_available"]
+        is False
+    )
 
 
 def test_refresh_model_market_board_in_memory_tracks_updated_change_summary() -> None:
@@ -755,9 +757,7 @@ def test_list_model_market_board_sources_returns_demo_source() -> None:
 
     assert catalog["sources"]
     assert catalog["sources"][0]["source_name"] == "demo_daily_lines_v1"
-    assert any(
-        entry["source_name"] == "demo_source_failure_v1" for entry in catalog["sources"]
-    )
+    assert any(entry["source_name"] == "demo_source_failure_v1" for entry in catalog["sources"])
     assert any(entry["source_name"] == "file_market_board_v1" for entry in catalog["sources"])
 
 
@@ -942,8 +942,7 @@ def test_market_board_refresh_in_memory_normalizes_partial_source_rows() -> None
     assert history["overview"]["warning_count"] == 1
     assert history["overview"]["status_counts"]["SUCCESS_WITH_WARNINGS"] == 1
     assert (
-        history["recent_source_runs"][0]["payload"]["validation_summary"]["invalid_row_count"]
-        == 2
+        history["recent_source_runs"][0]["payload"]["validation_summary"]["invalid_row_count"] == 2
     )
 
 

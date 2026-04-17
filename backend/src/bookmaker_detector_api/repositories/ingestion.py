@@ -5,7 +5,6 @@ from typing import Any
 
 from bookmaker_detector_api.data_quality_taxonomy import (
     canonical_issue_type,
-    issue_type_filter_variants,
     merge_issue_type_counts,
     normalize_issue_type_and_severity,
     severity_counts_from_issue_type_counts,
@@ -20,7 +19,6 @@ from bookmaker_detector_api.repositories.ingestion_in_memory_support import (
     list_reporting_snapshots,
     normalize_issue_record,
     raw_row_matches_scope,
-    upsert_quality_snapshot,
     upsert_reporting_snapshot,
 )
 from bookmaker_detector_api.repositories.ingestion_postgres_support import (
@@ -28,20 +26,20 @@ from bookmaker_detector_api.repositories.ingestion_postgres_support import (
     build_issue_scope_where_clauses,
     build_raw_row_scope_where_clauses,
     count_by_column,
-    normalize_issue_record as normalize_postgres_issue_record,
     select_data_quality_issue_rows_for_normalization,
+)
+from bookmaker_detector_api.repositories.ingestion_postgres_support import (
+    normalize_issue_record as normalize_postgres_issue_record,
 )
 from bookmaker_detector_api.repositories.ingestion_types import (
     DailyJobRunQualitySummary,
     DailyJobRunSummary,
     DailyPageRetrievalSummary,
     DataQualityIssueRecord,
-    IngestionRepository,
     JobRunRecord,
     PageRetrievalRecord,
     PageRetrievalSnapshot,
     PersistedCanonicalGame,
-    PersistedIngestionRun,
     PersistedRawRow,
 )
 
@@ -182,35 +180,19 @@ class InMemoryIngestionRepository:
             entry
             for entry in self.job_runs
             if (status is None or entry["status"] == status)
+            and (provider_name is None or entry.get("payload", {}).get("provider") == provider_name)
+            and (team_code is None or entry.get("payload", {}).get("team_code") == team_code)
             and (
-                provider_name is None
-                or entry.get("payload", {}).get("provider") == provider_name
+                season_label is None or entry.get("payload", {}).get("season_label") == season_label
             )
-            and (
-                team_code is None
-                or entry.get("payload", {}).get("team_code") == team_code
-            )
-            and (
-                season_label is None
-                or entry.get("payload", {}).get("season_label") == season_label
-            )
-            and (
-                run_label is None
-                or entry.get("payload", {}).get("run_label") == run_label
-            )
+            and (run_label is None or entry.get("payload", {}).get("run_label") == run_label)
             and (
                 started_from is None
-                or (
-                    entry.get("started_at") is not None
-                    and entry["started_at"] >= started_from
-                )
+                or (entry.get("started_at") is not None and entry["started_at"] >= started_from)
             )
             and (
                 started_to is None
-                or (
-                    entry.get("started_at") is not None
-                    and entry["started_at"] <= started_to
-                )
+                or (entry.get("started_at") is not None and entry["started_at"] <= started_to)
             )
         ]
         selected = list(reversed(selected))[offset : offset + limit]
@@ -252,15 +234,11 @@ class InMemoryIngestionRepository:
             ]
         if team_code is not None:
             selected_entries = [
-                entry
-                for entry in selected_entries
-                if entry["record"].team_code == team_code
+                entry for entry in selected_entries if entry["record"].team_code == team_code
             ]
         if season_label is not None:
             selected_entries = [
-                entry
-                for entry in selected_entries
-                if entry["record"].season_label == season_label
+                entry for entry in selected_entries if entry["record"].season_label == season_label
             ]
         if run_label is not None:
             selected_entries = [
@@ -669,6 +647,7 @@ class InMemoryIngestionRepository:
             "issue_type_updates": issue_type_updates,
             "severity_updates": severity_updates,
         }
+
 
 class PostgresIngestionRepository:
     def __init__(self, connection: Any) -> None:
@@ -1467,6 +1446,7 @@ class PostgresIngestionRepository:
             )
             for row in rows
         ]
+
     def list_page_retrievals(
         self,
         *,
@@ -1779,6 +1759,7 @@ class PostgresIngestionRepository:
             "issue_type_updates": issue_type_updates,
             "severity_updates": severity_updates,
         }
+
 
 def _json_dumps(payload: Any) -> str:
     import json

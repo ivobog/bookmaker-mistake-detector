@@ -19,15 +19,6 @@ const adminBacktestHistoryQuery = new URLSearchParams({
   recent_limit: "6"
 });
 
-const analystOpportunityQuery = new URLSearchParams({
-  target_task: "spread_error_regression",
-  team_code: "LAL",
-  season_label: "2024-2025",
-  canonical_game_id: "3",
-  train_ratio: "0.5",
-  validation_ratio: "0.25"
-});
-
 const adminOpportunityHistoryQuery = new URLSearchParams({
   target_task: "spread_error_regression",
   team_code: "LAL",
