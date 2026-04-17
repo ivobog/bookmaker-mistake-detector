@@ -93,6 +93,13 @@ CREATE TABLE IF NOT EXISTS data_quality_issue (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS ux_data_quality_issue_identity
+ON data_quality_issue (
+    issue_type,
+    COALESCE(raw_team_game_row_id, 0),
+    COALESCE(canonical_game_id, 0)
+);
+
 CREATE TABLE IF NOT EXISTS job_run_reporting_snapshot (
     id BIGSERIAL PRIMARY KEY,
     job_run_id BIGINT NOT NULL UNIQUE REFERENCES job_run(id) ON DELETE CASCADE,

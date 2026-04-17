@@ -134,6 +134,7 @@ def ingest_historical_team_page(
         "canonical_games_saved": canonical_games_saved,
         "metrics_saved": metrics_saved,
         "quality_issues_saved": quality_issues_saved,
+        "payload_storage_path": request.payload_storage_path,
         "parser_snapshot_path": parser_snapshot_path,
         "warning_count": len(warnings),
         "warnings": warnings,

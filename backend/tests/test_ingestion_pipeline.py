@@ -30,6 +30,7 @@ def test_ingestion_pipeline_persists_fixture_run_in_memory() -> None:
             source_url="https://example.com/covers/lal/2024-2025",
             requested_by="test-suite",
             html=fixture_html,
+            payload_storage_path="payload.html",
         ),
         provider=provider,
         repository=repository,
@@ -43,6 +44,7 @@ def test_ingestion_pipeline_persists_fixture_run_in_memory() -> None:
     assert repository.job_runs[0]["status"] == "COMPLETED"
     assert repository.job_runs[0]["summary"]["raw_rows_saved"] == 3
     assert repository.job_runs[0]["summary"]["quality_issues_saved"] == 3
+    assert repository.job_runs[0]["summary"]["payload_storage_path"] == "payload.html"
     assert repository.job_runs[0]["summary"]["diagnostic_count"] == 1
     assert repository.job_runs[0]["summary"]["diagnostics"] == [
         "season_block_selector_match:page-fallback"
@@ -230,6 +232,7 @@ def test_ingestion_pipeline_persists_live_historical_fragment_snapshot(
     )
 
     assert repository.job_runs[0]["summary"]["raw_rows_saved"] == 1
+    assert repository.job_runs[0]["summary"]["payload_storage_path"] is None
     assert repository.job_runs[0]["summary"]["parser_snapshot_path"] == result.parser_snapshot_path
     assert repository.job_runs[0]["summary"]["diagnostic_count"] == 3
     assert repository.job_runs[0]["summary"]["diagnostics"] == [

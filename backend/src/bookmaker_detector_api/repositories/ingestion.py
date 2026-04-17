@@ -182,18 +182,55 @@ class InMemoryIngestionRepository:
     def save_canonical_games(self, games: list[CanonicalGame]) -> list[PersistedCanonicalGame]:
         persisted_games: list[PersistedCanonicalGame] = []
         for game in games:
-            canonical_game_id = len(self.canonical_games) + 1
-            self.canonical_games.append({"id": canonical_game_id, **game.as_dict()})
+            canonical_game_key = (
+                game.season_label,
+                game.game_date,
+                game.home_team_code,
+                game.away_team_code,
+            )
+            existing_game = next(
+                (
+                    entry
+                    for entry in self.canonical_games
+                    if (
+                        entry["season_label"],
+                        entry["game_date"],
+                        entry["home_team_code"],
+                        entry["away_team_code"],
+                    )
+                    == canonical_game_key
+                ),
+                None,
+            )
+            if existing_game is None:
+                canonical_game_id = len(self.canonical_games) + 1
+                self.canonical_games.append({"id": canonical_game_id, **game.as_dict()})
+            else:
+                canonical_game_id = int(existing_game["id"])
+                existing_game.update({"id": canonical_game_id, **game.as_dict()})
             persisted_games.append(
                 PersistedCanonicalGame(canonical_game_id=canonical_game_id, game=game)
             )
         return persisted_games
 
     def save_game_metrics(self, metrics_by_game_id: list[tuple[int, GameMetric]]) -> int:
-        self.metrics.extend(
-            {"canonical_game_id": canonical_game_id, **metric.as_dict()}
-            for canonical_game_id, metric in metrics_by_game_id
-        )
+        for canonical_game_id, metric in metrics_by_game_id:
+            existing_metric = next(
+                (
+                    entry
+                    for entry in self.metrics
+                    if entry["canonical_game_id"] == canonical_game_id
+                ),
+                None,
+            )
+            if existing_metric is None:
+                self.metrics.append(
+                    {"canonical_game_id": canonical_game_id, **metric.as_dict()}
+                )
+            else:
+                existing_metric.update(
+                    {"canonical_game_id": canonical_game_id, **metric.as_dict()}
+                )
         return len(metrics_by_game_id)
 
     def complete_job_run(self, *, job_id: int, summary: dict[str, Any], status: str) -> None:
@@ -484,17 +521,43 @@ class InMemoryIngestionRepository:
 
     def save_data_quality_issues(self, issues: list[DataQualityIssueRecord]) -> int:
         for issue in issues:
-            issue_id = len(self.data_quality_issues) + 1
-            self.data_quality_issues.append(
-                {
-                    "id": issue_id,
-                    "issue_type": issue.issue_type,
-                    "severity": issue.severity,
-                    "raw_team_game_row_id": issue.raw_team_game_row_id,
-                    "canonical_game_id": issue.canonical_game_id,
-                    "details": issue.details,
-                }
+            issue_key = (
+                issue.issue_type,
+                issue.raw_team_game_row_id,
+                issue.canonical_game_id,
             )
+            existing_issue = next(
+                (
+                    entry
+                    for entry in self.data_quality_issues
+                    if (
+                        entry["issue_type"],
+                        entry["raw_team_game_row_id"],
+                        entry["canonical_game_id"],
+                    )
+                    == issue_key
+                ),
+                None,
+            )
+            if existing_issue is None:
+                issue_id = len(self.data_quality_issues) + 1
+                self.data_quality_issues.append(
+                    {
+                        "id": issue_id,
+                        "issue_type": issue.issue_type,
+                        "severity": issue.severity,
+                        "raw_team_game_row_id": issue.raw_team_game_row_id,
+                        "canonical_game_id": issue.canonical_game_id,
+                        "details": issue.details,
+                    }
+                )
+            else:
+                existing_issue.update(
+                    {
+                        "severity": issue.severity,
+                        "details": issue.details,
+                    }
+                )
         return len(issues)
 
     def list_data_quality_issues(
@@ -697,6 +760,7 @@ class PostgresIngestionRepository:
     def __init__(self, connection: Any) -> None:
         self.connection = connection
         self._raw_row_source_identity_ready = False
+        self._data_quality_issue_identity_ready = False
 
     def create_job_run(self, *, job_name: str, requested_by: str, payload: dict[str, Any]) -> int:
         with self.connection.cursor() as cursor:
@@ -1584,6 +1648,7 @@ class PostgresIngestionRepository:
     def save_data_quality_issues(self, issues: list[DataQualityIssueRecord]) -> int:
         if not issues:
             return 0
+        self._ensure_data_quality_issue_identity_schema()
         with self.connection.cursor() as cursor:
             for issue in issues:
                 cursor.execute(
@@ -1596,6 +1661,14 @@ class PostgresIngestionRepository:
                         details_json
                     )
                     VALUES (%s, %s, %s, %s, %s::jsonb)
+                    ON CONFLICT (
+                        issue_type,
+                        COALESCE(raw_team_game_row_id, 0),
+                        COALESCE(canonical_game_id, 0)
+                    )
+                    DO UPDATE SET
+                        severity = EXCLUDED.severity,
+                        details_json = EXCLUDED.details_json
                     """,
                     (
                         issue.issue_type,
@@ -1869,6 +1942,42 @@ class PostgresIngestionRepository:
             )
         self.connection.commit()
         self._raw_row_source_identity_ready = True
+
+    def _ensure_data_quality_issue_identity_schema(self) -> None:
+        if self._data_quality_issue_identity_ready:
+            return
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                DELETE FROM data_quality_issue dqi
+                USING (
+                    SELECT
+                        id,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY
+                                issue_type,
+                                COALESCE(raw_team_game_row_id, 0),
+                                COALESCE(canonical_game_id, 0)
+                            ORDER BY id DESC
+                        ) AS duplicate_rank
+                    FROM data_quality_issue
+                ) duplicates
+                WHERE dqi.id = duplicates.id
+                  AND duplicates.duplicate_rank > 1
+                """
+            )
+            cursor.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS ux_data_quality_issue_identity
+                ON data_quality_issue (
+                    issue_type,
+                    COALESCE(raw_team_game_row_id, 0),
+                    COALESCE(canonical_game_id, 0)
+                )
+                """
+            )
+        self.connection.commit()
+        self._data_quality_issue_identity_ready = True
 
 
 def _json_dumps(payload: Any) -> str:

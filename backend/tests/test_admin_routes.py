@@ -1872,6 +1872,7 @@ def test_validation_run_comparison_builds_latest_vs_previous_delta() -> None:
             "canonical_games_saved": 3,
             "metrics_saved": 3,
             "quality_issues_saved": 3,
+            "payload_storage_path": "payloads/first.html",
             "warning_count": 3,
             "diagnostics": ["season_block_selector_match:page-fallback"],
             "parser_provenance_counts": {
@@ -1902,6 +1903,7 @@ def test_validation_run_comparison_builds_latest_vs_previous_delta() -> None:
             "canonical_games_saved": 2,
             "metrics_saved": 2,
             "quality_issues_saved": 1,
+            "payload_storage_path": "payloads/second.html",
             "warning_count": 1,
             "diagnostics": [
                 "browser_fallback_requested",
@@ -1931,7 +1933,9 @@ def test_validation_run_comparison_builds_latest_vs_previous_delta() -> None:
     assert comparison["run_label"] == "phase-1-fetch-reporting-demo"
     assert comparison["run_count"] == 2
     assert comparison["latest_run"]["job_id"] == second_job_id
+    assert comparison["latest_run"]["payload_storage_path"] == "payloads/second.html"
     assert comparison["previous_run"]["job_id"] == first_job_id
+    assert comparison["previous_run"]["payload_storage_path"] == "payloads/first.html"
     assert comparison["latest_vs_previous"]["status_changed"] is False
     assert comparison["latest_vs_previous"]["metric_deltas"] == {
         "raw_rows_saved": 0,
@@ -2034,6 +2038,11 @@ def test_ingestion_trends_endpoint_returns_recent_run_rollup() -> None:
     assert payload["trends"]["recent_runs"][1]["reconciliation_status_counts"] == {
         "CONFLICT_SCORE": 1
     }
+    assert any(
+        run["payload_storage_path"] is not None
+        and run["parser_snapshot_path"] is not None
+        for run in payload["trends"]["recent_runs"]
+    )
     assert len(payload["trends"]["daily_buckets"]) == 4
     assert sum(bucket["job_count"] for bucket in payload["trends"]["daily_buckets"]) == 5
     assert all("diagnostic_counts" in bucket for bucket in payload["trends"]["daily_buckets"])

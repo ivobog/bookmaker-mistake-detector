@@ -3,7 +3,9 @@ from __future__ import annotations
 from dataclasses import asdict
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from tempfile import mkdtemp
 
+from bookmaker_detector_api.config import settings
 from bookmaker_detector_api.ingestion.models import ParseStatus, RawGameRow
 from bookmaker_detector_api.repositories import InMemoryIngestionRepository
 from bookmaker_detector_api.repositories.ingestion import IngestionRepository
@@ -223,15 +225,24 @@ def _seed_in_memory_demo_data(repository: IngestionRepository) -> None:
         / "fixtures"
         / "covers_sample_team_page.html"
     ).resolve()
-    run_fetch_and_ingest(
-        repository_mode="in_memory",
-        team_code="LAL",
-        season_label="2024-2025",
-        source_url=fixture_path.as_uri(),
-        requested_by="admin-diagnostics-seed-success",
-        persist_payload=False,
-        repository_override=repository,
-    )
+    artifact_root = Path(mkdtemp(prefix="admin-diagnostics-seed-", dir=str(Path.cwd())))
+    original_payload_dir = settings.raw_payload_dir
+    original_parser_snapshot_dir = settings.parser_snapshot_dir
+    settings.raw_payload_dir = str(artifact_root / "raw-payloads")
+    settings.parser_snapshot_dir = str(artifact_root / "parser-output")
+    try:
+        run_fetch_and_ingest(
+            repository_mode="in_memory",
+            team_code="LAL",
+            season_label="2024-2025",
+            source_url=fixture_path.as_uri(),
+            requested_by="admin-diagnostics-seed-success",
+            persist_payload=True,
+            repository_override=repository,
+        )
+    finally:
+        settings.raw_payload_dir = original_payload_dir
+        settings.parser_snapshot_dir = original_parser_snapshot_dir
     _shift_latest_in_memory_run(repository, days_ago=3)
     run_fetch_and_ingest(
         repository_mode="in_memory",
@@ -539,6 +550,7 @@ def _build_recent_run_summary(job_run) -> dict[str, object]:
         "canonical_games_saved": summary.get("canonical_games_saved", 0),
         "metrics_saved": summary.get("metrics_saved", 0),
         "quality_issues_saved": summary.get("quality_issues_saved", 0),
+        "payload_storage_path": summary.get("payload_storage_path"),
         "parser_snapshot_path": summary.get("parser_snapshot_path"),
         "warning_count": summary.get("warning_count", 0),
         "warnings": summary.get("warnings", []),

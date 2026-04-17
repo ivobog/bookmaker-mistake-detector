@@ -9,6 +9,7 @@ from bookmaker_detector_api.services.fetch_ingestion_runner import run_fetch_and
 from tests.support.covers_fixtures import (
     DEFAULT_TEAM_PAGE_URL,
     build_fixture_backed_covers_provider,
+    load_covers_fixture,
 )
 
 
@@ -217,8 +218,53 @@ def test_fetch_and_ingest_deduplicates_raw_rows_by_source_coordinates() -> None:
     assert first_result["status"] == "COMPLETED"
     assert second_result["status"] == "COMPLETED"
     assert len(repository.raw_rows) == 3
+    assert len(repository.canonical_games) == 3
+    assert len(repository.metrics) == 3
+    assert len(repository.data_quality_issues) == 3
     assert all(row["source_page_url"] == fixture_url for row in repository.raw_rows)
     assert {
         row["source_url"]
         for row in repository.raw_rows
     } == {f"{fixture_url}#validation_run=second"}
+
+
+def test_ingestion_pipeline_deduplicates_canonical_games_and_metrics_on_rerun() -> None:
+    provider = build_fixture_backed_covers_provider()()
+    repository = InMemoryIngestionRepository()
+    fixture_html = load_covers_fixture("covers_live_team_page.html")
+
+    first_result = fetch_ingestion_runner.ingest_historical_team_page(
+        request=fetch_ingestion_runner.HistoricalIngestionRequest(
+            provider_name="covers",
+            team_code="LAL",
+            season_label="2024-2025",
+            source_url=DEFAULT_TEAM_PAGE_URL,
+            source_page_url=DEFAULT_TEAM_PAGE_URL,
+            requested_by="test-suite",
+            html=fixture_html,
+        ),
+        provider=provider,
+        repository=repository,
+    )
+    second_result = fetch_ingestion_runner.ingest_historical_team_page(
+        request=fetch_ingestion_runner.HistoricalIngestionRequest(
+            provider_name="covers",
+            team_code="LAL",
+            season_label="2024-2025",
+            source_url=DEFAULT_TEAM_PAGE_URL,
+            source_page_url=DEFAULT_TEAM_PAGE_URL,
+            requested_by="test-suite",
+            html=fixture_html,
+        ),
+        provider=provider,
+        repository=repository,
+    )
+
+    assert first_result.raw_rows_saved == 1
+    assert second_result.raw_rows_saved == 1
+    assert len(repository.raw_rows) == 1
+    assert len(repository.canonical_games) == 1
+    assert len(repository.metrics) == 1
+    assert len(repository.data_quality_issues) == 1
+    assert repository.canonical_games[0]["id"] == 1
+    assert repository.metrics[0]["canonical_game_id"] == 1
