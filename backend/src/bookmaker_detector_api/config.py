@@ -2,6 +2,8 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
+
 
 class Settings(BaseSettings):
     api_env: str = "development"
@@ -26,7 +28,7 @@ class Settings(BaseSettings):
     the_odds_api_timeout_seconds: float = 10.0
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(REPO_ROOT / ".env"),
         env_prefix="",
         env_ignore_empty=True,
         extra="ignore",

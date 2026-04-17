@@ -236,6 +236,7 @@ def _run_target_load(
                 }
             )
         except Exception as exc:
+            _rollback_repository_transaction(repository)
             results.append(
                 _record_initial_load_failure(
                     repository=repository,
@@ -255,6 +256,13 @@ def _run_target_load(
                 break
 
     return results, stopped_early
+
+
+def _rollback_repository_transaction(repository: PostgresIngestionRepository) -> None:
+    connection = getattr(repository, "connection", None)
+    rollback = getattr(connection, "rollback", None)
+    if callable(rollback):
+        rollback()
 
 
 def _record_initial_load_failure(

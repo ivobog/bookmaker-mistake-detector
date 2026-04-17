@@ -528,3 +528,72 @@ def test_parse_csv_values_handles_empty_strings() -> None:
     assert loader.parse_csv_values(None) is None
     assert loader.parse_csv_values("") is None
     assert loader.parse_csv_values("LAL, BOS ,, NYK") == ["LAL", "BOS", "NYK"]
+
+
+def test_run_target_load_rolls_back_aborted_transaction_before_failure_logging(
+    monkeypatch,
+) -> None:
+    class FakeConnection:
+        def __init__(self) -> None:
+            self.rollback_calls = 0
+
+        def rollback(self) -> None:
+            self.rollback_calls += 1
+
+    class FakeRepository:
+        def __init__(self) -> None:
+            self.connection = FakeConnection()
+
+    class FakeProvider:
+        provider_name = "covers"
+
+        def fetch_team_main_page(self, *, url, requested_season_labels, browser_fallback):
+            return TeamPageFetchResult(
+                fetched_page=type(
+                    "FetchedPage",
+                    (),
+                    {
+                        "content": "<html></html>",
+                        "status": "SUCCESS",
+                        "http_status": 200,
+                    },
+                )(),
+                diagnostics=(),
+            )
+
+    target = loader.DatasetLoadTarget(
+        team_code="BOS",
+        team_name="Boston Celtics",
+        team_slug="boston-celtics",
+        team_main_page_url="https://example.com/bos",
+        season_labels=("2024-2025",),
+    )
+    repository = FakeRepository()
+    failure_calls: list[dict[str, object]] = []
+
+    def fake_ingest_historical_team_page(*, request, provider, repository):
+        raise RuntimeError("not-null violation")
+
+    def fake_record_initial_load_failure(**kwargs):
+        failure_calls.append(kwargs)
+        return {"status": "FAILED", "diagnostics": []}
+
+    monkeypatch.setattr(loader, "ingest_historical_team_page", fake_ingest_historical_team_page)
+    monkeypatch.setattr(loader, "_record_initial_load_failure", fake_record_initial_load_failure)
+
+    results, stopped_early = loader._run_target_load(
+        repository=repository,
+        provider=FakeProvider(),
+        target=target,
+        requested_by="test-suite",
+        run_label="test-run",
+        continue_on_error=True,
+        persist_payload=False,
+        browser_fallback=False,
+    )
+
+    assert repository.connection.rollback_calls == 1
+    assert stopped_early is False
+    assert results == [{"status": "FAILED", "diagnostics": []}]
+    assert len(failure_calls) == 1
+    assert failure_calls[0]["error_message"] == "not-null violation"

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 from bookmaker_detector_api.ingestion.models import CanonicalGame, RawGameRow, ReconciliationStatus
+from bookmaker_detector_api.team_normalization import normalize_team_code_or_name
 
 
 def canonicalize_rows(rows: list[RawGameRow]) -> list[CanonicalGame]:
@@ -112,4 +113,8 @@ def _pick_value(primary: float | None, secondary: float | None) -> float | None:
 
 
 def _normalize_team_code(team_code: str) -> str:
-    return team_code.removeprefix("@").strip().upper()
+    normalized_input = team_code.removeprefix("@").strip()
+    resolved_code = normalize_team_code_or_name(normalized_input)
+    if resolved_code is not None:
+        return resolved_code
+    return normalized_input.upper()

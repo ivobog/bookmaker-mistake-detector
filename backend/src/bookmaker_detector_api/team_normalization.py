@@ -22,7 +22,7 @@ NBA_TEAM_ALIASES = {
     "MIL": ("MIL", "Milwaukee", "Milwaukee Bucks", "Bucks"),
     "MIN": ("MIN", "Minnesota", "Minnesota Timberwolves", "Timberwolves"),
     "NOP": ("NOP", "NO", "New Orleans", "New Orleans Pelicans", "Pelicans"),
-    "NYK": ("NYK", "New York", "New York Knicks", "Knicks"),
+    "NYK": ("NYK", "NY", "New York", "New York Knicks", "Knicks"),
     "OKC": ("OKC", "Oklahoma City", "Oklahoma City Thunder", "Thunder"),
     "ORL": ("ORL", "Orlando", "Orlando Magic", "Magic"),
     "PHI": ("PHI", "Philadelphia", "Philadelphia 76ers", "76ers", "Sixers"),
