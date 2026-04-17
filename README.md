@@ -9,19 +9,28 @@ Phase 0, Phase 1, and Phase 2 are complete. Phase 3 is complete for the backend 
 - `infra/postgres/init/`: baseline PostgreSQL schema SQL
 - `.github/workflows/`: CI baseline
 
+## Schema Ownership
+- PostgreSQL schema ownership lives in `infra/postgres/init/`.
+- Normal API, worker, model, feature, and ingestion flows no longer create or alter tables at runtime.
+- `docker compose up --build` applies `infra/postgres/init/` automatically only when Postgres starts with a fresh empty data volume.
+- If you reuse an existing Postgres volume or external database, apply the SQL in `infra/postgres/init/` yourself before running postgres-backed flows.
+- Production postgres startup now fails fast with a schema-readiness error if required tables are missing, instead of creating them on demand later.
+
 ## Quick Start
 1. Copy `.env.example` to `.env`.
 2. Run `docker compose up --build`.
+   This initializes Postgres from `infra/postgres/init/` on first boot of a fresh volume.
 3. Open the frontend at `http://localhost:5173`.
 4. Check the API health route at `http://localhost:8000/api/v1/health`.
 5. Run the Phase 5 regression pass from the repo root with `powershell -ExecutionPolicy Bypass -File .\scripts\run_phase5_regression.ps1`.
-6. Run the initial historical production dataset bootstrap with `powershell -ExecutionPolicy Bypass -File .\scripts\run_initial_production_dataset_load.ps1 -SourceUrlTemplate "<provider-template>"` once you have a real team-season source template.
-7. Inspect the fixture-backed Phase 1 demo at `http://localhost:8000/api/v1/admin/phase-1-demo`.
-8. Inspect the fixture-backed persistence flow at `http://localhost:8000/api/v1/admin/phase-1-persistence-demo`.
-9. Inspect the worker-shaped ingestion flow at `http://localhost:8000/api/v1/admin/phase-1-worker-demo`.
-10. Inspect the fetch-and-ingest flow at `http://localhost:8000/api/v1/admin/phase-1-fetch-demo`.
-11. Inspect the failed-fetch diagnostics flow at `http://localhost:8000/api/v1/admin/phase-1-fetch-failure-demo`.
-12. Inspect fetch-backed reporting in one shot at `http://localhost:8000/api/v1/admin/phase-1-fetch-reporting-demo?repository_mode=in_memory`.
+6. If you are pointing at an existing Postgres database or persistent Docker volume, verify the schema from `infra/postgres/init/` is already applied before continuing.
+7. Run the initial historical production dataset bootstrap with `powershell -ExecutionPolicy Bypass -File .\scripts\run_initial_production_dataset_load.ps1 -SourceUrlTemplate "<provider-template>"` once you have a real team-season source template.
+8. Inspect the fixture-backed Phase 1 demo at `http://localhost:8000/api/v1/admin/phase-1-demo`.
+9. Inspect the fixture-backed persistence flow at `http://localhost:8000/api/v1/admin/phase-1-persistence-demo`.
+10. Inspect the worker-shaped ingestion flow at `http://localhost:8000/api/v1/admin/phase-1-worker-demo`.
+11. Inspect the fetch-and-ingest flow at `http://localhost:8000/api/v1/admin/phase-1-fetch-demo`.
+12. Inspect the failed-fetch diagnostics flow at `http://localhost:8000/api/v1/admin/phase-1-fetch-failure-demo`.
+13. Inspect fetch-backed reporting in one shot at `http://localhost:8000/api/v1/admin/phase-1-fetch-reporting-demo?repository_mode=in_memory`.
 Use `run_label=phase-1-fetch-reporting-demo` on recent-job and trend endpoints to isolate those validation runs from normal worker traffic.
 The same `run_label` filter now works on ingestion stats and data-quality issue views too.
 Compare the latest labeled validation runs at `http://localhost:8000/api/v1/admin/validation-runs/compare?repository_mode=in_memory&seed_demo=false&run_label=phase-1-fetch-reporting-demo`.
@@ -177,6 +186,7 @@ The repo now includes the first release-candidate slice:
 - a known-issues tracker at [docs/known_issues.md](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/docs/known_issues.md) for internal MVP rollout readiness
 - a release acceptance matrix at [docs/release_acceptance_checklist.md](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/docs/release_acceptance_checklist.md) mapped back to the SRS
 - a manual smoke worksheet at [docs/manual_smoke_checklist.md](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/docs/manual_smoke_checklist.md) with explicit pass/fail capture for the release flow
+- explicit schema ownership through `infra/postgres/init` plus fail-fast postgres schema verification in backend startup and connection paths
 
 ## Phase 1 Outcome
 The repo now includes:

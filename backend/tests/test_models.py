@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta, timezone
 import pytest
 
 from bookmaker_detector_api.demo import seed_phase_two_feature_in_memory
+from bookmaker_detector_api.services import model_market_board_sources as market_board_sources_module
 from bookmaker_detector_api.services import models as models_module
 from bookmaker_detector_api.services.models import (
     get_model_backtest_detail_in_memory,
@@ -819,9 +820,9 @@ def test_refresh_model_market_board_in_memory_supports_external_odds_source(
 ) -> None:
     repository, _, _ = seed_phase_two_feature_in_memory()
 
-    monkeypatch.setattr(models_module.settings, "the_odds_api_key", "test-key")
+    monkeypatch.setattr(market_board_sources_module.settings, "the_odds_api_key", "test-key")
     monkeypatch.setattr(
-        models_module,
+        market_board_sources_module,
         "_fetch_the_odds_api_games",
         lambda: [
             {

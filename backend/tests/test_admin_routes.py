@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from bookmaker_detector_api import demo as demo_module
 from bookmaker_detector_api.main import app
 from bookmaker_detector_api.repositories import InMemoryIngestionRepository
+from bookmaker_detector_api.services import model_market_board_sources as market_board_sources_module
 from bookmaker_detector_api.services import models as models_module
 from bookmaker_detector_api.services.admin_diagnostics import get_admin_diagnostics
 from bookmaker_detector_api.services.fetch_ingestion_runner import run_fetch_and_ingest
@@ -95,7 +96,7 @@ def test_phase_one_fetch_reporting_demo_endpoint_exposes_reporting_summary(monke
         }
 
     monkeypatch.setattr(
-        "bookmaker_detector_api.api.admin_routes.run_phase_one_fetch_reporting_demo_job",
+        "bookmaker_detector_api.api.admin_demo_routes.run_phase_one_fetch_reporting_demo_job",
         fake_fetch_reporting_demo,
     )
 
@@ -688,9 +689,9 @@ def test_phase_three_model_market_board_refresh_endpoint_supports_file_source() 
 def test_phase_three_model_market_board_refresh_endpoint_supports_external_odds_source(
     monkeypatch,
 ) -> None:
-    monkeypatch.setattr(models_module.settings, "the_odds_api_key", "test-key")
+    monkeypatch.setattr(market_board_sources_module.settings, "the_odds_api_key", "test-key")
     monkeypatch.setattr(
-        models_module,
+        market_board_sources_module,
         "_fetch_the_odds_api_games",
         lambda: [
             {
@@ -1744,7 +1745,7 @@ def test_recent_job_runs_endpoint_forwards_run_label_filter(monkeypatch) -> None
         }
 
     monkeypatch.setattr(
-        "bookmaker_detector_api.api.admin_routes.get_admin_diagnostics",
+        "bookmaker_detector_api.api.admin_diagnostics_routes.get_admin_diagnostics",
         fake_get_admin_diagnostics,
     )
 
@@ -1826,7 +1827,7 @@ def test_ingestion_stats_endpoint_forwards_run_label_filter(monkeypatch) -> None
         }
 
     monkeypatch.setattr(
-        "bookmaker_detector_api.api.admin_routes.get_admin_diagnostics",
+        "bookmaker_detector_api.api.admin_diagnostics_routes.get_admin_diagnostics",
         fake_get_admin_diagnostics,
     )
 
@@ -1949,7 +1950,7 @@ def test_validation_run_comparison_endpoint_forwards_filters(monkeypatch) -> Non
         }
 
     monkeypatch.setattr(
-        "bookmaker_detector_api.api.admin_routes.get_admin_diagnostics",
+        "bookmaker_detector_api.api.admin_diagnostics_routes.get_admin_diagnostics",
         fake_get_admin_diagnostics,
     )
 
@@ -2151,7 +2152,7 @@ def test_normalize_data_quality_issue_taxonomy_endpoint_returns_summary(monkeypa
         }
 
     monkeypatch.setattr(
-        "bookmaker_detector_api.api.admin_routes.normalize_data_quality_taxonomy",
+        "bookmaker_detector_api.api.admin_diagnostics_routes.normalize_data_quality_taxonomy",
         fake_normalize_data_quality_taxonomy,
     )
 

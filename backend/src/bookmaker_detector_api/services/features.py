@@ -1,12 +1,23 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from datetime import date, datetime, timezone
 from statistics import mean, median, pstdev
 from typing import Any
 
 from bookmaker_detector_api.repositories import InMemoryIngestionRepository
 from bookmaker_detector_api.repositories.ingestion import _json_dumps
+from bookmaker_detector_api.services.feature_evidence_scoring import (
+    build_evidence_recommendation,
+    build_evidence_strength_summary,
+)
+from bookmaker_detector_api.services.feature_records import (
+    CanonicalGameMetricRecord,
+    FeatureAnalysisArtifactRecord,
+    FeatureSnapshotRecord,
+    FeatureVersionRecord,
+    TeamPerspectiveGame,
+)
 
 DEFAULT_FEATURE_KEY = "baseline_team_features_v1"
 DEFAULT_FEATURE_WINDOWS = (3, 5, 10)
@@ -179,84 +190,6 @@ FEATURE_PATTERN_DIMENSIONS = {
     "rolling_3_over_rate_bucket",
 }
 
-
-@dataclass(slots=True)
-class FeatureVersionRecord:
-    id: int
-    feature_key: str
-    version_label: str
-    description: str
-    config: dict[str, Any]
-    created_at: datetime | None = None
-
-
-@dataclass(slots=True)
-class CanonicalGameMetricRecord:
-    canonical_game_id: int
-    season_label: str
-    game_date: date
-    home_team_code: str
-    away_team_code: str
-    home_score: int
-    away_score: int
-    final_home_margin: int
-    final_total_points: int
-    total_line: float | None
-    home_spread_line: float | None
-    away_spread_line: float | None
-    reconciliation_status: str
-    source_row_indexes: list[int]
-    warnings: list[str]
-    spread_error_home: float | None
-    spread_error_away: float | None
-    total_error: float | None
-    home_covered: bool | None
-    away_covered: bool | None
-    went_over: bool | None
-    went_under: bool | None
-
-
-@dataclass(slots=True)
-class TeamPerspectiveGame:
-    season_label: str
-    game_date: date
-    is_home: bool
-    point_margin: float
-    total_points: float
-    spread_error: float | None
-    total_error: float | None
-    covered: bool | None
-    went_over: bool | None
-
-
-@dataclass(slots=True)
-class FeatureSnapshotRecord:
-    id: int
-    canonical_game_id: int
-    feature_version_id: int
-    season_label: str
-    game_date: date
-    home_team_code: str
-    away_team_code: str
-    feature_payload: dict[str, Any]
-    created_at: datetime | None = None
-
-
-@dataclass(slots=True)
-class FeatureAnalysisArtifactRecord:
-    id: int
-    feature_version_id: int
-    artifact_type: str
-    target_task: str
-    team_code: str | None
-    season_label: str | None
-    artifact_key: str
-    dimensions: list[str]
-    payload: dict[str, Any]
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
-
-
 def materialize_baseline_feature_snapshots_for_in_memory(
     repository: InMemoryIngestionRepository,
     *,
@@ -299,7 +232,6 @@ def materialize_baseline_feature_snapshots_for_postgres(
     description: str = "Time-safe rolling team and matchup features for canonical games.",
     windows: tuple[int, ...] = DEFAULT_FEATURE_WINDOWS,
 ) -> dict[str, Any]:
-    ensure_feature_tables(connection)
     feature_version = ensure_feature_version_postgres(
         connection,
         feature_key=feature_key,
@@ -1328,67 +1260,6 @@ def get_feature_dataset_splits_in_memory(
         "row_count": len(dataset_rows),
         **split_result,
     }
-
-
-def ensure_feature_tables(connection: Any) -> None:
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS feature_version (
-                id BIGSERIAL PRIMARY KEY,
-                feature_key VARCHAR(64) NOT NULL UNIQUE,
-                version_label VARCHAR(128) NOT NULL,
-                description TEXT,
-                config_json JSONB NOT NULL DEFAULT '{}'::jsonb,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-            """
-        )
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS game_feature_snapshot (
-                id BIGSERIAL PRIMARY KEY,
-                canonical_game_id BIGINT NOT NULL REFERENCES canonical_game(id) ON DELETE CASCADE,
-                feature_version_id BIGINT NOT NULL REFERENCES feature_version(id) ON DELETE CASCADE,
-                season_id INTEGER NOT NULL REFERENCES season(id),
-                game_date DATE NOT NULL,
-                home_team_id INTEGER NOT NULL REFERENCES team(id),
-                away_team_id INTEGER NOT NULL REFERENCES team(id),
-                feature_payload_json JSONB NOT NULL DEFAULT '{}'::jsonb,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                UNIQUE (feature_version_id, canonical_game_id)
-            )
-            """
-        )
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS feature_analysis_artifact (
-                id BIGSERIAL PRIMARY KEY,
-                feature_version_id BIGINT NOT NULL REFERENCES feature_version(id) ON DELETE CASCADE,
-                artifact_type VARCHAR(64) NOT NULL,
-                target_task VARCHAR(64) NOT NULL,
-                scope_team_code VARCHAR(16) NOT NULL DEFAULT '',
-                scope_season_label VARCHAR(32) NOT NULL DEFAULT '',
-                artifact_key VARCHAR(255) NOT NULL,
-                dimensions_json JSONB NOT NULL DEFAULT '[]'::jsonb,
-                payload_json JSONB NOT NULL DEFAULT '{}'::jsonb,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                UNIQUE (
-                    feature_version_id,
-                    artifact_type,
-                    target_task,
-                    scope_team_code,
-                    scope_season_label,
-                    artifact_key
-                )
-            )
-            """
-        )
-    connection.commit()
-
-
 def ensure_feature_version_postgres(
     connection: Any,
     *,
@@ -1397,7 +1268,6 @@ def ensure_feature_version_postgres(
     description: str,
     config: dict[str, Any],
 ) -> FeatureVersionRecord:
-    ensure_feature_tables(connection)
     with connection.cursor() as cursor:
         cursor.execute(
             """
@@ -1495,7 +1365,6 @@ def save_feature_snapshots_postgres(
 ) -> int:
     if not snapshots:
         return 0
-    ensure_feature_tables(connection)
     with connection.cursor() as cursor:
         for snapshot in snapshots:
             cursor.execute(
@@ -1551,7 +1420,6 @@ def list_feature_snapshots_postgres(
     limit: int | None = None,
     offset: int = 0,
 ) -> list[FeatureSnapshotRecord]:
-    ensure_feature_tables(connection)
     if feature_version_id is None:
         feature_version = get_feature_version_postgres(
             connection,
@@ -1616,7 +1484,6 @@ def count_feature_snapshots_postgres(
     team_code: str | None = None,
     season_label: str | None = None,
 ) -> int:
-    ensure_feature_tables(connection)
     feature_version = get_feature_version_postgres(
         connection,
         feature_key=feature_key,
@@ -1652,7 +1519,6 @@ def save_feature_analysis_artifacts_postgres(
 ) -> int:
     if not artifacts:
         return 0
-    ensure_feature_tables(connection)
     with connection.cursor() as cursor:
         for artifact in artifacts:
             cursor.execute(
@@ -1708,7 +1574,6 @@ def list_feature_analysis_artifacts_postgres(
     limit: int | None = None,
     offset: int = 0,
 ) -> list[FeatureAnalysisArtifactRecord]:
-    ensure_feature_tables(connection)
     if feature_version_id is None:
         feature_version = get_feature_version_postgres(connection, feature_key=feature_key)
         if feature_version is None:
@@ -1775,7 +1640,6 @@ def get_feature_version_postgres(
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
 ) -> FeatureVersionRecord | None:
-    ensure_feature_tables(connection)
     with connection.cursor() as cursor:
         cursor.execute(
             """
@@ -3076,19 +2940,20 @@ def build_feature_evidence_bundle(
             else None
         ),
     }
-    evidence_strength = _build_evidence_strength_summary(
+    evidence_strength = build_evidence_strength_summary(
         task_type=comparable_result["task"]["task_type"],
         selected_pattern=selected_pattern,
         comparables=comparable_result["comparables"],
         benchmark_rankings=benchmark_result["benchmark_rankings"],
     )
-    evidence_recommendation = _build_evidence_recommendation(
+    evidence_recommendation = build_evidence_recommendation(
         target_task=target_task,
         task_type=comparable_result["task"]["task_type"],
         evidence_strength=evidence_strength,
         selected_pattern=selected_pattern,
         comparables=comparable_result["comparables"],
         benchmark_rankings=benchmark_result["benchmark_rankings"],
+        evidence_recommendation_policies=FEATURE_EVIDENCE_RECOMMENDATION_POLICIES,
     )
     return {
         "task": comparable_result["task"],
@@ -3322,326 +3187,6 @@ def _build_evidence_artifact_key(
     if team_code is not None:
         key_parts.insert(1 if canonical_game_id is not None else 0, f"team_code={team_code}")
     return "|".join(key_parts)
-
-
-def _build_evidence_strength_summary(
-    *,
-    task_type: str,
-    selected_pattern: dict[str, Any] | None,
-    comparables: list[dict[str, Any]],
-    benchmark_rankings: list[dict[str, Any]],
-) -> dict[str, Any]:
-    pattern_component = _build_pattern_strength_component(
-        task_type=task_type,
-        selected_pattern=selected_pattern,
-    )
-    comparable_component = _build_comparable_strength_component(comparables)
-    benchmark_component = _build_benchmark_strength_component(
-        benchmark_rankings=benchmark_rankings,
-    )
-    overall_score = round(
-        (
-            pattern_component["score"]
-            + comparable_component["score"]
-            + benchmark_component["score"]
-        )
-        / 3,
-        4,
-    )
-    warnings = []
-    if selected_pattern is None:
-        warnings.append("pattern_not_found")
-    elif int(selected_pattern.get("sample_size", 0)) < 3:
-        warnings.append("low_pattern_sample")
-    if len(comparables) == 0:
-        warnings.append("no_comparables_found")
-    elif len(comparables) < 3:
-        warnings.append("thin_comparable_set")
-    if not benchmark_rankings:
-        warnings.append("benchmark_context_unavailable")
-    elif benchmark_component["stability_score"] < 0.5:
-        warnings.append("benchmark_instability")
-    return {
-        "overall_score": overall_score,
-        "rating": _evidence_strength_rating(overall_score),
-        "components": {
-            "pattern_support": pattern_component,
-            "comparable_support": comparable_component,
-            "benchmark_support": benchmark_component,
-        },
-        "warnings": warnings,
-    }
-
-
-def _build_evidence_recommendation(
-    *,
-    target_task: str,
-    task_type: str,
-    evidence_strength: dict[str, Any],
-    selected_pattern: dict[str, Any] | None,
-    comparables: list[dict[str, Any]],
-    benchmark_rankings: list[dict[str, Any]],
-) -> dict[str, Any]:
-    policy = FEATURE_EVIDENCE_RECOMMENDATION_POLICIES.get(
-        target_task,
-        FEATURE_EVIDENCE_RECOMMENDATION_POLICIES["spread_error_regression"],
-    )
-    overall_score = float(evidence_strength["overall_score"])
-    warnings = list(evidence_strength["warnings"])
-    pattern_sample_size = int(selected_pattern.get("sample_size", 0)) if selected_pattern else 0
-    comparable_count = len(comparables)
-    top_similarity = comparables[0]["similarity_score"] if comparables else None
-    benchmark_support = evidence_strength["components"]["benchmark_support"]
-    benchmark_stability_score = benchmark_support["stability_score"]
-    benchmark_name = (
-        benchmark_rankings[0]["baseline_name"] if benchmark_rankings else None
-    )
-
-    if (
-        overall_score >= policy["candidate_min_overall_score"]
-        and pattern_sample_size >= policy["candidate_min_pattern_sample"]
-        and comparable_count >= policy["candidate_min_comparables"]
-        and benchmark_stability_score >= policy["candidate_min_benchmark_stability"]
-        and "benchmark_instability" not in warnings
-    ):
-        status = "candidate_signal"
-        recommended_action = "promote_to_model_review"
-        headline = "Signal looks strong enough for deeper model review."
-    elif overall_score >= policy["review_min_overall_score"] or (
-        pattern_sample_size >= policy["review_min_pattern_sample"]
-        and comparable_count >= policy["review_min_comparables"]
-    ):
-        status = "review_manually"
-        recommended_action = "review_manually"
-        headline = "Signal has some support, but still needs analyst judgment."
-    else:
-        status = "monitor_only"
-        recommended_action = "monitor_only"
-        headline = "Evidence is still thin, so this should stay in monitoring."
-
-    rationale = []
-    if pattern_sample_size > 0:
-        rationale.append(f"pattern sample size={pattern_sample_size}")
-    if comparable_count > 0:
-        rationale.append(f"comparables found={comparable_count}")
-    if top_similarity is not None:
-        rationale.append(f"top comparable similarity={top_similarity}")
-    if benchmark_name is not None:
-        rationale.append(
-            f"best benchmark={benchmark_name} (stability={benchmark_stability_score})"
-        )
-
-    next_steps = {
-        "candidate_signal": [
-            "compare against stronger benchmark or first simple model",
-            "review top comparables for face validity",
-            "track whether the signal persists on future windows",
-        ],
-        "review_manually": [
-            "inspect the ranked comparables",
-            "check whether the pattern holds across nearby buckets",
-            "wait for more history before escalating automatically",
-        ],
-        "monitor_only": [
-            "collect more historical examples for this bucket",
-            "watch for additional comparable cases",
-            "recheck after the next ingestion run",
-        ],
-    }[status]
-
-    return {
-        "status": status,
-        "recommended_action": recommended_action,
-        "headline": headline,
-        "task_type": task_type,
-        "policy_profile": {
-            "target_task": target_task,
-            "policy_name": policy["policy_name"],
-            "thresholds": {
-                "candidate_min_overall_score": policy["candidate_min_overall_score"],
-                "review_min_overall_score": policy["review_min_overall_score"],
-                "candidate_min_pattern_sample": policy["candidate_min_pattern_sample"],
-                "review_min_pattern_sample": policy["review_min_pattern_sample"],
-                "candidate_min_comparables": policy["candidate_min_comparables"],
-                "review_min_comparables": policy["review_min_comparables"],
-                "candidate_min_benchmark_stability": policy[
-                    "candidate_min_benchmark_stability"
-                ],
-            },
-        },
-        "rationale": rationale,
-        "blocking_factors": warnings,
-        "snapshot": {
-            "overall_score": overall_score,
-            "pattern_sample_size": pattern_sample_size,
-            "comparable_count": comparable_count,
-            "top_comparable_similarity_score": top_similarity,
-            "best_benchmark_name": benchmark_name,
-            "benchmark_stability_score": benchmark_stability_score,
-        },
-        "next_steps": next_steps,
-    }
-
-
-def _build_pattern_strength_component(
-    *,
-    task_type: str,
-    selected_pattern: dict[str, Any] | None,
-) -> dict[str, Any]:
-    if selected_pattern is None:
-        return {
-            "score": 0.0,
-            "sample_size": 0,
-            "signal_strength": None,
-            "signal_score": 0.0,
-            "sample_score": 0.0,
-        }
-
-    sample_size = int(selected_pattern.get("sample_size", 0))
-    signal_strength = selected_pattern.get("signal_strength")
-    sample_score = _bounded_ratio(sample_size, 8)
-    signal_score = _pattern_signal_score(
-        task_type=task_type,
-        signal_strength=signal_strength,
-        target_stddev=selected_pattern.get("target_stddev"),
-    )
-    return {
-        "score": round((sample_score * 0.6) + (signal_score * 0.4), 4),
-        "sample_size": sample_size,
-        "signal_strength": signal_strength,
-        "sample_score": sample_score,
-        "signal_score": signal_score,
-    }
-
-
-def _build_comparable_strength_component(
-    comparables: list[dict[str, Any]],
-) -> dict[str, Any]:
-    comparable_count = len(comparables)
-    similarity_scores = [
-        float(entry["similarity_score"])
-        for entry in comparables
-        if entry.get("similarity_score") is not None
-    ]
-    top_similarity_score = similarity_scores[0] if similarity_scores else None
-    average_similarity_score = _mean_or_none(similarity_scores)
-    count_score = _bounded_ratio(comparable_count, 8)
-    similarity_score = (
-        round(((top_similarity_score or 0.0) + (average_similarity_score or 0.0)) / 2, 4)
-        if similarity_scores
-        else 0.0
-    )
-    return {
-        "score": round((count_score * 0.5) + (similarity_score * 0.5), 4),
-        "comparable_count": comparable_count,
-        "top_similarity_score": top_similarity_score,
-        "average_similarity_score": average_similarity_score,
-        "count_score": count_score,
-        "similarity_score": similarity_score,
-    }
-
-
-def _build_benchmark_strength_component(
-    *,
-    benchmark_rankings: list[dict[str, Any]],
-) -> dict[str, Any]:
-    if not benchmark_rankings:
-        return {
-            "score": 0.0,
-            "baseline_name": None,
-            "primary_metric": None,
-            "validation_primary_metric": None,
-            "test_primary_metric": None,
-            "stability_gap": None,
-            "stability_score": 0.0,
-            "separation_score": 0.0,
-            "coverage_score": 0.0,
-        }
-
-    best_benchmark = benchmark_rankings[0]
-    second_benchmark = benchmark_rankings[1] if len(benchmark_rankings) > 1 else None
-    validation_primary_metric = best_benchmark.get("validation_primary_metric")
-    test_primary_metric = best_benchmark.get("test_primary_metric")
-    stability_gap = _metric_gap(validation_primary_metric, test_primary_metric)
-    stability_score = _metric_stability_score(
-        validation_primary_metric,
-        test_primary_metric,
-    )
-    separation_score = _benchmark_separation_score(best_benchmark, second_benchmark)
-    coverage_score = _bounded_ratio(best_benchmark.get("test_prediction_count", 0), 8)
-    return {
-        "score": round(
-            (stability_score * 0.4) + (separation_score * 0.35) + (coverage_score * 0.25),
-            4,
-        ),
-        "baseline_name": best_benchmark.get("baseline_name"),
-        "primary_metric": best_benchmark.get("primary_metric"),
-        "validation_primary_metric": validation_primary_metric,
-        "test_primary_metric": test_primary_metric,
-        "stability_gap": stability_gap,
-        "stability_score": stability_score,
-        "separation_score": separation_score,
-        "coverage_score": coverage_score,
-    }
-
-
-def _pattern_signal_score(
-    *,
-    task_type: str,
-    signal_strength: Any,
-    target_stddev: Any,
-) -> float:
-    if signal_strength is None:
-        return 0.0
-    if task_type == "classification":
-        return _bounded_ratio(signal_strength, 0.25)
-    if target_stddev not in (None, 0):
-        return _bounded_ratio(abs(float(signal_strength)), float(target_stddev))
-    return _bounded_ratio(abs(float(signal_strength)), 5.0)
-
-
-def _metric_gap(first_value: Any, second_value: Any) -> float | None:
-    if first_value is None or second_value is None:
-        return None
-    return round(abs(float(first_value) - float(second_value)), 4)
-
-
-def _metric_stability_score(first_value: Any, second_value: Any) -> float:
-    if first_value is None or second_value is None:
-        return 0.0
-    gap = abs(float(first_value) - float(second_value))
-    denominator = max(abs(float(first_value)), abs(float(second_value)), 1.0)
-    return round(max(0.0, 1.0 - min(gap / denominator, 1.0)), 4)
-
-
-def _benchmark_separation_score(
-    best_benchmark: dict[str, Any],
-    second_benchmark: dict[str, Any] | None,
-) -> float:
-    if second_benchmark is None:
-        return 0.5
-    best_value = best_benchmark.get("test_primary_metric")
-    second_value = second_benchmark.get("test_primary_metric")
-    if best_value is None or second_value is None:
-        return 0.0
-    gap = float(second_value) - float(best_value)
-    denominator = max(abs(float(second_value)), 1.0)
-    return round(max(0.0, min(gap / denominator, 1.0)), 4)
-
-
-def _evidence_strength_rating(score: float) -> str:
-    if score >= 0.75:
-        return "strong"
-    if score >= 0.45:
-        return "moderate"
-    return "weak"
-
-
-def _bounded_ratio(value: Any, upper_bound: float) -> float:
-    numeric_value = float(value or 0.0)
-    if upper_bound <= 0:
-        return 0.0
-    return round(max(0.0, min(numeric_value / upper_bound, 1.0)), 4)
 
 
 def build_feature_pattern_catalog(

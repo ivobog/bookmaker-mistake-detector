@@ -15,6 +15,14 @@ Use it together with:
 - [docs/manual_smoke_checklist.md](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/docs/manual_smoke_checklist.md)
 - [docs/known_issues.md](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/docs/known_issues.md)
 
+## Schema Contract
+- PostgreSQL schema ownership lives in `infra/postgres/init/`.
+- Normal API and worker execution must assume the schema already exists.
+- Runtime DDL is no longer part of request handling or worker execution.
+- `docker compose up --build` applies the init SQL only when the Postgres data directory is empty.
+- If you point the stack at an existing database or reused volume, apply the SQL in `infra/postgres/init/` before starting postgres-backed services.
+- Production backend startup now fails fast when required tables are missing, with an error that points back to `infra/postgres/init`.
+
 ## Default Regression Pass
 From the repository root, run:
 
@@ -50,6 +58,12 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_initial_production_datase
 The loader reads the team and season scope from the reference tables by default, uses the last four
 completed seasons when no explicit season filter is provided, and records one fetch-and-ingest job
 per team-season target in Postgres.
+
+Schema preflight before production-oriented validation:
+- confirm `infra/postgres/init/` matches the database you are about to use
+- if you are reusing a Docker volume or external Postgres instance, apply the SQL manually before boot
+- start the backend and verify startup succeeds before running ingestion, scoring, or bootstrap flows
+- treat a schema-readiness startup failure as an environment/setup issue, not as an application bug in the feature/model routes
 
 ## Acceptance Sequence
 Run Phase 5 in this order:
