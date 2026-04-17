@@ -40,6 +40,9 @@ class RawGameRow:
     total_line: float | None
     parse_status: ParseStatus
     warnings: list[str] = field(default_factory=list)
+    source_page_url: str | None = None
+    source_page_season_label: str | None = None
+    parser_provenance: dict[str, Any] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -90,4 +93,3 @@ class GameMetric:
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
-

@@ -137,10 +137,45 @@ class InMemoryIngestionRepository:
     ) -> list[PersistedRawRow]:
         persisted_rows: list[PersistedRawRow] = []
         for row in rows:
-            raw_row_id = len(self.raw_rows) + 1
-            self.raw_rows.append(
-                {"id": raw_row_id, "page_retrieval_id": page_retrieval_id, **row.as_dict()}
+            raw_row_key = (
+                row.provider_name,
+                row.team_code,
+                row.season_label,
+                row.source_page_url or row.source_url,
+                row.source_page_season_label or row.season_label,
+                row.source_section,
+                row.source_row_index,
             )
+            existing_row = next(
+                (
+                    entry
+                    for entry in self.raw_rows
+                    if (
+                        entry["provider_name"],
+                        entry["team_code"],
+                        entry["season_label"],
+                        entry.get("source_page_url") or entry["source_url"],
+                        entry.get("source_page_season_label") or entry["season_label"],
+                        entry["source_section"],
+                        entry["source_row_index"],
+                    )
+                    == raw_row_key
+                ),
+                None,
+            )
+            if existing_row is None:
+                raw_row_id = len(self.raw_rows) + 1
+                self.raw_rows.append(
+                    {"id": raw_row_id, "page_retrieval_id": page_retrieval_id, **row.as_dict()}
+                )
+            else:
+                raw_row_id = int(existing_row["id"])
+                existing_row.update(
+                    {
+                        "page_retrieval_id": page_retrieval_id,
+                        **row.as_dict(),
+                    }
+                )
             persisted_rows.append(PersistedRawRow(raw_row_id=raw_row_id, row=row))
         return persisted_rows
 
@@ -661,6 +696,7 @@ class InMemoryIngestionRepository:
 class PostgresIngestionRepository:
     def __init__(self, connection: Any) -> None:
         self.connection = connection
+        self._raw_row_source_identity_ready = False
 
     def create_job_run(self, *, job_name: str, requested_by: str, payload: dict[str, Any]) -> int:
         with self.connection.cursor() as cursor:
@@ -784,6 +820,7 @@ class PostgresIngestionRepository:
     ) -> list[PersistedRawRow]:
         if not rows:
             return []
+        self._ensure_raw_row_source_identity_schema()
         persisted_rows: list[PersistedRawRow] = []
         with self.connection.cursor() as cursor:
             for row in rows:
@@ -795,6 +832,8 @@ class PostgresIngestionRepository:
                         season_id,
                         page_retrieval_id,
                         source_url,
+                        source_page_url,
+                        source_page_season_label,
                         source_section,
                         source_row_index,
                         game_date,
@@ -814,11 +853,21 @@ class PostgresIngestionRepository:
                         (SELECT id FROM provider WHERE name = %s),
                         (SELECT id FROM team WHERE code = %s),
                         (SELECT id FROM season WHERE label = %s),
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s::jsonb
                     )
-                    ON CONFLICT (provider_id, team_id, season_id, source_url, source_row_index)
+                    ON CONFLICT (
+                        provider_id,
+                        team_id,
+                        season_id,
+                        source_page_url,
+                        source_page_season_label,
+                        source_section,
+                        source_row_index
+                    )
                     DO UPDATE SET
                         page_retrieval_id = EXCLUDED.page_retrieval_id,
+                        source_url = EXCLUDED.source_url,
                         source_section = EXCLUDED.source_section,
                         game_date = EXCLUDED.game_date,
                         opponent_team_code = EXCLUDED.opponent_team_code,
@@ -840,6 +889,8 @@ class PostgresIngestionRepository:
                         row.season_label,
                         page_retrieval_id,
                         row.source_url,
+                        row.source_page_url or row.source_url,
+                        row.source_page_season_label or row.season_label,
                         row.source_section,
                         row.source_row_index,
                         row.game_date,
@@ -1768,6 +1819,56 @@ class PostgresIngestionRepository:
             "issue_type_updates": issue_type_updates,
             "severity_updates": severity_updates,
         }
+
+    def _ensure_raw_row_source_identity_schema(self) -> None:
+        if self._raw_row_source_identity_ready:
+            return
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                ALTER TABLE raw_team_game_row
+                ADD COLUMN IF NOT EXISTS source_page_url TEXT
+                """
+            )
+            cursor.execute(
+                """
+                ALTER TABLE raw_team_game_row
+                ADD COLUMN IF NOT EXISTS source_page_season_label VARCHAR(32)
+                """
+            )
+            cursor.execute(
+                """
+                UPDATE raw_team_game_row rr
+                SET
+                    source_page_url = COALESCE(rr.source_page_url, rr.source_url),
+                    source_page_season_label = COALESCE(
+                        rr.source_page_season_label,
+                        s.label
+                    )
+                FROM season s
+                WHERE rr.season_id = s.id
+                  AND (
+                    rr.source_page_url IS NULL
+                    OR rr.source_page_season_label IS NULL
+                  )
+                """
+            )
+            cursor.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS ux_raw_team_game_row_source_coordinates
+                ON raw_team_game_row (
+                    provider_id,
+                    team_id,
+                    season_id,
+                    source_page_url,
+                    source_page_season_label,
+                    source_section,
+                    source_row_index
+                )
+                """
+            )
+        self.connection.commit()
+        self._raw_row_source_identity_ready = True
 
 
 def _json_dumps(payload: Any) -> str:

@@ -32,6 +32,7 @@ def run_fixture_ingestion(
         team_code=team_code,
         season_label=season_label,
         source_url=source_url,
+        source_page_url=source_url,
         requested_by=requested_by,
         html=fixture_html,
     )
@@ -58,4 +59,3 @@ def run_fixture_ingestion(
         "repository_mode": repository_mode,
         "result": asdict(result),
     }
-

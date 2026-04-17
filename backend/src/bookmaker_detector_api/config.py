@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     )
     database_url: str = "postgresql://bookmaker:bookmaker@localhost:5432/bookmaker_detector"
     raw_payload_dir: str = "artifacts/raw-pages"
+    parser_snapshot_dir: str = "artifacts/parser-output"
     the_odds_api_key: str | None = None
     the_odds_api_base_url: str = "https://api.the-odds-api.com/v4"
     the_odds_api_sport_key: str = "basketball_nba"
@@ -34,6 +35,10 @@ class Settings(BaseSettings):
     @property
     def raw_payload_path(self) -> Path:
         return Path(self.raw_payload_dir)
+
+    @property
+    def parser_snapshot_path(self) -> Path:
+        return Path(self.parser_snapshot_dir)
 
     @property
     def api_cors_origin_list(self) -> list[str]:

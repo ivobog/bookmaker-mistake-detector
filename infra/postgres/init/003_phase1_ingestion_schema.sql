@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS raw_team_game_row (
     season_id INTEGER NOT NULL REFERENCES season(id),
     page_retrieval_id BIGINT REFERENCES page_retrieval(id),
     source_url TEXT NOT NULL,
+    source_page_url TEXT NOT NULL,
+    source_page_season_label VARCHAR(32) NOT NULL,
     source_section VARCHAR(64) NOT NULL,
     source_row_index INTEGER NOT NULL,
     game_date DATE,
@@ -35,7 +37,15 @@ CREATE TABLE IF NOT EXISTS raw_team_game_row (
     parse_warning_codes_json JSONB NOT NULL DEFAULT '[]'::jsonb,
     canonicalization_status VARCHAR(32),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (provider_id, team_id, season_id, source_url, source_row_index)
+    UNIQUE (
+        provider_id,
+        team_id,
+        season_id,
+        source_page_url,
+        source_page_season_label,
+        source_section,
+        source_row_index
+    )
 );
 
 CREATE TABLE IF NOT EXISTS canonical_game (

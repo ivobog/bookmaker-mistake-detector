@@ -1778,6 +1778,9 @@ def test_ingestion_stats_endpoint_supports_scope_filters() -> None:
         "canonical.score_mismatch": 1,
     }
     assert payload["stats"]["data_quality_issue_severity_counts"] == {"warning": 2, "error": 1}
+    assert payload["stats"]["diagnostic_counts"] == {
+        "season_block_selector_match:page-fallback": 1
+    }
 
 
 def test_ingestion_stats_supports_run_label_filter() -> None:
@@ -1814,6 +1817,14 @@ def test_ingestion_stats_supports_run_label_filter() -> None:
         "canonical.single_team_perspective_only": 3
     }
     assert diagnostics["stats"]["data_quality_issue_severity_counts"] == {"warning": 3}
+    assert diagnostics["stats"]["parser_provenance_counts"] == {
+        "opponent_resolution_mode": {"direct_code": 3},
+        "ats_parse_mode": {"full": 3},
+        "ou_parse_mode": {"full": 3},
+    }
+    assert diagnostics["stats"]["diagnostic_counts"] == {
+        "season_block_selector_match:page-fallback": 1
+    }
 
 
 def test_ingestion_stats_endpoint_forwards_run_label_filter(monkeypatch) -> None:
@@ -1862,6 +1873,11 @@ def test_validation_run_comparison_builds_latest_vs_previous_delta() -> None:
             "metrics_saved": 3,
             "quality_issues_saved": 3,
             "warning_count": 3,
+            "diagnostics": ["season_block_selector_match:page-fallback"],
+            "parser_provenance_counts": {
+                "opponent_resolution_mode": {"direct_code": 3},
+                "ats_parse_mode": {"full": 3},
+            },
             "parse_status_counts": {"VALID": 3},
             "reconciliation_status_counts": {"PARTIAL_SINGLE_ROW": 3},
             "data_quality_issue_type_counts": {"canonical.single_team_perspective_only": 3},
@@ -1887,6 +1903,15 @@ def test_validation_run_comparison_builds_latest_vs_previous_delta() -> None:
             "metrics_saved": 2,
             "quality_issues_saved": 1,
             "warning_count": 1,
+            "diagnostics": [
+                "browser_fallback_requested",
+                "browser_fallback_used",
+                "season_block_selector_match:page-fallback",
+            ],
+            "parser_provenance_counts": {
+                "opponent_resolution_mode": {"alias_name": 1, "direct_code": 2},
+                "ats_parse_mode": {"full": 2, "line_only": 1},
+            },
             "parse_status_counts": {"VALID": 2, "INVALID": 1},
             "reconciliation_status_counts": {"PARTIAL_SINGLE_ROW": 2},
             "data_quality_issue_type_counts": {"parse.invalid_score_format": 1},
@@ -1929,6 +1954,14 @@ def test_validation_run_comparison_builds_latest_vs_previous_delta() -> None:
     assert comparison["latest_vs_previous"]["data_quality_issue_severity_count_deltas"] == {
         "error": 1,
         "warning": -3,
+    }
+    assert comparison["latest_vs_previous"]["parser_provenance_count_deltas"] == {
+        "opponent_resolution_mode": {"alias_name": 1, "direct_code": -1},
+        "ats_parse_mode": {"full": -1, "line_only": 1},
+    }
+    assert comparison["latest_vs_previous"]["diagnostic_count_deltas"] == {
+        "browser_fallback_requested": 1,
+        "browser_fallback_used": 1,
     }
 
 
@@ -1993,6 +2026,9 @@ def test_ingestion_trends_endpoint_returns_recent_run_rollup() -> None:
     assert overview["failed_jobs"] == 1
     assert overview["total_warning_count"] == 5
     assert overview["total_quality_issues_saved"] == 8
+    assert overview["diagnostic_counts"] == {
+        "season_block_selector_match:page-fallback": 2
+    }
     assert len(payload["trends"]["recent_runs"]) == 5
     assert payload["trends"]["recent_runs"][0]["status"] == "FAILED"
     assert payload["trends"]["recent_runs"][1]["reconciliation_status_counts"] == {
@@ -2000,6 +2036,7 @@ def test_ingestion_trends_endpoint_returns_recent_run_rollup() -> None:
     }
     assert len(payload["trends"]["daily_buckets"]) == 4
     assert sum(bucket["job_count"] for bucket in payload["trends"]["daily_buckets"]) == 5
+    assert all("diagnostic_counts" in bucket for bucket in payload["trends"]["daily_buckets"])
 
 
 def test_ingestion_trends_endpoint_supports_scope_filters() -> None:
@@ -2016,6 +2053,7 @@ def test_ingestion_trends_endpoint_supports_scope_filters() -> None:
     recent_run = payload["trends"]["recent_runs"][0]
     assert recent_run["team_code"] == "NYK"
     assert recent_run["parse_status_counts"] == {"VALID": 3}
+    assert recent_run["diagnostics"] == ["season_block_selector_match:page-fallback"]
     assert recent_run["reconciliation_status_counts"] == {
         "PARTIAL_SINGLE_ROW": 2,
         "CONFLICT_SCORE": 1,
@@ -2023,6 +2061,12 @@ def test_ingestion_trends_endpoint_supports_scope_filters() -> None:
     assert recent_run["data_quality_issue_type_counts"] == {
         "canonical.single_team_perspective_only": 2,
         "canonical.score_mismatch": 1,
+    }
+    assert payload["trends"]["overview"]["diagnostic_counts"] == {
+        "season_block_selector_match:page-fallback": 1
+    }
+    assert payload["trends"]["daily_buckets"][0]["diagnostic_counts"] == {
+        "season_block_selector_match:page-fallback": 1
     }
 
 
@@ -2093,7 +2137,23 @@ def test_ingestion_quality_trends_endpoint_returns_rollup() -> None:
     assert overview["reconciliation_conflict_spread_line_count"] == 0
     assert overview["quality_issue_warning_count"] == 5
     assert overview["quality_issue_error_count"] == 3
+    assert overview["parser_provenance_counts"] == {
+        "opponent_resolution_mode": {"direct_code": 6},
+        "ats_parse_mode": {"full": 6},
+        "ou_parse_mode": {"full": 6},
+    }
     assert len(payload["quality_trends"]["daily_buckets"]) == 4
+    assert all(
+        "parser_provenance_counts" in bucket
+        for bucket in payload["quality_trends"]["daily_buckets"]
+    )
+    assert sum(
+        bucket["parser_provenance_counts"].get("opponent_resolution_mode", {}).get(
+            "direct_code",
+            0,
+        )
+        for bucket in payload["quality_trends"]["daily_buckets"]
+    ) == 6
 
 
 def test_ingestion_quality_trends_endpoint_supports_scope_filters() -> None:
@@ -2113,7 +2173,17 @@ def test_ingestion_quality_trends_endpoint_supports_scope_filters() -> None:
     assert overview["reconciliation_conflict_score_count"] == 1
     assert overview["quality_issue_warning_count"] == 2
     assert overview["quality_issue_error_count"] == 1
+    assert overview["parser_provenance_counts"] == {
+        "opponent_resolution_mode": {"direct_code": 3},
+        "ats_parse_mode": {"full": 3},
+        "ou_parse_mode": {"full": 3},
+    }
     assert len(payload["quality_trends"]["daily_buckets"]) == 1
+    assert payload["quality_trends"]["daily_buckets"][0]["parser_provenance_counts"] == {
+        "opponent_resolution_mode": {"direct_code": 3},
+        "ats_parse_mode": {"full": 3},
+        "ou_parse_mode": {"full": 3},
+    }
 
 
 def test_recent_job_runs_endpoint_supports_started_window() -> None:

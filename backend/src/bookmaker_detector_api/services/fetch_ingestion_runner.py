@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict
 
 from bookmaker_detector_api.config import settings
-from bookmaker_detector_api.fetching import fetch_page, store_raw_payload
+from bookmaker_detector_api.fetching import store_raw_payload
 from bookmaker_detector_api.ingestion.providers import CoversHistoricalTeamPageProvider
 from bookmaker_detector_api.repositories import InMemoryIngestionRepository
 from bookmaker_detector_api.repositories.ingestion import IngestionRepository, PageRetrievalRecord
@@ -34,7 +34,7 @@ def run_fetch_and_ingest(
     else:
         repository, repository_context = build_ingestion_repository(repository_mode)
     try:
-        fetched_page = fetch_page(source_url)
+        fetched_page = provider.fetch_page(url=source_url)
         payload_storage_path = None
         if persist_payload:
             payload_storage_path = str(
@@ -53,12 +53,15 @@ def run_fetch_and_ingest(
             team_code=team_code,
             season_label=season_label,
             source_url=effective_source_url,
+            source_page_url=source_url,
             requested_by=requested_by,
             run_label=run_label,
             html=fetched_page.content,
             retrieval_status=fetched_page.status,
             retrieval_http_status=fetched_page.http_status,
             payload_storage_path=payload_storage_path,
+            persist_parser_snapshot=persist_payload,
+            parser_snapshot_root_dir=settings.parser_snapshot_path,
         )
 
         result = ingest_historical_team_page(
@@ -70,6 +73,7 @@ def run_fetch_and_ingest(
         response: dict[str, object] = {
             "repository_mode": repository_mode,
             "payload_storage_path": payload_storage_path,
+            "parser_snapshot_path": result.parser_snapshot_path,
             "fetch_http_status": fetched_page.http_status,
             "result": asdict(result),
             "status": "COMPLETED",
@@ -148,6 +152,7 @@ def _record_fetch_failure(
         "job_id": job_id,
         "page_retrieval_id": page_retrieval_id,
         "payload_storage_path": None,
+        "parser_snapshot_path": None,
         "fetch_http_status": None,
     }
 

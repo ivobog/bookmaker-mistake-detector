@@ -27,6 +27,8 @@ class PersistedIngestionRun:
     canonical_games_saved: int
     metrics_saved: int
     warnings: list[str] = field(default_factory=list)
+    diagnostics: list[str] = field(default_factory=list)
+    parser_snapshot_path: str | None = None
 
 
 @dataclass(slots=True)

@@ -52,6 +52,16 @@ def get_admin_diagnostics(
         if seed_demo:
             _seed_in_memory_demo_data(repository)
 
+        matching_job_runs = _list_all_matching_job_runs(
+            repository=repository,
+            job_status=job_status,
+            provider_name=provider_name,
+            team_code=team_code,
+            season_label=season_label,
+            run_label=run_label,
+            started_from=started_from,
+            started_to=started_to,
+        )
         job_runs = repository.list_job_runs(
             limit=job_limit,
             offset=job_offset,
@@ -175,17 +185,29 @@ def get_admin_diagnostics(
                         run_label=run_label,
                     )
                 ),
+                "parser_provenance_counts": _aggregate_parser_provenance_counts(
+                    [_build_recent_run_summary(job_run) for job_run in matching_job_runs]
+                ),
+                "diagnostic_counts": _aggregate_diagnostic_counts(
+                    [_build_recent_run_summary(job_run) for job_run in matching_job_runs]
+                ),
             },
             "trends": _build_run_trends(
                 trend_job_runs=trend_job_runs,
                 trend_daily_summaries=trend_daily_summaries,
+                all_matching_runs=[
+                    _build_recent_run_summary(job_run) for job_run in matching_job_runs
+                ],
             ),
             "validation_run_comparison": _build_validation_run_comparison(
                 validation_compare_runs,
                 run_label=run_label,
             ),
             "retrieval_trends": _build_retrieval_trends(retrieval_trend_daily_summaries),
-            "quality_trends": _build_quality_trends(quality_trend_daily_summaries),
+            "quality_trends": _build_quality_trends(
+                quality_trend_daily_summaries,
+                recent_runs=[_build_recent_run_summary(job_run) for job_run in matching_job_runs],
+            ),
         }
     finally:
         if repository_context is not None:
@@ -343,11 +365,25 @@ def _seed_canonical_conflict_demo(repository: IngestionRepository) -> None:
     _shift_latest_in_memory_run(repository, days_ago=0)
 
 
-def _build_run_trends(*, trend_job_runs, trend_daily_summaries) -> dict[str, object]:
+def _build_run_trends(
+    *,
+    trend_job_runs,
+    trend_daily_summaries,
+    all_matching_runs: list[dict[str, object]],
+) -> dict[str, object]:
     recent_runs = [_build_recent_run_summary(job_run) for job_run in trend_job_runs]
+    diagnostic_daily_buckets = _build_diagnostic_daily_buckets(all_matching_runs)
+    daily_buckets: list[dict[str, object]] = []
+    for summary in trend_daily_summaries:
+        bucket = asdict(summary)
+        bucket["diagnostic_counts"] = diagnostic_daily_buckets.get(summary.date, {})
+        daily_buckets.append(bucket)
     return {
-        "overview": _build_trend_overview(trend_daily_summaries),
-        "daily_buckets": [asdict(summary) for summary in trend_daily_summaries],
+        "overview": _build_trend_overview(
+            trend_daily_summaries,
+            all_matching_runs=all_matching_runs,
+        ),
+        "daily_buckets": daily_buckets,
         "recent_runs": recent_runs,
     }
 
@@ -394,7 +430,11 @@ def _build_retrieval_trends(trend_daily_summaries) -> dict[str, object]:
     }
 
 
-def _build_quality_trends(trend_daily_summaries) -> dict[str, object]:
+def _build_quality_trends(
+    trend_daily_summaries,
+    *,
+    recent_runs: list[dict[str, object]],
+) -> dict[str, object]:
     parse_valid_count = sum(summary.parse_valid_count for summary in trend_daily_summaries)
     parse_invalid_count = sum(summary.parse_invalid_count for summary in trend_daily_summaries)
     parse_warning_count = sum(summary.parse_warning_count for summary in trend_daily_summaries)
@@ -433,6 +473,16 @@ def _build_quality_trends(trend_daily_summaries) -> dict[str, object]:
         + reconciliation_conflict_spread_line_count
     )
     quality_issue_total = quality_issue_warning_count + quality_issue_error_count
+    parser_provenance_counts = _aggregate_parser_provenance_counts(recent_runs)
+    parser_provenance_daily_buckets = _build_parser_provenance_daily_buckets(recent_runs)
+    daily_buckets: list[dict[str, object]] = []
+    for summary in trend_daily_summaries:
+        bucket = asdict(summary)
+        bucket["parser_provenance_counts"] = parser_provenance_daily_buckets.get(
+            summary.date,
+            {},
+        )
+        daily_buckets.append(bucket)
 
     return {
         "overview": {
@@ -464,8 +514,9 @@ def _build_quality_trends(trend_daily_summaries) -> dict[str, object]:
             )
             if quality_issue_total
             else 0.0,
+            "parser_provenance_counts": parser_provenance_counts,
         },
-        "daily_buckets": [asdict(summary) for summary in trend_daily_summaries],
+        "daily_buckets": daily_buckets,
     }
 
 
@@ -488,8 +539,12 @@ def _build_recent_run_summary(job_run) -> dict[str, object]:
         "canonical_games_saved": summary.get("canonical_games_saved", 0),
         "metrics_saved": summary.get("metrics_saved", 0),
         "quality_issues_saved": summary.get("quality_issues_saved", 0),
+        "parser_snapshot_path": summary.get("parser_snapshot_path"),
         "warning_count": summary.get("warning_count", 0),
         "warnings": summary.get("warnings", []),
+        "diagnostic_count": summary.get("diagnostic_count", 0),
+        "diagnostics": summary.get("diagnostics", []),
+        "parser_provenance_counts": summary.get("parser_provenance_counts", {}),
         "parse_status_counts": summary.get("parse_status_counts", {}),
         "reconciliation_status_counts": summary.get("reconciliation_status_counts", {}),
         "data_quality_issue_type_counts": summary.get("data_quality_issue_type_counts", {}),
@@ -546,6 +601,14 @@ def _build_run_delta(
             latest_run["data_quality_issue_severity_counts"],
             previous_run["data_quality_issue_severity_counts"],
         ),
+        "parser_provenance_count_deltas": _build_nested_count_delta(
+            latest_run["parser_provenance_counts"],
+            previous_run["parser_provenance_counts"],
+        ),
+        "diagnostic_count_deltas": _build_count_delta(
+            _count_diagnostics(latest_run),
+            _count_diagnostics(previous_run),
+        ),
     }
 
 
@@ -561,7 +624,26 @@ def _build_count_delta(
     return delta
 
 
-def _build_trend_overview(trend_daily_summaries) -> dict[str, object]:
+def _build_nested_count_delta(
+    latest_counts: dict[str, dict[str, int]],
+    previous_counts: dict[str, dict[str, int]],
+) -> dict[str, dict[str, int]]:
+    delta: dict[str, dict[str, int]] = {}
+    for category in sorted(set(latest_counts) | set(previous_counts)):
+        category_delta = _build_count_delta(
+            latest_counts.get(category, {}),
+            previous_counts.get(category, {}),
+        )
+        if category_delta:
+            delta[category] = category_delta
+    return delta
+
+
+def _build_trend_overview(
+    trend_daily_summaries,
+    *,
+    all_matching_runs: list[dict[str, object]],
+) -> dict[str, object]:
     job_count = sum(summary.job_count for summary in trend_daily_summaries)
     completed_jobs = sum(summary.completed_jobs for summary in trend_daily_summaries)
     failed_jobs = sum(summary.failed_jobs for summary in trend_daily_summaries)
@@ -578,6 +660,117 @@ def _build_trend_overview(trend_daily_summaries) -> dict[str, object]:
         "avg_quality_issues_saved": round((total_quality_issues / job_count), 2)
         if job_count
         else 0.0,
+        "diagnostic_counts": _aggregate_diagnostic_counts(all_matching_runs),
+    }
+
+
+def _list_all_matching_job_runs(
+    *,
+    repository: IngestionRepository,
+    job_status: str | None,
+    provider_name: str | None,
+    team_code: str | None,
+    season_label: str | None,
+    run_label: str | None,
+    started_from: datetime | None,
+    started_to: datetime | None,
+    page_size: int = 200,
+) -> list:
+    all_job_runs = []
+    offset = 0
+    while True:
+        batch = repository.list_job_runs(
+            limit=page_size,
+            offset=offset,
+            status=job_status,
+            provider_name=provider_name,
+            team_code=team_code,
+            season_label=season_label,
+            run_label=run_label,
+            started_from=started_from,
+            started_to=started_to,
+        )
+        if not batch:
+            break
+        all_job_runs.extend(batch)
+        if len(batch) < page_size:
+            break
+        offset += page_size
+    return all_job_runs
+
+
+def _aggregate_parser_provenance_counts(
+    recent_runs: list[dict[str, object]],
+) -> dict[str, dict[str, int]]:
+    aggregate: dict[str, dict[str, int]] = {}
+    for run in recent_runs:
+        parser_provenance_counts = run.get("parser_provenance_counts", {})
+        if not isinstance(parser_provenance_counts, dict):
+            continue
+        for category, category_counts in parser_provenance_counts.items():
+            if not isinstance(category_counts, dict):
+                continue
+            bucket = aggregate.setdefault(str(category), {})
+            for mode, count in category_counts.items():
+                if str(mode) in {"unknown", "missing"}:
+                    continue
+                bucket[str(mode)] = bucket.get(str(mode), 0) + int(count)
+    return {category: counts for category, counts in aggregate.items() if counts}
+
+
+def _aggregate_diagnostic_counts(recent_runs: list[dict[str, object]]) -> dict[str, int]:
+    diagnostic_counts: dict[str, int] = {}
+    for run in recent_runs:
+        for diagnostic in run.get("diagnostics", []):
+            diagnostic_key = str(diagnostic).strip()
+            if not diagnostic_key:
+                continue
+            diagnostic_counts[diagnostic_key] = diagnostic_counts.get(diagnostic_key, 0) + 1
+    return diagnostic_counts
+
+
+def _build_diagnostic_daily_buckets(
+    recent_runs: list[dict[str, object]],
+) -> dict[str, dict[str, int]]:
+    daily_buckets: dict[str, dict[str, int]] = {}
+    for run in recent_runs:
+        bucket_date = _bucket_date_for_run(run.get("started_at"))
+        bucket = daily_buckets.setdefault(bucket_date, {})
+        for diagnostic in run.get("diagnostics", []):
+            diagnostic_key = str(diagnostic).strip()
+            if not diagnostic_key:
+                continue
+            bucket[diagnostic_key] = bucket.get(diagnostic_key, 0) + 1
+    return daily_buckets
+
+
+def _count_diagnostics(run_summary: dict[str, object]) -> dict[str, int]:
+    return _aggregate_diagnostic_counts([run_summary])
+
+
+def _build_parser_provenance_daily_buckets(
+    recent_runs: list[dict[str, object]],
+) -> dict[str, dict[str, dict[str, int]]]:
+    daily_buckets: dict[str, dict[str, dict[str, int]]] = {}
+    for run in recent_runs:
+        bucket_date = _bucket_date_for_run(run.get("started_at"))
+        parser_provenance_counts = run.get("parser_provenance_counts", {})
+        if not isinstance(parser_provenance_counts, dict):
+            continue
+        daily_bucket = daily_buckets.setdefault(bucket_date, {})
+        for category, category_counts in parser_provenance_counts.items():
+            if not isinstance(category_counts, dict):
+                continue
+            aggregate_counts = daily_bucket.setdefault(str(category), {})
+            for mode, count in category_counts.items():
+                if str(mode) in {"unknown", "missing"}:
+                    continue
+                aggregate_counts[str(mode)] = aggregate_counts.get(str(mode), 0) + int(count)
+    return {
+        bucket_date: {
+            category: counts for category, counts in category_counts.items() if counts
+        }
+        for bucket_date, category_counts in daily_buckets.items()
     }
 
 

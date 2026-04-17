@@ -1,11 +1,26 @@
 from __future__ import annotations
 
-import re
 from dataclasses import asdict, dataclass
-from datetime import date
 
+from bookmaker_detector_api.config import settings
 from bookmaker_detector_api.db.postgres import postgres_connection
-from bookmaker_detector_api.services.fetch_ingestion_runner import run_fetch_and_ingest
+from bookmaker_detector_api.fetching import store_raw_payload
+from bookmaker_detector_api.ingestion.providers import (
+    CoversHistoricalTeamPageProvider,
+    DiscoveredTeamPage,
+)
+from bookmaker_detector_api.repositories import PostgresIngestionRepository
+from bookmaker_detector_api.repositories.ingestion import PageRetrievalRecord
+from bookmaker_detector_api.services.ingestion_pipeline import (
+    HistoricalIngestionRequest,
+    ingest_historical_team_page,
+)
+from bookmaker_detector_api.team_normalization import (
+    slugify_team_name,
+    team_identity_keys,
+)
+
+DEFAULT_COVERS_NBA_TEAMS_INDEX_URL = "https://www.covers.com/sport/basketball/nba/teams"
 
 
 @dataclass(frozen=True)
@@ -13,10 +28,10 @@ class DatasetLoadTarget:
     team_code: str
     team_name: str
     team_slug: str
-    season_label: str
-    season_start_date: date
-    season_end_date: date
-    source_url: str
+    team_main_page_url: str
+    season_labels: tuple[str, ...]
+    provider_team_slug: str | None = None
+    provider_team_key: str | None = None
 
 
 def parse_csv_values(raw_value: str | None) -> list[str] | None:
@@ -28,75 +43,60 @@ def parse_csv_values(raw_value: str | None) -> list[str] | None:
 
 def run_initial_production_dataset_load(
     *,
-    source_url_template: str,
+    base_url: str = DEFAULT_COVERS_NBA_TEAMS_INDEX_URL,
     team_codes: list[str] | None = None,
     season_labels: list[str] | None = None,
     requested_by: str = "initial-production-dataset-load",
     run_label: str = "initial-production-dataset-load",
     continue_on_error: bool = True,
     persist_payload: bool = True,
+    browser_fallback: bool = False,
 ) -> dict[str, object]:
+    provider = CoversHistoricalTeamPageProvider()
+
     with postgres_connection() as connection:
         targets = build_initial_dataset_load_targets(
             connection,
-            source_url_template=source_url_template,
+            provider=provider,
+            base_url=base_url,
             team_codes=team_codes,
             season_labels=season_labels,
         )
+        repository = PostgresIngestionRepository(connection)
 
-    results: list[dict[str, object]] = []
-    stopped_early = False
+        results: list[dict[str, object]] = []
+        stopped_early = False
 
-    for target in targets:
-        response = run_fetch_and_ingest(
-            repository_mode="postgres",
-            team_code=target.team_code,
-            season_label=target.season_label,
-            source_url=target.source_url,
-            requested_by=requested_by,
-            run_label=run_label,
-            persist_payload=persist_payload,
-        )
-        results.append(
-            {
-                "team_code": target.team_code,
-                "season_label": target.season_label,
-                "source_url": target.source_url,
-                "status": str(response.get("status", "UNKNOWN")),
-                "job_id": response.get("result", {}).get("job_id")
-                if isinstance(response.get("result"), dict)
-                else response.get("job_id"),
-                "page_retrieval_id": response.get("result", {}).get("page_retrieval_id")
-                if isinstance(response.get("result"), dict)
-                else response.get("page_retrieval_id"),
-                "raw_rows_saved": response.get("result", {}).get("raw_rows_saved")
-                if isinstance(response.get("result"), dict)
-                else None,
-                "canonical_games_saved": response.get("result", {}).get("canonical_games_saved")
-                if isinstance(response.get("result"), dict)
-                else None,
-                "metrics_saved": response.get("result", {}).get("metrics_saved")
-                if isinstance(response.get("result"), dict)
-                else None,
-                "error_message": response.get("error_message"),
-                "payload_storage_path": response.get("payload_storage_path"),
-            }
-        )
-
-        if response.get("status") == "FAILED" and not continue_on_error:
-            stopped_early = True
-            break
+        for target in targets:
+            target_results, target_stopped_early = _run_target_load(
+                repository=repository,
+                provider=provider,
+                target=target,
+                requested_by=requested_by,
+                run_label=run_label,
+                continue_on_error=continue_on_error,
+                persist_payload=persist_payload,
+                browser_fallback=browser_fallback,
+            )
+            results.extend(target_results)
+            if target_stopped_early:
+                stopped_early = True
+                break
 
     failed_count = sum(1 for result in results if result["status"] == "FAILED")
     completed_count = sum(1 for result in results if result["status"] == "COMPLETED")
 
     return {
         "status": "FAILED" if failed_count else "COMPLETED",
+        "provider_name": provider.provider_name,
+        "base_url": base_url,
         "requested_by": requested_by,
         "run_label": run_label,
         "continue_on_error": continue_on_error,
         "persist_payload": persist_payload,
-        "target_count": len(targets),
+        "browser_fallback": browser_fallback,
+        "team_page_target_count": len(targets),
+        "target_count": sum(len(target.season_labels) for target in targets),
         "processed_target_count": len(results),
         "completed_target_count": completed_count,
         "failed_target_count": failed_count,
@@ -109,52 +109,247 @@ def run_initial_production_dataset_load(
 def build_initial_dataset_load_targets(
     connection,
     *,
-    source_url_template: str,
+    provider: CoversHistoricalTeamPageProvider,
+    base_url: str,
     team_codes: list[str] | None = None,
     season_labels: list[str] | None = None,
 ) -> list[DatasetLoadTarget]:
-    selected_teams = _load_team_scope(connection, team_codes=team_codes)
+    selected_teams = _load_team_scope(
+        connection,
+        provider_name=provider.provider_name,
+        team_codes=team_codes,
+    )
     selected_seasons = _load_season_scope(connection, season_labels=season_labels)
+    discovered_team_pages = provider.discover_team_pages(index_url=base_url)
+    targets = _match_discovered_team_pages(
+        selected_teams=selected_teams,
+        discovered_team_pages=discovered_team_pages,
+        season_labels=[season["label"] for season in selected_seasons],
+        provider=provider,
+    )
 
-    targets: list[DatasetLoadTarget] = []
-    for season in selected_seasons:
-        for team in selected_teams:
-            render_context = _build_render_context(
-                team_code=team["code"],
-                team_name=team["name"],
-                season_label=season["label"],
-                season_start_date=season["start_date"],
-                season_end_date=season["end_date"],
-            )
-            try:
-                rendered_source_url = source_url_template.format(**render_context)
-            except KeyError as exc:
-                missing_key = str(exc).strip("'")
-                raise ValueError(
-                    f"Unsupported source URL template placeholder: {missing_key}."
-                ) from exc
-            targets.append(
-                DatasetLoadTarget(
-                    team_code=team["code"],
-                    team_name=team["name"],
-                    team_slug=render_context["team_slug"],
-                    season_label=season["label"],
-                    season_start_date=season["start_date"],
-                    season_end_date=season["end_date"],
-                    source_url=rendered_source_url,
-                )
-            )
+    selected_team_codes = {team["code"] for team in selected_teams}
+    discovered_team_codes = {target.team_code for target in targets}
+    missing_team_codes = sorted(selected_team_codes - discovered_team_codes)
+    if missing_team_codes:
+        raise ValueError(
+            "Unable to resolve Covers team pages for team codes: "
+            f"{', '.join(missing_team_codes)}."
+        )
 
     return targets
 
 
-def _load_team_scope(connection, *, team_codes: list[str] | None) -> list[dict[str, object]]:
-    query = "SELECT code, name FROM team"
-    params: list[object] = []
+def _run_target_load(
+    *,
+    repository: PostgresIngestionRepository,
+    provider: CoversHistoricalTeamPageProvider,
+    target: DatasetLoadTarget,
+    requested_by: str,
+    run_label: str,
+    continue_on_error: bool,
+    persist_payload: bool,
+    browser_fallback: bool,
+) -> tuple[list[dict[str, object]], bool]:
+    try:
+        fetch_result = provider.fetch_team_main_page(
+            url=target.team_main_page_url,
+            requested_season_labels=target.season_labels,
+            browser_fallback=browser_fallback,
+        )
+        fetched_page = fetch_result.fetched_page
+    except Exception as exc:
+        failure_results = [
+            _record_initial_load_failure(
+                repository=repository,
+                provider_name=provider.provider_name,
+                team_code=target.team_code,
+                season_label=season_label,
+                source_url=target.team_main_page_url,
+                requested_by=requested_by,
+                run_label=run_label,
+                error_message=str(exc),
+                diagnostics=["team_page_fetch_failed"],
+            )
+            for season_label in target.season_labels
+        ]
+        return failure_results, not continue_on_error
+
+    results: list[dict[str, object]] = []
+    stopped_early = False
+
+    for season_label in target.season_labels:
+        payload_storage_path = None
+        if persist_payload:
+            payload_storage_path = str(
+                store_raw_payload(
+                    root_dir=settings.raw_payload_path,
+                    provider_name=provider.provider_name,
+                    team_code=target.team_code,
+                    season_label=season_label,
+                    source_url=target.team_main_page_url,
+                    content=fetched_page.content,
+                )
+            )
+
+        diagnostics = list(fetch_result.diagnostics)
+        if season_label in fetch_result.missing_season_labels:
+            diagnostics.append("browser_fallback_season_still_missing")
+
+        try:
+            result = ingest_historical_team_page(
+                request=HistoricalIngestionRequest(
+                    provider_name=provider.provider_name,
+                    team_code=target.team_code,
+                    season_label=season_label,
+                    source_url=target.team_main_page_url,
+                    source_page_url=target.team_main_page_url,
+                    requested_by=requested_by,
+                    run_label=run_label,
+                    html=fetched_page.content,
+                    retrieval_status=fetched_page.status,
+                    retrieval_http_status=fetched_page.http_status,
+                    payload_storage_path=payload_storage_path,
+                    diagnostics=diagnostics,
+                    persist_parser_snapshot=persist_payload,
+                    parser_snapshot_root_dir=settings.parser_snapshot_path,
+                ),
+                provider=provider,
+                repository=repository,
+            )
+            results.append(
+                {
+                    "team_code": target.team_code,
+                    "team_name": target.team_name,
+                    "season_label": season_label,
+                    "source_url": target.team_main_page_url,
+                    "status": "COMPLETED",
+                    "job_id": result.job_id,
+                    "page_retrieval_id": result.page_retrieval_id,
+                    "raw_rows_saved": result.raw_rows_saved,
+                    "canonical_games_saved": result.canonical_games_saved,
+                    "metrics_saved": result.metrics_saved,
+                    "error_message": None,
+                    "payload_storage_path": payload_storage_path,
+                    "parser_snapshot_path": result.parser_snapshot_path,
+                    "diagnostics": result.diagnostics,
+                }
+            )
+        except Exception as exc:
+            results.append(
+                _record_initial_load_failure(
+                    repository=repository,
+                    provider_name=provider.provider_name,
+                    team_code=target.team_code,
+                    season_label=season_label,
+                    source_url=target.team_main_page_url,
+                    requested_by=requested_by,
+                    run_label=run_label,
+                    error_message=str(exc),
+                    payload_storage_path=payload_storage_path,
+                    diagnostics=diagnostics,
+                )
+            )
+            if not continue_on_error:
+                stopped_early = True
+                break
+
+    return results, stopped_early
+
+
+def _record_initial_load_failure(
+    *,
+    repository: PostgresIngestionRepository,
+    provider_name: str,
+    team_code: str,
+    season_label: str,
+    source_url: str,
+    requested_by: str,
+    run_label: str | None,
+    error_message: str,
+    payload_storage_path: str | None = None,
+    diagnostics: list[str] | None = None,
+) -> dict[str, object]:
+    job_id = repository.create_job_run(
+        job_name="historical_team_page_fetch",
+        requested_by=requested_by,
+        payload={
+            "provider": provider_name,
+            "team_code": team_code,
+            "season_label": season_label,
+            "source_url": source_url,
+            "run_label": run_label,
+        },
+    )
+    page_retrieval_id = repository.create_page_retrieval(
+        job_id=job_id,
+        record=PageRetrievalRecord(
+            provider_name=provider_name,
+            team_code=team_code,
+            season_label=season_label,
+            source_url=source_url,
+            status="FAILED",
+            http_status=None,
+            error_message=error_message,
+            payload_storage_path=payload_storage_path,
+        ),
+    )
+    repository.complete_job_run(
+        job_id=job_id,
+        summary={
+            "raw_rows_saved": 0,
+            "canonical_games_saved": 0,
+            "metrics_saved": 0,
+            "error_message": error_message,
+            "diagnostic_count": len(diagnostics or []),
+            "diagnostics": diagnostics or [],
+        },
+        status="FAILED",
+    )
+    return {
+        "team_code": team_code,
+        "season_label": season_label,
+        "source_url": source_url,
+        "status": "FAILED",
+        "job_id": job_id,
+        "page_retrieval_id": page_retrieval_id,
+        "raw_rows_saved": None,
+        "canonical_games_saved": None,
+        "metrics_saved": None,
+        "error_message": error_message,
+        "payload_storage_path": payload_storage_path,
+        "parser_snapshot_path": None,
+        "diagnostics": diagnostics or [],
+    }
+
+
+def _load_team_scope(
+    connection,
+    *,
+    provider_name: str,
+    team_codes: list[str] | None,
+) -> list[dict[str, object]]:
+    query = """
+        SELECT
+            t.code,
+            t.name,
+            tpm.provider_team_key,
+            tpm.provider_team_slug
+        FROM team t
+        LEFT JOIN team_provider_mapping tpm
+            ON tpm.team_id = t.id
+           AND tpm.active = TRUE
+           AND tpm.provider_id = (
+                SELECT id
+                FROM provider
+                WHERE name = %s
+            )
+    """
+    params: list[object] = [provider_name]
     if team_codes is not None:
-        query += " WHERE code = ANY(%s)"
+        query += " WHERE t.code = ANY(%s)"
         params.append(team_codes)
-    query += " ORDER BY code"
+    query += " ORDER BY t.code"
 
     with connection.cursor() as cursor:
         cursor.execute(query, params)
@@ -163,7 +358,16 @@ def _load_team_scope(connection, *, team_codes: list[str] | None) -> list[dict[s
     if not rows:
         raise ValueError("No teams matched the requested initial dataset scope.")
 
-    return [{"code": row[0], "name": row[1]} for row in rows]
+    return [
+        {
+            "code": row[0],
+            "name": row[1],
+            "team_slug": slugify_team_name(row[1]),
+            "provider_team_key": row[2],
+            "provider_team_slug": row[3],
+        }
+        for row in rows
+    ]
 
 
 def _load_season_scope(
@@ -198,28 +402,78 @@ def _load_season_scope(
     ]
 
 
-def _build_render_context(
+def _match_discovered_team_pages(
     *,
-    team_code: str,
-    team_name: str,
-    season_label: str,
-    season_start_date: date,
-    season_end_date: date,
-) -> dict[str, str]:
-    season_start_year, season_end_year = season_label.split("-", maxsplit=1)
-    return {
-        "team_code": team_code,
-        "team_code_lower": team_code.lower(),
-        "team_name": team_name,
-        "team_slug": _slugify(team_name),
-        "season_label": season_label,
-        "season_start_year": season_start_year,
-        "season_end_year": season_end_year,
-        "season_start_date": season_start_date.isoformat(),
-        "season_end_date": season_end_date.isoformat(),
-    }
+    selected_teams: list[dict[str, object]],
+    discovered_team_pages: list[DiscoveredTeamPage],
+    season_labels: list[str],
+    provider: CoversHistoricalTeamPageProvider,
+) -> list[DatasetLoadTarget]:
+    selected_team_lookup = {team["code"]: team for team in selected_teams}
+    matched_team_codes: set[str] = set()
+    targets: list[DatasetLoadTarget] = []
+
+    for discovered_team_page in discovered_team_pages:
+        matched_team = _match_team(discovered_team_page=discovered_team_page, teams=selected_teams)
+        if matched_team is None:
+            continue
+        team_code = str(matched_team["code"])
+        if team_code in matched_team_codes:
+            continue
+        matched_team_codes.add(team_code)
+        canonical_team = selected_team_lookup[team_code]
+        targets.append(
+            DatasetLoadTarget(
+                team_code=team_code,
+                team_name=str(canonical_team["name"]),
+                team_slug=str(canonical_team["team_slug"]),
+                team_main_page_url=provider.resolve_team_main_page_url(
+                    team_page=discovered_team_page
+                ),
+                season_labels=tuple(season_labels),
+                provider_team_slug=_string_or_none(canonical_team.get("provider_team_slug")),
+                provider_team_key=_string_or_none(canonical_team.get("provider_team_key")),
+            )
+        )
+
+    return targets
 
 
-def _slugify(value: str) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
-    return re.sub(r"-{2,}", "-", slug)
+def _match_team(
+    *,
+    discovered_team_page: DiscoveredTeamPage,
+    teams: list[dict[str, object]],
+) -> dict[str, object] | None:
+    discovered_keys = team_identity_keys(
+        discovered_team_page.team_name,
+        discovered_team_page.team_slug,
+    )
+    matches = [
+        team for team in teams if discovered_keys & _team_record_identity_keys(team)
+    ]
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        raise ValueError(
+            "Ambiguous team identity match for discovered Covers page "
+            f"{discovered_team_page.team_main_page_url}."
+        )
+
+    return None
+
+
+def _string_or_none(value: object) -> str | None:
+    if value is None:
+        return None
+    string_value = str(value).strip()
+    return string_value or None
+
+
+def _team_record_identity_keys(team: dict[str, object]) -> set[str]:
+    return team_identity_keys(
+        str(team["name"]),
+        _string_or_none(team.get("team_slug")),
+        _string_or_none(team.get("provider_team_key")),
+        _string_or_none(team.get("provider_team_slug")),
+        team_code=str(team["code"]),
+    )

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -18,6 +19,23 @@ def store_raw_payload(
     target_dir.mkdir(parents=True, exist_ok=True)
     target_path = target_dir / f"{provider_name}_{safe_source}.html"
     target_path.write_text(content, encoding="utf-8")
+    return target_path
+
+
+def store_parser_snapshot(
+    *,
+    root_dir: Path,
+    provider_name: str,
+    team_code: str,
+    season_label: str,
+    source_url: str,
+    payload: dict[str, object],
+) -> Path:
+    safe_source = _sanitize_filename(source_url)
+    target_dir = root_dir / season_label / team_code
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target_path = target_dir / f"{provider_name}_{safe_source}.json"
+    target_path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
     return target_path
 
 
