@@ -36,10 +36,12 @@ from bookmaker_detector_api.repositories.ingestion_types import (
     DailyJobRunSummary,
     DailyPageRetrievalSummary,
     DataQualityIssueRecord,
+    IngestionRepository,
     JobRunRecord,
     PageRetrievalRecord,
     PageRetrievalSnapshot,
     PersistedCanonicalGame,
+    PersistedIngestionRun,
     PersistedRawRow,
 )
 
