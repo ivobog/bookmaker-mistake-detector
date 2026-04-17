@@ -221,6 +221,7 @@ Exit criteria:
 
 ### Phase 5: Release Candidate
 Duration: 1 week
+Status: In progress
 
 Objectives:
 - stabilize the MVP for internal use
@@ -237,6 +238,11 @@ Deliverables:
 - MVP release candidate
 - known issues list
 - operating checklist
+
+Current slice notes:
+- Phase 5 has started with a runnable regression script
+- release-candidate runbook documentation is now present
+- known-issues tracking is now explicitly seeded in the repo
 
 Exit criteria:
 - MVP acceptance checklist passes
@@ -397,19 +403,19 @@ Mitigation:
 - Phase 4: Backtesting, UX, and Operations Hardening
 
 ### Active recommendation
-- begin Phase 5: Release Candidate
+- continue Phase 5: Release Candidate
 
 ### Phase 5 current focus
-- run a full regression pass across ingestion, scoring, backtesting, and UI workflows
+- use the new regression script as the default release-candidate validation path
 - tighten documentation, runbooks, and known-issues handling for internal MVP use
 - harden operational edges around cadence orchestration, retries, and alerting
 
 ## 11. Immediate Next Steps
-1. Run a full regression pass across Docker, backend APIs, worker flows, and the frontend analyst workspace.
-2. Add release-oriented documentation and runbooks for local setup, external source configuration, and operational cadence.
-3. Harden retries, audit logging, and failure handling around ingestion, market-board refresh, and scoring cadence flows.
-4. Review acceptance criteria from the SRS against the delivered MVP surfaces and capture any remaining gaps.
-5. Produce a known-issues and internal rollout checklist for the release candidate.
+1. Expand the Phase 5 regression pass from code checks into a documented Docker/manual smoke checklist.
+2. Harden retries, audit logging, and failure handling around ingestion, market-board refresh, and scoring cadence flows.
+3. Review acceptance criteria from the SRS against the delivered MVP surfaces and capture any remaining gaps.
+4. Produce a fuller internal rollout checklist on top of the new known-issues tracker and runbook.
+5. Run the first end-to-end release-candidate validation pass and record findings.
 
 ## 12. Recommendation
 The best execution approach is to treat the product as a data-quality-first analytics system, not a model-first betting app. If Phase 1 is weak, everything downstream becomes misleading; if Phase 1 is strong, the rest of the roadmap becomes much safer and faster.

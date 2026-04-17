@@ -1,6 +1,6 @@
 # Bookmaker Mistake Detector
 
-Phase 0, Phase 1, and Phase 2 are complete. Phase 3 is complete for the backend MVP predictive workflow, and Phase 4 is complete for the MVP backtesting and analyst review layer.
+Phase 0, Phase 1, and Phase 2 are complete. Phase 3 is complete for the backend MVP predictive workflow, Phase 4 is complete for the MVP backtesting and analyst review layer, and Phase 5 has started with release-candidate regression and runbook hardening.
 
 ## Stack
 - `backend/`: FastAPI API service
@@ -14,12 +14,14 @@ Phase 0, Phase 1, and Phase 2 are complete. Phase 3 is complete for the backend 
 2. Run `docker compose up --build`.
 3. Open the frontend at `http://localhost:5173`.
 4. Check the API health route at `http://localhost:8000/api/v1/health`.
-5. Inspect the fixture-backed Phase 1 demo at `http://localhost:8000/api/v1/admin/phase-1-demo`.
-6. Inspect the fixture-backed persistence flow at `http://localhost:8000/api/v1/admin/phase-1-persistence-demo`.
-7. Inspect the worker-shaped ingestion flow at `http://localhost:8000/api/v1/admin/phase-1-worker-demo`.
-8. Inspect the fetch-and-ingest flow at `http://localhost:8000/api/v1/admin/phase-1-fetch-demo`.
-9. Inspect the failed-fetch diagnostics flow at `http://localhost:8000/api/v1/admin/phase-1-fetch-failure-demo`.
-10. Inspect fetch-backed reporting in one shot at `http://localhost:8000/api/v1/admin/phase-1-fetch-reporting-demo?repository_mode=in_memory`.
+5. Run the Phase 5 regression pass from the repo root with `powershell -ExecutionPolicy Bypass -File .\scripts\run_phase5_regression.ps1`.
+6. Run the initial historical production dataset bootstrap with `powershell -ExecutionPolicy Bypass -File .\scripts\run_initial_production_dataset_load.ps1 -SourceUrlTemplate "<provider-template>"` once you have a real team-season source template.
+7. Inspect the fixture-backed Phase 1 demo at `http://localhost:8000/api/v1/admin/phase-1-demo`.
+8. Inspect the fixture-backed persistence flow at `http://localhost:8000/api/v1/admin/phase-1-persistence-demo`.
+9. Inspect the worker-shaped ingestion flow at `http://localhost:8000/api/v1/admin/phase-1-worker-demo`.
+10. Inspect the fetch-and-ingest flow at `http://localhost:8000/api/v1/admin/phase-1-fetch-demo`.
+11. Inspect the failed-fetch diagnostics flow at `http://localhost:8000/api/v1/admin/phase-1-fetch-failure-demo`.
+12. Inspect fetch-backed reporting in one shot at `http://localhost:8000/api/v1/admin/phase-1-fetch-reporting-demo?repository_mode=in_memory`.
 Use `run_label=phase-1-fetch-reporting-demo` on recent-job and trend endpoints to isolate those validation runs from normal worker traffic.
 The same `run_label` filter now works on ingestion stats and data-quality issue views too.
 Compare the latest labeled validation runs at `http://localhost:8000/api/v1/admin/validation-runs/compare?repository_mode=in_memory&seed_demo=false&run_label=phase-1-fetch-reporting-demo`.
@@ -109,6 +111,7 @@ Phase 1 is complete for the backend MVP data spine.
 Phase 2 is complete for the backend analytical core.
 Phase 3 is complete for the backend MVP predictive workflow.
 Phase 4 is complete for the MVP backtesting, analyst review, and provenance UX layer.
+Phase 5 is in progress, starting with release-candidate regression, runbook, and known-issues tooling.
 
 ## Phase 2 Outcome
 The repo now includes:
@@ -166,6 +169,15 @@ The repo now includes:
 - a linkable hash-route flow that connects backtests, opportunities, comparable cases, and provenance artifacts without adding a heavy routing dependency
 - Phase 4 verification backed by passing frontend typecheck, lint, and production build checks
 
+## Phase 5 Progress
+The repo now includes the first release-candidate slice:
+- a root regression script at [scripts/run_phase5_regression.ps1](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/scripts/run_phase5_regression.ps1) that runs backend checks, backend tests, compile checks, and frontend validation in one pass
+- an initial production historical dataset bootstrap script at [scripts/run_initial_production_dataset_load.ps1](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/scripts/run_initial_production_dataset_load.ps1) backed by a bulk team/season loader and worker mode
+- a release runbook at [docs/release_candidate_runbook.md](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/docs/release_candidate_runbook.md) for regression and manual smoke validation
+- a known-issues tracker at [docs/known_issues.md](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/docs/known_issues.md) for internal MVP rollout readiness
+- a release acceptance matrix at [docs/release_acceptance_checklist.md](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/docs/release_acceptance_checklist.md) mapped back to the SRS
+- a manual smoke worksheet at [docs/manual_smoke_checklist.md](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/docs/manual_smoke_checklist.md) with explicit pass/fail capture for the release flow
+
 ## Phase 1 Outcome
 The repo now includes:
 - a provider abstraction and a fixture-backed `covers` historical-team-page parser
@@ -198,4 +210,4 @@ The repo now includes:
 - a worker entry point that can execute the same fixture-backed ingestion flow in `in_memory` or `postgres` mode
 
 ## Next Phase
-Start Phase 5 by treating the current stack as an MVP release candidate: run a full regression pass, harden documentation and runbooks, and close the remaining operational gaps before internal use.
+Continue Phase 5 by expanding from the new regression/runbook foundation into a full release-candidate checklist, manual smoke validation, and final operational hardening before internal use.
