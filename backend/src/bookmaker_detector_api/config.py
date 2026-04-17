@@ -7,6 +7,12 @@ class Settings(BaseSettings):
     api_env: str = "development"
     api_host: str = "0.0.0.0"
     api_port: int = 8000
+    api_cors_origins: str = (
+        "http://localhost:5173,"
+        "http://127.0.0.1:5173,"
+        "http://localhost:4173,"
+        "http://127.0.0.1:4173"
+    )
     database_url: str = "postgresql://bookmaker:bookmaker@localhost:5432/bookmaker_detector"
     raw_payload_dir: str = "artifacts/raw-pages"
     the_odds_api_key: str | None = None
@@ -28,6 +34,14 @@ class Settings(BaseSettings):
     @property
     def raw_payload_path(self) -> Path:
         return Path(self.raw_payload_dir)
+
+    @property
+    def api_cors_origin_list(self) -> list[str]:
+        return [
+            origin.strip()
+            for origin in self.api_cors_origins.split(",")
+            if origin.strip()
+        ]
 
 
 settings = Settings()

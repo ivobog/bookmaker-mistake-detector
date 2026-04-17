@@ -25,6 +25,7 @@ services:
       API_ENV: ${API_ENV}
       API_HOST: ${API_HOST}
       API_PORT: ${API_PORT}
+      API_CORS_ORIGINS: ${API_CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173}
       DATABASE_URL: ${DATABASE_URL}
       RAW_PAYLOAD_DIR: ${RAW_PAYLOAD_DIR}
       THE_ODDS_API_KEY: ${THE_ODDS_API_KEY:-}
