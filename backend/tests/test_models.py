@@ -26,6 +26,7 @@ from bookmaker_detector_api.services.models import (
     get_model_market_board_source_run_history_in_memory,
     get_model_opportunity_detail_in_memory,
     get_model_opportunity_history_in_memory,
+    get_model_opportunity_queue_in_memory,
     get_model_scoring_history_in_memory,
     get_model_scoring_preview_in_memory,
     get_model_scoring_run_detail_in_memory,
@@ -447,6 +448,12 @@ def test_materialize_model_opportunities_in_memory_persists_reviewable_signal() 
     )
     assert len(stored) == 1
     assert stored[0].status == "review_manually"
+    assert stored[0].materialization_scope_source == "game_scoped"
+    assert stored[0].materialization_scope_team_code == "LAL"
+    assert stored[0].materialization_scope_season_label == "2024-2025"
+    assert stored[0].materialization_scope_canonical_game_id == 3
+    assert stored[0].materialization_batch_id
+    assert stored[0].materialized_at is not None
 
 
 def test_materialize_model_opportunities_in_memory_emits_structured_workflow_logs(
@@ -707,6 +714,7 @@ def test_materialize_model_future_opportunities_in_memory_persists_future_review
     assert stored[0].scenario_key == "2025-2026:2026-04-20:LAL:BOS"
     assert stored[0].model_scoring_run_id == materialized["scoring_run"]["id"]
     assert stored[0].canonical_game_id is None
+    assert stored[0].materialization_scope_source == "worker"
 
 
 def test_get_model_future_slate_preview_in_memory_returns_batch_summary() -> None:
@@ -1871,6 +1879,153 @@ def test_get_model_opportunity_history_in_memory_returns_rollup() -> None:
     assert detail is not None
     assert detail["id"] == 1
     assert detail["payload"]["prediction"]["team_code"] == "LAL"
+
+
+def test_model_opportunity_queue_in_memory_prefers_latest_relevant_batch() -> None:
+    repository, _, _ = seed_phase_two_feature_in_memory()
+    team_batch_id = "batch-team-lal"
+    operator_batch_id = "batch-operator-global"
+    team_materialized_at = datetime(2026, 4, 18, 0, 5, tzinfo=timezone.utc)
+    operator_materialized_at = datetime(2026, 4, 18, 0, 10, tzinfo=timezone.utc)
+    repository.model_opportunities.extend(
+        [
+            {
+                "id": 1,
+                "model_scoring_run_id": 11,
+                "model_selection_snapshot_id": 12,
+                "model_evaluation_snapshot_id": 13,
+                "feature_version_id": 1,
+                "target_task": "spread_error_regression",
+                "source_kind": "historical_game",
+                "scenario_key": None,
+                "opportunity_key": "opp-team-lal",
+                "team_code": "LAL",
+                "opponent_code": "BOS",
+                "season_label": "2024-2025",
+                "canonical_game_id": 3,
+                "game_date": date(2025, 1, 1),
+                "policy_name": "spread_edge_policy_v1",
+                "status": "review_manually",
+                "prediction_value": -1.0352,
+                "signal_strength": 1.0352,
+                "evidence_rating": "medium",
+                "recommendation_status": "lean",
+                "materialization_batch_id": team_batch_id,
+                "materialized_at": team_materialized_at,
+                "materialization_scope_team_code": "LAL",
+                "materialization_scope_season_label": "2024-2025",
+                "materialization_scope_canonical_game_id": 3,
+                "materialization_scope_source": "game_scoped",
+                "materialization_scope_key": "team=LAL|season=2024-2025|game=3",
+                "payload": {},
+                "created_at": team_materialized_at,
+                "updated_at": team_materialized_at,
+            },
+            {
+                "id": 2,
+                "model_scoring_run_id": 21,
+                "model_selection_snapshot_id": 22,
+                "model_evaluation_snapshot_id": 23,
+                "feature_version_id": 1,
+                "target_task": "spread_error_regression",
+                "source_kind": "historical_game",
+                "scenario_key": None,
+                "opportunity_key": "opp-operator-lal",
+                "team_code": "LAL",
+                "opponent_code": "BOS",
+                "season_label": "2024-2025",
+                "canonical_game_id": 3,
+                "game_date": date(2025, 1, 1),
+                "policy_name": "spread_edge_policy_v1",
+                "status": "review_manually",
+                "prediction_value": -1.0352,
+                "signal_strength": 1.0352,
+                "evidence_rating": "medium",
+                "recommendation_status": "lean",
+                "materialization_batch_id": operator_batch_id,
+                "materialized_at": operator_materialized_at,
+                "materialization_scope_team_code": None,
+                "materialization_scope_season_label": None,
+                "materialization_scope_canonical_game_id": None,
+                "materialization_scope_source": "operator",
+                "materialization_scope_key": "operator-wide",
+                "payload": {},
+                "created_at": operator_materialized_at,
+                "updated_at": operator_materialized_at,
+            },
+            {
+                "id": 3,
+                "model_scoring_run_id": 22,
+                "model_selection_snapshot_id": 22,
+                "model_evaluation_snapshot_id": 23,
+                "feature_version_id": 1,
+                "target_task": "spread_error_regression",
+                "source_kind": "historical_game",
+                "scenario_key": None,
+                "opportunity_key": "opp-operator-nyk",
+                "team_code": "NYK",
+                "opponent_code": "MIA",
+                "season_label": "2024-2025",
+                "canonical_game_id": 4,
+                "game_date": date(2025, 1, 2),
+                "policy_name": "spread_edge_policy_v1",
+                "status": "candidate_signal",
+                "prediction_value": -1.0352,
+                "signal_strength": 1.0352,
+                "evidence_rating": "medium",
+                "recommendation_status": "lean",
+                "materialization_batch_id": operator_batch_id,
+                "materialized_at": operator_materialized_at,
+                "materialization_scope_team_code": None,
+                "materialization_scope_season_label": None,
+                "materialization_scope_canonical_game_id": None,
+                "materialization_scope_source": "operator",
+                "materialization_scope_key": "operator-wide",
+                "payload": {},
+                "created_at": operator_materialized_at,
+                "updated_at": operator_materialized_at,
+            },
+        ]
+    )
+
+    full_history = list_model_opportunities_in_memory(
+        repository,
+        target_task="spread_error_regression",
+    )
+    assert {
+        entry.materialization_batch_id for entry in full_history
+    } >= {
+        team_batch_id,
+        operator_batch_id,
+    }
+
+    operator_queue = get_model_opportunity_queue_in_memory(
+        repository,
+        target_task="spread_error_regression",
+    )
+    assert operator_queue["queue_batch_id"] == operator_batch_id
+    assert operator_queue["queue_scope"]["source"] == "operator"
+    assert operator_queue["queue_scope_is_scoped"] is False
+    assert operator_queue["opportunities"]
+    assert all(
+        entry.materialization_batch_id == operator_batch_id
+        for entry in operator_queue["opportunities"]
+    )
+
+    team_queue = get_model_opportunity_queue_in_memory(
+        repository,
+        target_task="spread_error_regression",
+        team_code="LAL",
+        season_label="2024-2025",
+    )
+    assert team_queue["queue_batch_id"] == team_batch_id
+    assert team_queue["queue_scope"]["source"] == "game_scoped"
+    assert team_queue["queue_scope_is_scoped"] is True
+    assert team_queue["opportunities"]
+    assert all(
+        entry.materialization_batch_id == team_batch_id
+        for entry in team_queue["opportunities"]
+    )
 
 
 def test_train_phase_three_models_rejects_unsupported_targets() -> None:

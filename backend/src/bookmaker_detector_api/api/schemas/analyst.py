@@ -86,6 +86,10 @@ class AnalystOpportunity(BaseModel):
     signal_strength: float
     evidence_rating: str | None = None
     recommendation_status: str | None = None
+    materialization_batch_id: str
+    materialized_at: str | None = None
+    materialization_scope: dict[str, Any] = Field(default_factory=dict)
+    model_explainability: dict[str, Any] | None = None
     payload: dict[str, Any] = Field(default_factory=dict)
     created_at: str | None = None
     updated_at: str | None = None
@@ -95,6 +99,11 @@ class AnalystOpportunityListResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
     repository_mode: RepositoryMode
+    queue_batch_id: str | None = None
+    queue_materialized_at: str | None = None
+    queue_scope: dict[str, Any] = Field(default_factory=dict)
+    queue_scope_label: str | None = None
+    queue_scope_is_scoped: bool = False
     opportunity_count: int
     opportunities: list[AnalystOpportunity]
 

@@ -1,7 +1,11 @@
 import type { ReactNode } from "react";
 
 import { StatTile } from "./appSharedComponents";
-import type { OpportunityHistoryResponse, OpportunityRecord } from "./appTypes";
+import type {
+  OpportunityHistoryResponse,
+  OpportunityListResponse,
+  OpportunityRecord
+} from "./appTypes";
 import { formatCompactNumber, formatLabel, formatTimestamp } from "./appUtils";
 
 function OpportunityListItem({
@@ -55,6 +59,7 @@ function OpportunityListItem({
 
 export function OpportunitiesWorkspace({
   opportunityHistory,
+  opportunityList,
   opportunities,
   activeOpportunityId,
   showQueueDetail,
@@ -62,6 +67,7 @@ export function OpportunitiesWorkspace({
   onSelectOpportunity
 }: {
   opportunityHistory: OpportunityHistoryResponse;
+  opportunityList: OpportunityListResponse;
   opportunities: OpportunityRecord[];
   activeOpportunityId: number | null;
   showQueueDetail: boolean;
@@ -69,6 +75,13 @@ export function OpportunitiesWorkspace({
   onSelectOpportunity: (opportunityId: number) => void;
 }) {
   const opportunityOverview = opportunityHistory.model_opportunity_history.overview;
+  const queueScope = opportunityList.queue_scope;
+  const queueScopeLabel =
+    opportunityList.queue_scope_label ??
+    (opportunityList.queue_scope_is_scoped ? "Scoped queue" : "Operator-wide queue");
+  const queueNote = opportunityList.queue_scope_is_scoped
+    ? "This queue was materialized from a scoped run and may not represent the global analyst queue."
+    : "Queue scope: operator-wide.";
 
   return (
     <>
@@ -97,6 +110,9 @@ export function OpportunitiesWorkspace({
                 <h2>Analyst queue</h2>
               </div>
               <div className="pill-row">
+                <span className={`pill${opportunityList.queue_scope_is_scoped ? " pill-warning" : ""}`}>
+                  {opportunityList.queue_scope_is_scoped ? "Scoped" : "Global"}
+                </span>
                 <span className="pill">
                   Historical {String(opportunityOverview.source_kind_counts.historical_game ?? 0)}
                 </span>
@@ -104,6 +120,46 @@ export function OpportunitiesWorkspace({
                   Future {String(opportunityOverview.source_kind_counts.future_scenario ?? 0)}
                 </span>
               </div>
+            </div>
+
+            <div
+              className={`sub-panel queue-scope-panel${
+                opportunityList.queue_scope_is_scoped ? " queue-scope-panel-warning" : ""
+              }`}
+            >
+              <div className="section-heading compact-heading">
+                <div>
+                  <p className="sub-panel-title">Queue scope</p>
+                  <p className="sub-panel-stat">{queueScopeLabel}</p>
+                </div>
+                <div className="pill-row">
+                  {opportunityList.queue_batch_id ? (
+                    <span className="pill">Batch {opportunityList.queue_batch_id.slice(0, 8)}</span>
+                  ) : null}
+                  {opportunityList.queue_materialized_at ? (
+                    <span className="pill">
+                      {formatTimestamp(opportunityList.queue_materialized_at)}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+              <p className="sub-panel-meta">{queueNote}</p>
+              {opportunityList.queue_scope_is_scoped ? (
+                <div className="detail-list compact-list">
+                  <div className="detail-list-item">
+                    <span>Team scope</span>
+                    <strong>{queueScope.team_code ?? "n/a"}</strong>
+                  </div>
+                  <div className="detail-list-item">
+                    <span>Season scope</span>
+                    <strong>{queueScope.season_label ?? "n/a"}</strong>
+                  </div>
+                  <div className="detail-list-item">
+                    <span>Scope source</span>
+                    <strong>{formatLabel(queueScope.source)}</strong>
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             <div className="list-stack">

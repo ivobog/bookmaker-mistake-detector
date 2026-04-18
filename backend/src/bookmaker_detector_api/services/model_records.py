@@ -209,6 +209,13 @@ class ModelOpportunityRecord:
     signal_strength: float
     evidence_rating: str | None
     recommendation_status: str | None
+    materialization_batch_id: str
+    materialized_at: datetime
+    materialization_scope_team_code: str | None
+    materialization_scope_season_label: str | None
+    materialization_scope_canonical_game_id: int | None
+    materialization_scope_source: str
+    materialization_scope_key: str
     payload: dict[str, Any]
     created_at: datetime | None = None
     updated_at: datetime | None = None

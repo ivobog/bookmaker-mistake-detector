@@ -1,6 +1,6 @@
 import { ProvenanceInspector, ProvenanceRibbon, StatTile } from "./appSharedComponents";
 import type { OpportunityRecord, ProvenanceInspectorData, ProvenanceItem } from "./appTypes";
-import { asArray, asRecord, formatCompactNumber, formatLabel, readNested } from "./appUtils";
+import { asArray, asRecord, formatCompactNumber, formatLabel, formatTimestamp, readNested } from "./appUtils";
 
 export function OpportunityDetailCard({
   opportunity,
@@ -54,6 +54,9 @@ export function OpportunityDetailCard({
   const activeSelection = asRecord(readNested(opportunity.payload, "active_selection"));
   const activeEvaluationSnapshot = asRecord(readNested(opportunity.payload, "active_evaluation_snapshot"));
   const scenario = asRecord(readNested(opportunity.payload, "scenario"));
+  const materializationScope = opportunity.materialization_scope;
+  const explainability = opportunity.model_explainability;
+  const showTreeStumpExplainability = explainability?.model_family === "tree_stump";
 
   return (
     <article className="panel focus-panel">
@@ -144,6 +147,14 @@ export function OpportunityDetailCard({
         <div className="detail-list-item">
           <span>Scenario key</span>
           <strong>{opportunity.scenario_key ?? "historical_game"}</strong>
+        </div>
+        <div className="detail-list-item">
+          <span>Queue scope</span>
+          <strong>{materializationScope.scope_key ?? materializationScope.source ?? "n/a"}</strong>
+        </div>
+        <div className="detail-list-item">
+          <span>Materialized</span>
+          <strong>{formatTimestamp(opportunity.materialized_at)}</strong>
         </div>
       </div>
 
@@ -383,6 +394,40 @@ export function OpportunityDetailCard({
               <div className="detail-list-item">
                 <span>Scenario date</span>
                 <strong>{String(readNested(scenario, "game_date") ?? "n/a")}</strong>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {showTreeStumpExplainability ? (
+          <section className="sub-panel stump-explainability-panel">
+            <p className="sub-panel-title">Tree stump explanation</p>
+            <p className="sub-panel-stat">
+              {String(explainability.selected_feature ?? "n/a")}
+            </p>
+            <p className="sub-panel-meta">
+              Repeated predictions are expected when multiple rows land on the same stump branch.
+            </p>
+            <div className="detail-list compact-list">
+              <div className="detail-list-item">
+                <span>Threshold</span>
+                <strong>{String(explainability.threshold ?? "n/a")}</strong>
+              </div>
+              <div className="detail-list-item">
+                <span>Selected feature value</span>
+                <strong>{String(explainability.selected_feature_value ?? "n/a")}</strong>
+              </div>
+              <div className="detail-list-item">
+                <span>Branch taken</span>
+                <strong>{formatLabel(explainability.branch)}</strong>
+              </div>
+              <div className="detail-list-item">
+                <span>Left leaf prediction</span>
+                <strong>{String(explainability.left_prediction ?? "n/a")}</strong>
+              </div>
+              <div className="detail-list-item">
+                <span>Right leaf prediction</span>
+                <strong>{String(explainability.right_prediction ?? "n/a")}</strong>
               </div>
             </div>
           </section>

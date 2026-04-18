@@ -816,9 +816,58 @@ def _serialize_model_opportunity(
         "signal_strength": opportunity.signal_strength,
         "evidence_rating": opportunity.evidence_rating,
         "recommendation_status": opportunity.recommendation_status,
+        "materialization_batch_id": opportunity.materialization_batch_id,
+        "materialized_at": opportunity.materialized_at.isoformat()
+        if opportunity.materialized_at
+        else None,
+        "materialization_scope": {
+            "team_code": opportunity.materialization_scope_team_code,
+            "season_label": opportunity.materialization_scope_season_label,
+            "canonical_game_id": opportunity.materialization_scope_canonical_game_id,
+            "source": opportunity.materialization_scope_source,
+            "scope_key": opportunity.materialization_scope_key,
+        },
+        "model_explainability": _serialize_model_opportunity_explainability(opportunity),
         "payload": opportunity.payload,
         "created_at": opportunity.created_at.isoformat() if opportunity.created_at else None,
         "updated_at": opportunity.updated_at.isoformat() if opportunity.updated_at else None,
+    }
+
+
+def _serialize_model_opportunity_explainability(
+    opportunity: ModelOpportunityRecord,
+) -> dict[str, Any] | None:
+    active_snapshot = opportunity.payload.get("active_evaluation_snapshot")
+    prediction_payload = opportunity.payload.get("prediction")
+    if not isinstance(active_snapshot, dict):
+        return None
+    snapshot_payload = active_snapshot.get("snapshot")
+    if not isinstance(snapshot_payload, dict):
+        return None
+    artifact = snapshot_payload.get("artifact")
+    if not isinstance(artifact, dict):
+        return None
+    model_family = artifact.get("model_family") or active_snapshot.get("model_family")
+    if model_family is None:
+        return None
+    selected_feature = artifact.get("selected_feature") or active_snapshot.get("selected_feature")
+    selected_feature_value = (
+        prediction_payload.get("selected_feature_value")
+        if isinstance(prediction_payload, dict)
+        else None
+    )
+    threshold = artifact.get("threshold")
+    branch = None
+    if selected_feature_value is not None and threshold is not None:
+        branch = "left" if float(selected_feature_value) <= float(threshold) else "right"
+    return {
+        "model_family": model_family,
+        "selected_feature": selected_feature,
+        "threshold": threshold,
+        "left_prediction": artifact.get("left_prediction"),
+        "right_prediction": artifact.get("right_prediction"),
+        "selected_feature_value": selected_feature_value,
+        "branch": branch,
     }
 
 

@@ -137,6 +137,24 @@ export type OpportunityRecord = {
   signal_strength: number;
   evidence_rating: string | null;
   recommendation_status: string | null;
+  materialization_batch_id: string;
+  materialized_at: string | null;
+  materialization_scope: {
+    team_code: string | null;
+    season_label: string | null;
+    canonical_game_id: number | null;
+    source: string | null;
+    scope_key: string | null;
+  };
+  model_explainability: {
+    model_family: string | null;
+    selected_feature: string | null;
+    threshold: number | null;
+    left_prediction: number | null;
+    right_prediction: number | null;
+    selected_feature_value: number | null;
+    branch: string | null;
+  } | null;
   payload: Record<string, unknown>;
   created_at: string | null;
   updated_at: string | null;
@@ -164,6 +182,17 @@ export type OpportunityHistoryResponse = {
 
 export type OpportunityListResponse = {
   repository_mode: string;
+  queue_batch_id: string | null;
+  queue_materialized_at: string | null;
+  queue_scope: {
+    team_code: string | null;
+    season_label: string | null;
+    canonical_game_id: number | null;
+    source: string | null;
+    scope_key: string | null;
+  };
+  queue_scope_label: string | null;
+  queue_scope_is_scoped: boolean;
   opportunity_count: number;
   opportunities: OpportunityRecord[];
 };

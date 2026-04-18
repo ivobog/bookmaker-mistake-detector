@@ -1844,7 +1844,10 @@ def test_phase_three_model_market_board_score_endpoint_materializes_slate() -> N
     assert payload["slate_result"]["materialized_opportunity_count"] >= 1
 
 
-def test_phase_three_model_opportunity_materialize_endpoint_returns_opportunities() -> None:
+def test_phase_three_model_opportunity_materialize_endpoint_returns_opportunities(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(admin_opportunity_api, "_use_postgres_stable_read_mode", lambda: False)
     response = client.post(
         "/api/v1/admin/models/opportunities/materialize"
         "?target_task=spread_error_regression&team_code=LAL&season_label=2024-2025"
@@ -1861,7 +1864,9 @@ def test_phase_three_model_opportunity_materialize_endpoint_returns_opportunitie
 
 
 def test_phase_three_model_opportunities_endpoint_returns_empty_without_hidden_materialization(
+    monkeypatch,
 ) -> None:
+    monkeypatch.setattr(analyst_opportunities_api, "_use_postgres_analyst_mode", lambda: False)
     response = client.get(
         "/api/v1/analyst/opportunities"
         "?target_task=spread_error_regression&team_code=LAL&season_label=2024-2025"
@@ -1871,6 +1876,8 @@ def test_phase_three_model_opportunities_endpoint_returns_empty_without_hidden_m
     assert response.status_code == 200
     payload = response.json()
     assert payload["repository_mode"] == "in_memory"
+    assert payload["queue_batch_id"] is None
+    assert payload["queue_scope_is_scoped"] is False
     assert payload["opportunity_count"] == 0
     assert payload["opportunities"] == []
 
@@ -1878,36 +1885,75 @@ def test_phase_three_model_opportunities_endpoint_returns_empty_without_hidden_m
 def test_phase_three_model_opportunities_endpoint_returns_existing_rows(
     monkeypatch,
 ) -> None:
+    monkeypatch.setattr(analyst_opportunities_api, "_use_postgres_analyst_mode", lambda: False)
     monkeypatch.setattr(
         analyst_opportunities_api,
-        "list_model_opportunities_in_memory",
-        lambda repository, **kwargs: [
-            ModelOpportunityRecord(
-                id=7,
-                model_scoring_run_id=3,
-                model_selection_snapshot_id=2,
-                model_evaluation_snapshot_id=5,
-                feature_version_id=1,
-                target_task="spread_error_regression",
-                source_kind="future_scenario",
-                scenario_key="lal-bos-2026-04-20",
-                opportunity_key="opp-7",
-                team_code="LAL",
-                opponent_code="BOS",
-                season_label="2025-2026",
-                canonical_game_id=None,
-                game_date=date(2026, 4, 20),
-                policy_name="candidate_threshold",
-                status="review_manually",
-                prediction_value=4.25,
-                signal_strength=0.73,
-                evidence_rating="medium",
-                recommendation_status="lean",
-                payload={"prediction": {"team_code": "LAL"}},
-                created_at=datetime(2026, 4, 18, 0, 0, tzinfo=timezone.utc),
-                updated_at=datetime(2026, 4, 18, 0, 5, tzinfo=timezone.utc),
-            )
-        ],
+        "get_model_opportunity_queue_in_memory",
+        lambda repository, **kwargs: {
+            "queue_batch_id": "batch-lal-2026-04-20",
+            "queue_materialized_at": "2026-04-18T00:05:00+00:00",
+            "queue_scope": {
+                "team_code": "LAL",
+                "season_label": "2025-2026",
+                "canonical_game_id": None,
+                "source": "team_scoped",
+                "scope_key": "team=LAL|season=2025-2026",
+            },
+            "queue_scope_label": "Scoped queue: team=LAL, season=2025-2026",
+            "queue_scope_is_scoped": True,
+            "opportunities": [
+                ModelOpportunityRecord(
+                    id=7,
+                    model_scoring_run_id=3,
+                    model_selection_snapshot_id=2,
+                    model_evaluation_snapshot_id=5,
+                    feature_version_id=1,
+                    target_task="spread_error_regression",
+                    source_kind="future_scenario",
+                    scenario_key="lal-bos-2026-04-20",
+                    opportunity_key="opp-7",
+                    team_code="LAL",
+                    opponent_code="BOS",
+                    season_label="2025-2026",
+                    canonical_game_id=None,
+                    game_date=date(2026, 4, 20),
+                    policy_name="candidate_threshold",
+                    status="review_manually",
+                    prediction_value=4.25,
+                    signal_strength=0.73,
+                    evidence_rating="medium",
+                    recommendation_status="lean",
+                    materialization_batch_id="batch-lal-2026-04-20",
+                    materialized_at=datetime(2026, 4, 18, 0, 5, tzinfo=timezone.utc),
+                    materialization_scope_team_code="LAL",
+                    materialization_scope_season_label="2025-2026",
+                    materialization_scope_canonical_game_id=None,
+                    materialization_scope_source="team_scoped",
+                    materialization_scope_key="team=LAL|season=2025-2026",
+                    payload={
+                        "prediction": {
+                            "team_code": "LAL",
+                            "selected_feature_value": 0.61,
+                        },
+                        "active_evaluation_snapshot": {
+                            "model_family": "tree_stump",
+                            "selected_feature": "rolling_10_avg_total_error",
+                            "snapshot": {
+                                "artifact": {
+                                    "model_family": "tree_stump",
+                                    "selected_feature": "rolling_10_avg_total_error",
+                                    "threshold": -0.475,
+                                    "left_prediction": 0.5142,
+                                    "right_prediction": -1.0352,
+                                }
+                            },
+                        },
+                    },
+                    created_at=datetime(2026, 4, 18, 0, 0, tzinfo=timezone.utc),
+                    updated_at=datetime(2026, 4, 18, 0, 5, tzinfo=timezone.utc),
+                )
+            ],
+        },
     )
 
     response = client.get(
@@ -1923,14 +1969,21 @@ def test_phase_three_model_opportunities_endpoint_returns_existing_rows(
     assert response.status_code == 200
     payload = response.json()
     assert payload["repository_mode"] == "in_memory"
+    assert payload["queue_batch_id"] == "batch-lal-2026-04-20"
+    assert payload["queue_scope_label"] == "Scoped queue: team=LAL, season=2025-2026"
+    assert payload["queue_scope_is_scoped"] is True
     assert payload["opportunity_count"] == 1
     assert payload["opportunities"][0]["source_kind"] == "future_scenario"
     assert payload["opportunities"][0]["canonical_game_id"] is None
     assert payload["opportunities"][0]["team_code"] == "LAL"
+    assert payload["opportunities"][0]["materialization_batch_id"] == "batch-lal-2026-04-20"
+    assert payload["opportunities"][0]["model_explainability"]["branch"] == "right"
 
 
 def test_phase_three_model_opportunity_detail_endpoint_returns_null_without_hidden_materialization(
+    monkeypatch,
 ) -> None:
+    monkeypatch.setattr(analyst_opportunities_api, "_use_postgres_analyst_mode", lambda: False)
     response = client.get("/api/v1/analyst/opportunities/1")
 
     assert response.status_code == 200
@@ -1942,6 +1995,7 @@ def test_phase_three_model_opportunity_detail_endpoint_returns_null_without_hidd
 def test_phase_three_model_opportunity_detail_endpoint_returns_existing_payload(
     monkeypatch,
 ) -> None:
+    monkeypatch.setattr(analyst_opportunities_api, "_use_postgres_analyst_mode", lambda: False)
     monkeypatch.setattr(
         analyst_opportunities_api,
         "get_model_opportunity_detail_in_memory",
@@ -1966,6 +2020,24 @@ def test_phase_three_model_opportunity_detail_endpoint_returns_existing_payload(
             "signal_strength": 0.73,
             "evidence_rating": "medium",
             "recommendation_status": "lean",
+            "materialization_batch_id": "batch-lal-2026-04-20",
+            "materialized_at": "2026-04-18T00:05:00+00:00",
+            "materialization_scope": {
+                "team_code": "LAL",
+                "season_label": "2025-2026",
+                "canonical_game_id": None,
+                "source": "team_scoped",
+                "scope_key": "team=LAL|season=2025-2026",
+            },
+            "model_explainability": {
+                "model_family": "tree_stump",
+                "selected_feature": "rolling_10_avg_total_error",
+                "threshold": -0.475,
+                "left_prediction": 0.5142,
+                "right_prediction": -1.0352,
+                "selected_feature_value": 0.61,
+                "branch": "right",
+            },
             "payload": {"scenario": {"home_team_code": "LAL"}},
             "created_at": "2026-04-18T00:00:00+00:00",
             "updated_at": "2026-04-18T00:05:00+00:00",
@@ -1981,12 +2053,15 @@ def test_phase_three_model_opportunity_detail_endpoint_returns_existing_payload(
     assert payload["repository_mode"] == "in_memory"
     assert payload["opportunity"] is not None
     assert payload["opportunity"]["source_kind"] == "future_scenario"
+    assert payload["opportunity"]["materialization_scope"]["source"] == "team_scoped"
+    assert payload["opportunity"]["model_explainability"]["branch"] == "right"
     assert payload["opportunity"]["payload"]["scenario"]["home_team_code"] == "LAL"
 
 
-def test_phase_three_model_opportunity_history_endpoint_returns_empty_without_hidden_seeding() -> (
-    None
-):
+def test_phase_three_model_opportunity_history_endpoint_returns_empty_without_hidden_seeding(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(admin_opportunity_api, "_use_postgres_stable_read_mode", lambda: False)
     response = client.get(
         "/api/v1/admin/models/opportunities/history"
         "?target_task=spread_error_regression&team_code=LAL&season_label=2024-2025&recent_limit=5"
@@ -2004,6 +2079,7 @@ def test_phase_three_model_opportunity_history_endpoint_returns_empty_without_hi
 def test_phase_three_model_opportunity_history_endpoint_returns_existing_rollup(
     monkeypatch,
 ) -> None:
+    monkeypatch.setattr(admin_opportunity_api, "_use_postgres_stable_read_mode", lambda: False)
     monkeypatch.setattr(
         admin_opportunity_api,
         "get_model_opportunity_history_in_memory",

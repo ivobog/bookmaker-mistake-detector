@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any
+from uuid import uuid4
 
 from bookmaker_detector_api.repositories import ModelOpportunityStore
 from bookmaker_detector_api.repositories.ingestion_json import _json_dumps
@@ -16,10 +17,12 @@ def materialize_model_opportunities(
     target_task: str,
     build_opportunities,
     save_opportunities,
+    materialization_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     opportunities = build_opportunities(
         scoring_preview=scoring_preview,
         target_task=target_task,
+        materialization_context=materialization_context,
     )
     persisted = save_opportunities(opportunities)
     return {
@@ -37,6 +40,7 @@ def build_model_opportunities(
     policy: dict[str, Any] | None,
     model_scoring_run_id: int | None = None,
     allow_best_effort_review: bool = False,
+    materialization_context: dict[str, Any] | None = None,
 ) -> list[ModelOpportunityRecord]:
     active_selection = scoring_preview.get("active_selection")
     active_snapshot = scoring_preview.get("active_evaluation_snapshot")
@@ -46,6 +50,7 @@ def build_model_opportunities(
         return []
     if policy is None:
         raise ValueError(f"Unsupported opportunity policy target_task: {target_task}")
+    resolved_materialization_context = materialization_context or build_materialization_context()
     opportunities = []
     predictions = list(scoring_preview.get("predictions", []))
     for prediction in predictions:
@@ -94,6 +99,25 @@ def build_model_opportunities(
                     "evidence",
                     "recommendation",
                     "status",
+                ),
+                materialization_batch_id=str(
+                    resolved_materialization_context["materialization_batch_id"]
+                ),
+                materialized_at=resolved_materialization_context["materialized_at"],
+                materialization_scope_team_code=resolved_materialization_context[
+                    "materialization_scope_team_code"
+                ],
+                materialization_scope_season_label=resolved_materialization_context[
+                    "materialization_scope_season_label"
+                ],
+                materialization_scope_canonical_game_id=resolved_materialization_context[
+                    "materialization_scope_canonical_game_id"
+                ],
+                materialization_scope_source=str(
+                    resolved_materialization_context["materialization_scope_source"]
+                ),
+                materialization_scope_key=str(
+                    resolved_materialization_context["materialization_scope_key"]
                 ),
                 payload=payload,
             )
@@ -152,10 +176,97 @@ def build_model_opportunities(
                     "recommendation",
                     "status",
                 ),
+                materialization_batch_id=str(
+                    resolved_materialization_context["materialization_batch_id"]
+                ),
+                materialized_at=resolved_materialization_context["materialized_at"],
+                materialization_scope_team_code=resolved_materialization_context[
+                    "materialization_scope_team_code"
+                ],
+                materialization_scope_season_label=resolved_materialization_context[
+                    "materialization_scope_season_label"
+                ],
+                materialization_scope_canonical_game_id=resolved_materialization_context[
+                    "materialization_scope_canonical_game_id"
+                ],
+                materialization_scope_source=str(
+                    resolved_materialization_context["materialization_scope_source"]
+                ),
+                materialization_scope_key=str(
+                    resolved_materialization_context["materialization_scope_key"]
+                ),
                 payload=payload,
             )
         )
     return opportunities
+
+
+def build_materialization_context(
+    *,
+    team_code: str | None = None,
+    season_label: str | None = None,
+    canonical_game_id: int | None = None,
+    scope_source: str | None = None,
+    scope_key: str | None = None,
+    batch_id: str | None = None,
+    materialized_at: datetime | None = None,
+) -> dict[str, Any]:
+    resolved_source = _resolve_materialization_scope_source(
+        team_code=team_code,
+        canonical_game_id=canonical_game_id,
+        scope_source=scope_source,
+    )
+    return {
+        "materialization_batch_id": batch_id or uuid4().hex,
+        "materialized_at": materialized_at or datetime.now(timezone.utc),
+        "materialization_scope_team_code": team_code,
+        "materialization_scope_season_label": season_label,
+        "materialization_scope_canonical_game_id": canonical_game_id,
+        "materialization_scope_source": resolved_source,
+        "materialization_scope_key": scope_key
+        or _build_materialization_scope_key(
+            team_code=team_code,
+            season_label=season_label,
+            canonical_game_id=canonical_game_id,
+            scope_source=resolved_source,
+        ),
+    }
+
+
+def _resolve_materialization_scope_source(
+    *,
+    team_code: str | None,
+    canonical_game_id: int | None,
+    scope_source: str | None,
+) -> str:
+    if scope_source is not None:
+        return scope_source
+    if canonical_game_id is not None:
+        return "game_scoped"
+    if team_code is not None:
+        return "team_scoped"
+    return "operator"
+
+
+def _build_materialization_scope_key(
+    *,
+    team_code: str | None,
+    season_label: str | None,
+    canonical_game_id: int | None,
+    scope_source: str,
+) -> str:
+    if scope_source == "operator" and team_code is None and canonical_game_id is None:
+        return "operator-wide"
+    parts: list[str] = []
+    if team_code is not None:
+        parts.append(f"team={team_code}")
+    if season_label is not None:
+        parts.append(f"season={season_label}")
+    if canonical_game_id is not None:
+        parts.append(f"game={canonical_game_id}")
+    if parts:
+        return "|".join(parts)
+    return scope_source
 
 
 def evaluate_opportunity_status(
@@ -208,14 +319,6 @@ def save_model_opportunities_in_memory(
 ) -> list[ModelOpportunityRecord]:
     persisted: list[ModelOpportunityRecord] = []
     for opportunity in opportunities:
-        existing = next(
-            (
-                entry
-                for entry in repository.model_opportunities
-                if entry["opportunity_key"] == opportunity.opportunity_key
-            ),
-            None,
-        )
         now = datetime.now(timezone.utc)
         payload = {
             "model_scoring_run_id": opportunity.model_scoring_run_id,
@@ -237,17 +340,22 @@ def save_model_opportunities_in_memory(
             "signal_strength": opportunity.signal_strength,
             "evidence_rating": opportunity.evidence_rating,
             "recommendation_status": opportunity.recommendation_status,
+            "materialization_batch_id": opportunity.materialization_batch_id,
+            "materialized_at": opportunity.materialized_at,
+            "materialization_scope_team_code": opportunity.materialization_scope_team_code,
+            "materialization_scope_season_label": opportunity.materialization_scope_season_label,
+            "materialization_scope_canonical_game_id": (
+                opportunity.materialization_scope_canonical_game_id
+            ),
+            "materialization_scope_source": opportunity.materialization_scope_source,
+            "materialization_scope_key": opportunity.materialization_scope_key,
             "payload": opportunity.payload,
+            "id": len(repository.model_opportunities) + 1,
+            "created_at": now,
             "updated_at": now,
         }
-        if existing is None:
-            payload["id"] = len(repository.model_opportunities) + 1
-            payload["created_at"] = now
-            repository.model_opportunities.append(payload)
-            persisted.append(ModelOpportunityRecord(**payload))
-        else:
-            existing.update(payload)
-            persisted.append(ModelOpportunityRecord(**existing))
+        repository.model_opportunities.append(payload)
+        persisted.append(ModelOpportunityRecord(**payload))
     return persisted
 
 
@@ -280,13 +388,21 @@ def save_model_opportunities_postgres(
                     signal_strength,
                     evidence_rating,
                     recommendation_status,
+                    materialization_batch_id,
+                    materialized_at,
+                    materialization_scope_team_code,
+                    materialization_scope_season_label,
+                    materialization_scope_canonical_game_id,
+                    materialization_scope_source,
+                    materialization_scope_key,
                     payload_json
                 )
                 VALUES (
                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s::jsonb
                 )
-                ON CONFLICT (opportunity_key)
+                ON CONFLICT (materialization_batch_id, opportunity_key)
                 DO UPDATE SET
                     model_scoring_run_id = EXCLUDED.model_scoring_run_id,
                     model_selection_snapshot_id = EXCLUDED.model_selection_snapshot_id,
@@ -306,6 +422,12 @@ def save_model_opportunities_postgres(
                     signal_strength = EXCLUDED.signal_strength,
                     evidence_rating = EXCLUDED.evidence_rating,
                     recommendation_status = EXCLUDED.recommendation_status,
+                    materialized_at = EXCLUDED.materialized_at,
+                    materialization_scope_team_code = EXCLUDED.materialization_scope_team_code,
+                    materialization_scope_season_label = EXCLUDED.materialization_scope_season_label,
+                    materialization_scope_canonical_game_id = EXCLUDED.materialization_scope_canonical_game_id,
+                    materialization_scope_source = EXCLUDED.materialization_scope_source,
+                    materialization_scope_key = EXCLUDED.materialization_scope_key,
                     payload_json = EXCLUDED.payload_json,
                     updated_at = NOW()
                 RETURNING id, created_at, updated_at
@@ -330,6 +452,13 @@ def save_model_opportunities_postgres(
                     opportunity.signal_strength,
                     opportunity.evidence_rating,
                     opportunity.recommendation_status,
+                    opportunity.materialization_batch_id,
+                    opportunity.materialized_at,
+                    opportunity.materialization_scope_team_code,
+                    opportunity.materialization_scope_season_label,
+                    opportunity.materialization_scope_canonical_game_id,
+                    opportunity.materialization_scope_source,
+                    opportunity.materialization_scope_key,
                     _json_dumps(opportunity.payload),
                 ),
             )
@@ -356,6 +485,17 @@ def save_model_opportunities_postgres(
                     signal_strength=opportunity.signal_strength,
                     evidence_rating=opportunity.evidence_rating,
                     recommendation_status=opportunity.recommendation_status,
+                    materialization_batch_id=opportunity.materialization_batch_id,
+                    materialized_at=opportunity.materialized_at,
+                    materialization_scope_team_code=opportunity.materialization_scope_team_code,
+                    materialization_scope_season_label=(
+                        opportunity.materialization_scope_season_label
+                    ),
+                    materialization_scope_canonical_game_id=(
+                        opportunity.materialization_scope_canonical_game_id
+                    ),
+                    materialization_scope_source=opportunity.materialization_scope_source,
+                    materialization_scope_key=opportunity.materialization_scope_key,
                     payload=opportunity.payload,
                     created_at=row[1],
                     updated_at=row[2],
@@ -374,27 +514,37 @@ def list_model_opportunities_in_memory(
     season_label: str | None = None,
     source_kind: str | None = None,
     scenario_key: str | None = None,
+    materialization_batch_id: str | None = None,
+    latest_batch_only: bool = False,
 ) -> list[ModelOpportunityRecord]:
+    resolved_batch_id = materialization_batch_id
+    if latest_batch_only and resolved_batch_id is None:
+        batch_anchor = _resolve_latest_opportunity_batch_in_memory(
+            repository.model_opportunities,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+        )
+        if batch_anchor is None:
+            return []
+        resolved_batch_id = str(batch_anchor["materialization_batch_id"])
     selected = [
         ModelOpportunityRecord(**entry)
         for entry in repository.model_opportunities
-        if (target_task is None or entry["target_task"] == target_task)
-        and (
-            team_code is None
-            or entry["team_code"] == team_code
-            or entry["opponent_code"] == team_code
+        if _matches_opportunity_filters(
+            entry,
+            target_task=target_task,
+            team_code=team_code,
+            status=status,
+            season_label=season_label,
+            source_kind=source_kind,
+            scenario_key=scenario_key,
+            materialization_batch_id=resolved_batch_id,
         )
-        and (status is None or entry["status"] == status)
-        and (season_label is None or entry["season_label"] == season_label)
-        and (source_kind is None or entry["source_kind"] == source_kind)
-        and (scenario_key is None or entry.get("scenario_key") == scenario_key)
     ]
     return sorted(
         selected,
-        key=lambda entry: (
-            entry.created_at or datetime.min.replace(tzinfo=timezone.utc),
-            entry.id,
-        ),
+        key=_opportunity_sort_key,
         reverse=True,
     )
 
@@ -408,7 +558,20 @@ def list_model_opportunities_postgres(
     season_label: str | None = None,
     source_kind: str | None = None,
     scenario_key: str | None = None,
+    materialization_batch_id: str | None = None,
+    latest_batch_only: bool = False,
 ) -> list[ModelOpportunityRecord]:
+    resolved_batch_id = materialization_batch_id
+    if latest_batch_only and resolved_batch_id is None:
+        batch_anchor = _resolve_latest_opportunity_batch_postgres(
+            connection,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+        )
+        if batch_anchor is None:
+            return []
+        resolved_batch_id = str(batch_anchor["materialization_batch_id"])
     query = """
         SELECT
             id,
@@ -431,6 +594,13 @@ def list_model_opportunities_postgres(
             signal_strength,
             evidence_rating,
             recommendation_status,
+            materialization_batch_id,
+            materialized_at,
+            materialization_scope_team_code,
+            materialization_scope_season_label,
+            materialization_scope_canonical_game_id,
+            materialization_scope_source,
+            materialization_scope_key,
             payload_json,
             created_at,
             updated_at
@@ -456,6 +626,9 @@ def list_model_opportunities_postgres(
     if scenario_key is not None:
         query += " AND scenario_key = %s"
         params.append(scenario_key)
+    if resolved_batch_id is not None:
+        query += " AND materialization_batch_id = %s"
+        params.append(resolved_batch_id)
     query += " ORDER BY created_at DESC, id DESC"
     with connection.cursor() as cursor:
         cursor.execute(query, params)
@@ -482,12 +655,83 @@ def list_model_opportunities_postgres(
             signal_strength=float(row[17]),
             evidence_rating=row[18],
             recommendation_status=row[19],
-            payload=row[20],
-            created_at=row[21],
-            updated_at=row[22],
+            materialization_batch_id=row[20],
+            materialized_at=row[21],
+            materialization_scope_team_code=row[22],
+            materialization_scope_season_label=row[23],
+            materialization_scope_canonical_game_id=(
+                int(row[24]) if row[24] is not None else None
+            ),
+            materialization_scope_source=row[25],
+            materialization_scope_key=row[26],
+            payload=row[27],
+            created_at=row[28],
+            updated_at=row[29],
         )
         for row in rows
     ]
+
+
+def get_model_opportunity_queue_in_memory(
+    repository: ModelOpportunityStore,
+    *,
+    target_task: str | None = None,
+    team_code: str | None = None,
+    status: str | None = None,
+    season_label: str | None = None,
+    source_kind: str | None = None,
+    scenario_key: str | None = None,
+) -> dict[str, Any]:
+    batch_anchor = _resolve_latest_opportunity_batch_in_memory(
+        repository.model_opportunities,
+        target_task=target_task,
+        team_code=team_code,
+        season_label=season_label,
+    )
+    if batch_anchor is None:
+        return _build_model_opportunity_queue_result(None, [])
+    opportunities = list_model_opportunities_in_memory(
+        repository,
+        target_task=target_task,
+        team_code=team_code,
+        status=status,
+        season_label=season_label,
+        source_kind=source_kind,
+        scenario_key=scenario_key,
+        materialization_batch_id=str(batch_anchor["materialization_batch_id"]),
+    )
+    return _build_model_opportunity_queue_result(batch_anchor, opportunities)
+
+
+def get_model_opportunity_queue_postgres(
+    connection: Any,
+    *,
+    target_task: str | None = None,
+    team_code: str | None = None,
+    status: str | None = None,
+    season_label: str | None = None,
+    source_kind: str | None = None,
+    scenario_key: str | None = None,
+) -> dict[str, Any]:
+    batch_anchor = _resolve_latest_opportunity_batch_postgres(
+        connection,
+        target_task=target_task,
+        team_code=team_code,
+        season_label=season_label,
+    )
+    if batch_anchor is None:
+        return _build_model_opportunity_queue_result(None, [])
+    opportunities = list_model_opportunities_postgres(
+        connection,
+        target_task=target_task,
+        team_code=team_code,
+        status=status,
+        season_label=season_label,
+        source_kind=source_kind,
+        scenario_key=scenario_key,
+        materialization_batch_id=str(batch_anchor["materialization_batch_id"]),
+    )
+    return _build_model_opportunity_queue_result(batch_anchor, opportunities)
 
 
 def get_model_opportunity_detail_in_memory(
@@ -628,3 +872,219 @@ def positive_int_or_none(value: Any) -> int | None:
         return None
     integer_value = int(value)
     return integer_value if integer_value > 0 else None
+
+
+def _matches_opportunity_filters(
+    entry: dict[str, Any],
+    *,
+    target_task: str | None,
+    team_code: str | None,
+    status: str | None,
+    season_label: str | None,
+    source_kind: str | None,
+    scenario_key: str | None,
+    materialization_batch_id: str | None,
+) -> bool:
+    if target_task is not None and entry["target_task"] != target_task:
+        return False
+    if team_code is not None and entry["team_code"] != team_code and entry["opponent_code"] != team_code:
+        return False
+    if status is not None and entry["status"] != status:
+        return False
+    if season_label is not None and entry["season_label"] != season_label:
+        return False
+    if source_kind is not None and entry["source_kind"] != source_kind:
+        return False
+    if scenario_key is not None and entry.get("scenario_key") != scenario_key:
+        return False
+    if (
+        materialization_batch_id is not None
+        and entry.get("materialization_batch_id") != materialization_batch_id
+    ):
+        return False
+    return True
+
+
+def _resolve_latest_opportunity_batch_in_memory(
+    entries: list[dict[str, Any]],
+    *,
+    target_task: str | None,
+    team_code: str | None,
+    season_label: str | None,
+) -> dict[str, Any] | None:
+    candidates = [
+        entry
+        for entry in entries
+        if _matches_materialization_scope(
+            entry,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+        )
+    ]
+    if not candidates:
+        return None
+    return max(candidates, key=_opportunity_entry_sort_key)
+
+
+def _resolve_latest_opportunity_batch_postgres(
+    connection: Any,
+    *,
+    target_task: str | None,
+    team_code: str | None,
+    season_label: str | None,
+) -> dict[str, Any] | None:
+    query = """
+        SELECT
+            materialization_batch_id,
+            materialized_at,
+            materialization_scope_team_code,
+            materialization_scope_season_label,
+            materialization_scope_canonical_game_id,
+            materialization_scope_source,
+            materialization_scope_key,
+            MAX(id) AS max_id
+        FROM model_opportunity
+        WHERE 1=1
+    """
+    params: list[Any] = []
+    if target_task is not None:
+        query += " AND target_task = %s"
+        params.append(target_task)
+    if team_code is None:
+        query += " AND materialization_scope_source = %s"
+        params.append("operator")
+    else:
+        query += " AND materialization_scope_team_code = %s"
+        params.append(team_code)
+        query += " AND materialization_scope_source IN (%s, %s)"
+        params.extend(["team_scoped", "game_scoped"])
+        if season_label is not None:
+            query += " AND materialization_scope_season_label = %s"
+            params.append(season_label)
+    query += """
+        GROUP BY
+            materialization_batch_id,
+            materialized_at,
+            materialization_scope_team_code,
+            materialization_scope_season_label,
+            materialization_scope_canonical_game_id,
+            materialization_scope_source,
+            materialization_scope_key
+        ORDER BY materialized_at DESC, max_id DESC
+        LIMIT 1
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(query, params)
+        row = cursor.fetchone()
+    if row is None:
+        return None
+    return {
+        "materialization_batch_id": row[0],
+        "materialized_at": row[1],
+        "materialization_scope_team_code": row[2],
+        "materialization_scope_season_label": row[3],
+        "materialization_scope_canonical_game_id": (
+            int(row[4]) if row[4] is not None else None
+        ),
+        "materialization_scope_source": row[5],
+        "materialization_scope_key": row[6],
+        "id": int(row[7]),
+    }
+
+
+def _matches_materialization_scope(
+    entry: dict[str, Any],
+    *,
+    target_task: str | None,
+    team_code: str | None,
+    season_label: str | None,
+) -> bool:
+    if target_task is not None and entry["target_task"] != target_task:
+        return False
+    scope_source = entry.get("materialization_scope_source")
+    if team_code is None:
+        return scope_source == "operator"
+    if entry.get("materialization_scope_team_code") != team_code:
+        return False
+    if scope_source not in {"team_scoped", "game_scoped"}:
+        return False
+    if (
+        season_label is not None
+        and entry.get("materialization_scope_season_label") != season_label
+    ):
+        return False
+    return True
+
+
+def _build_model_opportunity_queue_result(
+    batch_anchor: dict[str, Any] | None,
+    opportunities: list[ModelOpportunityRecord],
+) -> dict[str, Any]:
+    scope_payload = (
+        {
+            "team_code": batch_anchor.get("materialization_scope_team_code"),
+            "season_label": batch_anchor.get("materialization_scope_season_label"),
+            "canonical_game_id": batch_anchor.get("materialization_scope_canonical_game_id"),
+            "source": batch_anchor.get("materialization_scope_source"),
+            "scope_key": batch_anchor.get("materialization_scope_key"),
+        }
+        if batch_anchor is not None
+        else {
+            "team_code": None,
+            "season_label": None,
+            "canonical_game_id": None,
+            "source": None,
+            "scope_key": None,
+        }
+    )
+    return {
+        "queue_batch_id": batch_anchor.get("materialization_batch_id") if batch_anchor else None,
+        "queue_materialized_at": (
+            batch_anchor.get("materialized_at").isoformat()
+            if batch_anchor is not None and batch_anchor.get("materialized_at") is not None
+            else None
+        ),
+        "queue_scope": scope_payload,
+        "queue_scope_label": build_materialization_scope_label(scope_payload),
+        "queue_scope_is_scoped": bool(
+            batch_anchor is not None and batch_anchor.get("materialization_scope_source") != "operator"
+        ),
+        "opportunities": opportunities,
+    }
+
+
+def build_materialization_scope_label(scope_payload: dict[str, Any] | None) -> str | None:
+    if scope_payload is None:
+        return None
+    scope_source = scope_payload.get("source")
+    if scope_source == "operator":
+        return "Operator-wide queue"
+    if scope_source is None:
+        return None
+    parts: list[str] = []
+    if scope_payload.get("team_code") is not None:
+        parts.append(f"team={scope_payload['team_code']}")
+    if scope_payload.get("season_label") is not None:
+        parts.append(f"season={scope_payload['season_label']}")
+    if scope_payload.get("canonical_game_id") is not None:
+        parts.append(f"game={scope_payload['canonical_game_id']}")
+    if not parts and scope_payload.get("scope_key") is not None:
+        parts.append(str(scope_payload["scope_key"]))
+    return "Scoped queue: " + ", ".join(parts) if parts else "Scoped queue"
+
+
+def _opportunity_sort_key(entry: ModelOpportunityRecord) -> tuple[datetime, datetime, int]:
+    minimum = datetime.min.replace(tzinfo=timezone.utc)
+    return (
+        entry.materialized_at or minimum,
+        entry.created_at or minimum,
+        entry.id,
+    )
+
+
+def _opportunity_entry_sort_key(entry: dict[str, Any]) -> tuple[datetime, datetime, int]:
+    minimum = datetime.min.replace(tzinfo=timezone.utc)
+    materialized_at = entry.get("materialized_at") or minimum
+    created_at = entry.get("created_at") or minimum
+    return (materialized_at, created_at, int(entry.get("id", 0)))

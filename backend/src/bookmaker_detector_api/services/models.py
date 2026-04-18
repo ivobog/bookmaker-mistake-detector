@@ -1365,6 +1365,11 @@ def materialize_model_opportunities_in_memory(
         limit=limit,
     )
     try:
+        materialization_context = model_opportunities.build_materialization_context(
+            team_code=team_code,
+            season_label=season_label,
+            canonical_game_id=canonical_game_id,
+        )
         scoring_preview = get_model_scoring_preview_in_memory(
             repository,
             feature_key=feature_key,
@@ -1384,6 +1389,7 @@ def materialize_model_opportunities_in_memory(
         result = model_opportunities.materialize_model_opportunities(
             scoring_preview=scoring_preview,
             target_task=target_task,
+            materialization_context=materialization_context,
             build_opportunities=lambda **kwargs: model_opportunities.build_model_opportunities(
                 **kwargs,
                 policy=OPPORTUNITY_POLICY_CONFIGS.get(target_task),
@@ -1425,6 +1431,14 @@ def materialize_model_future_opportunities_in_memory(
     validation_ratio: float = 0.15,
     drop_null_targets: bool = True,
 ) -> dict[str, Any]:
+    materialization_context = model_opportunities.build_materialization_context(
+        season_label=season_label,
+        scope_source="worker",
+        scope_key=(
+            "worker"
+            f"|scenario={season_label}:{game_date.isoformat()}:{home_team_code}:{away_team_code}"
+        ),
+    )
     materialized_preview = materialize_model_future_game_preview_in_memory(
         repository,
         feature_key=feature_key,
@@ -1449,6 +1463,7 @@ def materialize_model_future_opportunities_in_memory(
         build_opportunities=lambda **kwargs: model_opportunities.build_model_opportunities(
             **kwargs,
             policy=OPPORTUNITY_POLICY_CONFIGS.get(target_task),
+            materialization_context=materialization_context,
         ),
         save_opportunities=lambda opportunities: save_model_opportunities_in_memory(
             repository,
@@ -1486,6 +1501,11 @@ def materialize_model_opportunities_postgres(
         limit=limit,
     )
     try:
+        materialization_context = model_opportunities.build_materialization_context(
+            team_code=team_code,
+            season_label=season_label,
+            canonical_game_id=canonical_game_id,
+        )
         scoring_preview = get_model_scoring_preview_postgres(
             connection,
             feature_key=feature_key,
@@ -1505,6 +1525,7 @@ def materialize_model_opportunities_postgres(
         result = model_opportunities.materialize_model_opportunities(
             scoring_preview=scoring_preview,
             target_task=target_task,
+            materialization_context=materialization_context,
             build_opportunities=lambda **kwargs: model_opportunities.build_model_opportunities(
                 **kwargs,
                 policy=OPPORTUNITY_POLICY_CONFIGS.get(target_task),
@@ -1546,6 +1567,14 @@ def materialize_model_future_opportunities_postgres(
     validation_ratio: float = 0.15,
     drop_null_targets: bool = True,
 ) -> dict[str, Any]:
+    materialization_context = model_opportunities.build_materialization_context(
+        season_label=season_label,
+        scope_source="worker",
+        scope_key=(
+            "worker"
+            f"|scenario={season_label}:{game_date.isoformat()}:{home_team_code}:{away_team_code}"
+        ),
+    )
     materialized_preview = materialize_model_future_game_preview_postgres(
         connection,
         feature_key=feature_key,
@@ -1570,6 +1599,7 @@ def materialize_model_future_opportunities_postgres(
         build_opportunities=lambda **kwargs: model_opportunities.build_model_opportunities(
             **kwargs,
             policy=OPPORTUNITY_POLICY_CONFIGS.get(target_task),
+            materialization_context=materialization_context,
         ),
         save_opportunities=lambda opportunities: save_model_opportunities_postgres(
             connection,
@@ -1729,6 +1759,15 @@ def materialize_model_future_slate_in_memory(
         model_market_board_id=model_market_board_id,
     )
     try:
+        slate_scope_key = "worker"
+        if slate_label is not None:
+            slate_scope_key += f"|slate={slate_label}"
+        if model_market_board_id is not None:
+            slate_scope_key += f"|board={model_market_board_id}"
+        materialization_context = model_opportunities.build_materialization_context(
+            scope_source="worker",
+            scope_key=slate_scope_key,
+        )
         result = model_future_scenarios.materialize_future_slate(
             games=games,
             target_task=target_task,
@@ -1755,6 +1794,7 @@ def materialize_model_future_slate_in_memory(
             build_opportunities=lambda **kwargs: model_opportunities.build_model_opportunities(
                 **kwargs,
                 policy=OPPORTUNITY_POLICY_CONFIGS.get(target_task),
+                materialization_context=materialization_context,
             ),
             save_opportunities=lambda opportunities: save_model_opportunities_in_memory(
                 repository,
@@ -1803,6 +1843,15 @@ def materialize_model_future_slate_postgres(
         model_market_board_id=model_market_board_id,
     )
     try:
+        slate_scope_key = "worker"
+        if slate_label is not None:
+            slate_scope_key += f"|slate={slate_label}"
+        if model_market_board_id is not None:
+            slate_scope_key += f"|board={model_market_board_id}"
+        materialization_context = model_opportunities.build_materialization_context(
+            scope_source="worker",
+            scope_key=slate_scope_key,
+        )
         result = model_future_scenarios.materialize_future_slate(
             games=games,
             target_task=target_task,
@@ -1829,6 +1878,7 @@ def materialize_model_future_slate_postgres(
             build_opportunities=lambda **kwargs: model_opportunities.build_model_opportunities(
                 **kwargs,
                 policy=OPPORTUNITY_POLICY_CONFIGS.get(target_task),
+                materialization_context=materialization_context,
             ),
             save_opportunities=lambda opportunities: save_model_opportunities_postgres(
                 connection,
@@ -2940,6 +2990,8 @@ def list_model_opportunities_in_memory(
     season_label: str | None = None,
     source_kind: str | None = None,
     scenario_key: str | None = None,
+    materialization_batch_id: str | None = None,
+    latest_batch_only: bool = False,
 ) -> list[ModelOpportunityRecord]:
     return model_opportunities.list_model_opportunities_in_memory(
         repository,
@@ -2949,6 +3001,8 @@ def list_model_opportunities_in_memory(
         season_label=season_label,
         source_kind=source_kind,
         scenario_key=scenario_key,
+        materialization_batch_id=materialization_batch_id,
+        latest_batch_only=latest_batch_only,
     )
 
 
@@ -2961,8 +3015,54 @@ def list_model_opportunities_postgres(
     season_label: str | None = None,
     source_kind: str | None = None,
     scenario_key: str | None = None,
+    materialization_batch_id: str | None = None,
+    latest_batch_only: bool = False,
 ) -> list[ModelOpportunityRecord]:
     return model_opportunities.list_model_opportunities_postgres(
+        connection,
+        target_task=target_task,
+        team_code=team_code,
+        status=status,
+        season_label=season_label,
+        source_kind=source_kind,
+        scenario_key=scenario_key,
+        materialization_batch_id=materialization_batch_id,
+        latest_batch_only=latest_batch_only,
+    )
+
+
+def get_model_opportunity_queue_in_memory(
+    repository: PhaseThreeModelingStore,
+    *,
+    target_task: str | None = None,
+    team_code: str | None = None,
+    status: str | None = None,
+    season_label: str | None = None,
+    source_kind: str | None = None,
+    scenario_key: str | None = None,
+) -> dict[str, Any]:
+    return model_opportunities.get_model_opportunity_queue_in_memory(
+        repository,
+        target_task=target_task,
+        team_code=team_code,
+        status=status,
+        season_label=season_label,
+        source_kind=source_kind,
+        scenario_key=scenario_key,
+    )
+
+
+def get_model_opportunity_queue_postgres(
+    connection: Any,
+    *,
+    target_task: str | None = None,
+    team_code: str | None = None,
+    status: str | None = None,
+    season_label: str | None = None,
+    source_kind: str | None = None,
+    scenario_key: str | None = None,
+) -> dict[str, Any]:
+    return model_opportunities.get_model_opportunity_queue_postgres(
         connection,
         target_task=target_task,
         team_code=team_code,

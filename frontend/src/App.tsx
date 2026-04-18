@@ -23,6 +23,7 @@ import type {
   ModelHistoryResponse,
   ModelTrainingRun,
   OpportunityHistoryResponse,
+  OpportunityListResponse,
   OpportunityRecord,
   ProvenanceInspectorData,
   ProvenanceItem,
@@ -57,6 +58,7 @@ import { OpportunitiesWorkspace } from "./opportunitiesWorkspace";
 export default function App() {
   const [history, setHistory] = useState<BacktestHistoryResponse | null>(null);
   const [opportunityHistory, setOpportunityHistory] = useState<OpportunityHistoryResponse | null>(null);
+  const [opportunityList, setOpportunityList] = useState<OpportunityListResponse | null>(null);
   const [opportunities, setOpportunities] = useState<OpportunityRecord[]>([]);
   const [modelHistory, setModelHistory] = useState<ModelHistoryResponse["model_history"] | null>(null);
   const [activeModelRun, setActiveModelRun] = useState<ModelTrainingRun | null>(null);
@@ -125,6 +127,7 @@ export default function App() {
             : nextHistory.model_backtest_history.overview.latest_run;
         setActiveRun(preferredRun);
         setOpportunityHistory(nextOpportunityHistory);
+        setOpportunityList(nextOpportunityList);
         setOpportunities(nextOpportunityList.opportunities);
         setModelHistory(nextModelHistory.model_history);
         const preferredOpportunityId =
@@ -417,6 +420,7 @@ export default function App() {
         fetchOpportunities()
       ]);
       setOpportunityHistory(nextOpportunityHistory);
+      setOpportunityList(nextOpportunityList);
       setOpportunities(nextOpportunityList.opportunities);
       const nextOpportunityId = materialized.opportunities[0]?.id ?? nextOpportunityList.opportunities[0]?.id ?? null;
       setActiveOpportunityId(nextOpportunityId);
@@ -856,7 +860,7 @@ export default function App() {
         />
       ) : null}
 
-      {!loading && viewMode === "opportunities" && opportunityHistory && opportunityOverview ? (
+      {!loading && viewMode === "opportunities" && opportunityHistory && opportunityOverview && opportunityList ? (
         <OpportunitiesWorkspace
           activeOpportunityId={activeOpportunityId}
           detailContent={
@@ -926,6 +930,7 @@ export default function App() {
             )
           }
           onSelectOpportunity={(opportunityId) => navigate({ name: "opportunity-detail", opportunityId })}
+          opportunityList={opportunityList}
           opportunities={opportunities}
           opportunityHistory={opportunityHistory}
           showQueueDetail={route.name === "opportunities"}

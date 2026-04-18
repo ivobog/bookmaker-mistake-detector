@@ -276,6 +276,22 @@ textarea {
   border-radius: 24px;
 }
 
+.queue-scope-panel {
+  margin-bottom: 18px;
+  padding: 18px;
+  border-radius: 20px;
+  background:
+    linear-gradient(135deg, rgba(244, 248, 255, 0.9), rgba(255, 250, 238, 0.88)),
+    rgba(255, 255, 255, 0.82);
+}
+
+.queue-scope-panel-warning {
+  border-color: rgba(171, 83, 33, 0.18);
+  background:
+    linear-gradient(135deg, rgba(255, 244, 232, 0.96), rgba(255, 252, 245, 0.92)),
+    rgba(255, 255, 255, 0.82);
+}
+
 .focus-panel {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(245, 249, 253, 0.8)),
@@ -315,6 +331,18 @@ textarea {
   color: #30415d;
   font-size: 0.84rem;
   font-weight: 600;
+}
+
+.pill-warning {
+  background: rgba(171, 83, 33, 0.14);
+  color: #8d471d;
+}
+
+.stump-explainability-panel {
+  border-color: rgba(54, 91, 144, 0.16);
+  background:
+    linear-gradient(160deg, rgba(239, 246, 255, 0.96), rgba(255, 255, 255, 0.92)),
+    rgba(255, 255, 255, 0.8);
 }
 
 .mini-grid {
