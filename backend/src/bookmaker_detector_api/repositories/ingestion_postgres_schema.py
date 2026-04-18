@@ -1,6 +1,59 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
+
+
+REPO_ROOT = Path(__file__).resolve().parents[4]
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeSchemaMutationOwnership:
+    helper_name: str
+    bootstrap_sql_path: str
+    operations: tuple[str, ...]
+    target_state: str
+
+    @property
+    def bootstrap_sql_abspath(self) -> Path:
+        return REPO_ROOT / self.bootstrap_sql_path
+
+
+RUNTIME_SCHEMA_MUTATION_OWNERSHIP: tuple[RuntimeSchemaMutationOwnership, ...] = (
+    RuntimeSchemaMutationOwnership(
+        helper_name="ensure_raw_row_source_identity_schema",
+        bootstrap_sql_path="infra/postgres/init/019_phase5_raw_row_source_identity_schema.sql",
+        operations=(
+            "ALTER TABLE raw_team_game_row ADD COLUMN source_page_url",
+            "ALTER TABLE raw_team_game_row ADD COLUMN source_page_season_label",
+            "UPDATE raw_team_game_row backfill source_page identity values",
+            "CREATE UNIQUE INDEX ux_raw_team_game_row_source_coordinates",
+        ),
+        target_state=(
+            "Keep owned by bootstrap SQL today; move to versioned migration tooling if schema evolution "
+            "resumes beyond the current init-chain."
+        ),
+    ),
+    RuntimeSchemaMutationOwnership(
+        helper_name="ensure_data_quality_issue_identity_schema",
+        bootstrap_sql_path=(
+            "infra/postgres/init/020_phase7_data_quality_issue_identity_schema.sql"
+        ),
+        operations=(
+            "DELETE duplicate data_quality_issue identity rows",
+            "CREATE UNIQUE INDEX ux_data_quality_issue_identity",
+        ),
+        target_state=(
+            "Keep owned by bootstrap SQL today; treat duplicate cleanup plus index creation as migration-owned "
+            "work if this table evolves again."
+        ),
+    ),
+)
+
+
+def list_runtime_schema_mutation_ownership() -> tuple[RuntimeSchemaMutationOwnership, ...]:
+    return RUNTIME_SCHEMA_MUTATION_OWNERSHIP
 
 
 def verify_raw_row_source_identity_schema(connection: Any) -> bool:

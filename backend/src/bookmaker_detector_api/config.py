@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     def resolved_postgres_allow_runtime_schema_mutation(self) -> bool:
         if self.postgres_allow_runtime_schema_mutation is not None:
             return self.postgres_allow_runtime_schema_mutation
-        return self.api_env.lower() != "production"
+        return False
 
 
 settings = Settings()

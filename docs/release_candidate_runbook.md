@@ -17,8 +17,11 @@ Use it together with:
 
 ## Schema Contract
 - PostgreSQL schema ownership lives in `infra/postgres/init/`.
+- The current migration authority is the ordered bootstrap SQL chain in `infra/postgres/init/`; Alembic is not in the repo yet.
 - Normal API and worker execution must assume the schema already exists.
 - Runtime DDL is no longer part of request handling or worker execution.
+- `POSTGRES_ALLOW_RUNTIME_SCHEMA_MUTATION` now defaults to disabled in every environment.
+- Only explicit bootstrap or demo-maintenance flows should opt into runtime schema mutation, and that opt-in should stay exceptional.
 - `docker compose up --build` applies the init SQL only when the Postgres data directory is empty.
 - If you point the stack at an existing database or reused volume, apply the SQL in `infra/postgres/init/` before starting postgres-backed services.
 - Production backend startup now fails fast when required tables are missing, with an error that points back to `infra/postgres/init`.

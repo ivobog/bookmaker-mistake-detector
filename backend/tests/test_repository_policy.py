@@ -18,7 +18,7 @@ from bookmaker_detector_api.repositories.ingestion_types import (
 )
 
 
-def test_settings_resolved_postgres_allow_runtime_schema_mutation_defaults_by_env() -> None:
+def test_settings_resolved_postgres_allow_runtime_schema_mutation_defaults_to_disabled() -> None:
     assert (
         Settings(
             api_env="production",
@@ -31,7 +31,7 @@ def test_settings_resolved_postgres_allow_runtime_schema_mutation_defaults_by_en
             api_env="development",
             postgres_allow_runtime_schema_mutation=None,
         ).resolved_postgres_allow_runtime_schema_mutation
-        is True
+        is False
     )
     assert (
         Settings(
@@ -45,6 +45,27 @@ def test_settings_resolved_postgres_allow_runtime_schema_mutation_defaults_by_en
 def test_ingestion_repository_contract_exports_resolve_to_canonical_protocol() -> None:
     assert package_ingestion_repository is canonical_ingestion_repository
     assert shim_ingestion_repository is canonical_ingestion_repository
+
+
+def test_build_bootstrap_postgres_ingestion_repository_enables_runtime_schema_mutation(
+    monkeypatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeRepository:
+        def __init__(self, connection, *, allow_runtime_schema_mutation=True) -> None:
+            captured["connection"] = connection
+            captured["allow_runtime_schema_mutation"] = allow_runtime_schema_mutation
+
+    monkeypatch.setattr(repo_factory, "PostgresIngestionRepository", FakeRepository)
+
+    repository = repo_factory.build_bootstrap_postgres_ingestion_repository("bootstrap-connection")
+
+    assert isinstance(repository, FakeRepository)
+    assert captured == {
+        "connection": "bootstrap-connection",
+        "allow_runtime_schema_mutation": True,
+    }
 
 
 def test_build_ingestion_repository_passes_runtime_schema_policy(monkeypatch) -> None:
