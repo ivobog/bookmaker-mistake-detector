@@ -93,7 +93,11 @@ BOOTSTRAP_SQL_CHAIN: tuple[BootstrapSqlFile, ...] = (
         "infra/postgres/init/021_phase3_market_board_source_run_schema.sql",
         "market board source runs",
     ),
-    BootstrapSqlFile(22, "infra/postgres/init/022_seed_2025_2026_season.sql", "2025-2026 season seed"),
+    BootstrapSqlFile(
+        22,
+        "infra/postgres/init/022_seed_2025_2026_season.sql",
+        "2025-2026 season seed",
+    ),
     BootstrapSqlFile(
         23,
         "infra/postgres/init/023_phase3_opportunity_materialization_batch_schema.sql",

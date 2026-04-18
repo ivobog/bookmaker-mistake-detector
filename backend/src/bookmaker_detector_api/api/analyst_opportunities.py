@@ -12,10 +12,10 @@ from bookmaker_detector_api.api.schemas import (
 )
 from bookmaker_detector_api.config import settings
 from bookmaker_detector_api.db.postgres import postgres_connection
-from bookmaker_detector_api.services.model_records import ModelOpportunityRecord
 from bookmaker_detector_api.services.model_market_board_views import (
     _serialize_model_opportunity,
 )
+from bookmaker_detector_api.services.model_records import ModelOpportunityRecord
 from bookmaker_detector_api.services.models import (
     get_model_opportunity_detail_in_memory,
     get_model_opportunity_detail_postgres,

@@ -423,9 +423,12 @@ def save_model_opportunities_postgres(
                     evidence_rating = EXCLUDED.evidence_rating,
                     recommendation_status = EXCLUDED.recommendation_status,
                     materialized_at = EXCLUDED.materialized_at,
-                    materialization_scope_team_code = EXCLUDED.materialization_scope_team_code,
-                    materialization_scope_season_label = EXCLUDED.materialization_scope_season_label,
-                    materialization_scope_canonical_game_id = EXCLUDED.materialization_scope_canonical_game_id,
+                    materialization_scope_team_code =
+                        EXCLUDED.materialization_scope_team_code,
+                    materialization_scope_season_label =
+                        EXCLUDED.materialization_scope_season_label,
+                    materialization_scope_canonical_game_id =
+                        EXCLUDED.materialization_scope_canonical_game_id,
                     materialization_scope_source = EXCLUDED.materialization_scope_source,
                     materialization_scope_key = EXCLUDED.materialization_scope_key,
                     payload_json = EXCLUDED.payload_json,
@@ -887,7 +890,11 @@ def _matches_opportunity_filters(
 ) -> bool:
     if target_task is not None and entry["target_task"] != target_task:
         return False
-    if team_code is not None and entry["team_code"] != team_code and entry["opponent_code"] != team_code:
+    if (
+        team_code is not None
+        and entry["team_code"] != team_code
+        and entry["opponent_code"] != team_code
+    ):
         return False
     if status is not None and entry["status"] != status:
         return False
@@ -1048,7 +1055,8 @@ def _build_model_opportunity_queue_result(
         "queue_scope": scope_payload,
         "queue_scope_label": build_materialization_scope_label(scope_payload),
         "queue_scope_is_scoped": bool(
-            batch_anchor is not None and batch_anchor.get("materialization_scope_source") != "operator"
+            batch_anchor is not None
+            and batch_anchor.get("materialization_scope_source") != "operator"
         ),
         "opportunities": opportunities,
     }
