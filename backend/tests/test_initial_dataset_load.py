@@ -1,6 +1,7 @@
 import json
 import logging
 from contextlib import contextmanager
+from datetime import date
 
 from bookmaker_detector_api.config import settings
 from bookmaker_detector_api.ingestion.providers import (
@@ -626,6 +627,83 @@ def test_parse_csv_values_handles_empty_strings() -> None:
     assert loader.parse_csv_values(None) is None
     assert loader.parse_csv_values("") is None
     assert loader.parse_csv_values("LAL, BOS ,, NYK") == ["LAL", "BOS", "NYK"]
+
+
+def test_load_season_scope_allows_explicit_active_seasons() -> None:
+    executed: dict[str, object] = {}
+
+    class FakeCursor:
+        def execute(self, query, params) -> None:
+            executed["query"] = query
+            executed["params"] = params
+
+        def fetchall(self):
+            return [("2025-2026", date(2025, 10, 21), date(2026, 6, 19))]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+    class FakeConnection:
+        def cursor(self):
+            return FakeCursor()
+
+    result = loader._load_season_scope(FakeConnection(), season_labels=["2025-2026"])
+
+    assert result == [
+        {
+            "label": "2025-2026",
+            "start_date": date(2025, 10, 21),
+            "end_date": date(2026, 6, 19),
+        }
+    ]
+    assert "WHERE label = ANY(%s)" in str(executed["query"])
+    assert "is_completed = TRUE" not in str(executed["query"])
+    assert executed["params"] == [["2025-2026"]]
+
+
+def test_load_season_scope_defaults_to_recent_completed_seasons() -> None:
+    executed: dict[str, object] = {}
+
+    class FakeCursor:
+        def execute(self, query, params) -> None:
+            executed["query"] = query
+            executed["params"] = params
+
+        def fetchall(self):
+            return [
+                ("2024-2025", date(2024, 10, 22), date(2025, 6, 22)),
+                ("2023-2024", date(2023, 10, 24), date(2024, 6, 17)),
+            ]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+    class FakeConnection:
+        def cursor(self):
+            return FakeCursor()
+
+    result = loader._load_season_scope(FakeConnection(), season_labels=None)
+
+    assert result == [
+        {
+            "label": "2023-2024",
+            "start_date": date(2023, 10, 24),
+            "end_date": date(2024, 6, 17),
+        },
+        {
+            "label": "2024-2025",
+            "start_date": date(2024, 10, 22),
+            "end_date": date(2025, 6, 22),
+        },
+    ]
+    assert "WHERE is_completed = TRUE ORDER BY start_date DESC LIMIT 4" in str(executed["query"])
+    assert executed["params"] == []
 
 
 def test_run_target_load_rolls_back_aborted_transaction_before_failure_logging(

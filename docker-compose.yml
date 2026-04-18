@@ -23,10 +23,11 @@ services:
     container_name: bookmaker-backend
     environment:
       API_ENV: ${API_ENV}
+      API_REPOSITORY_MODE: ${API_REPOSITORY_MODE:-}
       API_HOST: ${API_HOST}
       API_PORT: ${API_PORT}
       API_CORS_ORIGINS: ${API_CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173}
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       RAW_PAYLOAD_DIR: ${RAW_PAYLOAD_DIR}
       THE_ODDS_API_KEY: ${THE_ODDS_API_KEY:-}
       THE_ODDS_API_BASE_URL: ${THE_ODDS_API_BASE_URL:-https://api.the-odds-api.com/v4}
@@ -49,7 +50,7 @@ services:
     container_name: bookmaker-worker
     environment:
       WORKER_ENV: ${WORKER_ENV}
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       RAW_PAYLOAD_DIR: ${RAW_PAYLOAD_DIR}
       WORKER_POLL_INTERVAL_SECONDS: ${WORKER_POLL_INTERVAL_SECONDS}
       WORKER_JOB_MODE: ${WORKER_JOB_MODE}

@@ -422,21 +422,22 @@ def _load_season_scope(
     query = """
         SELECT label, start_date, end_date
         FROM season
-        WHERE is_completed = TRUE
     """
     params: list[object] = []
     if season_labels is not None:
-        query += " AND label = ANY(%s)"
+        query += " WHERE label = ANY(%s)"
         params.append(season_labels)
         query += " ORDER BY start_date"
     else:
-        query += " ORDER BY start_date DESC LIMIT 4"
+        query += " WHERE is_completed = TRUE ORDER BY start_date DESC LIMIT 4"
 
     with connection.cursor() as cursor:
         cursor.execute(query, params)
         rows = cursor.fetchall()
 
     if not rows:
+        if season_labels is not None:
+            raise ValueError("No seasons matched the requested initial dataset scope.")
         raise ValueError("No completed seasons matched the requested initial dataset scope.")
 
     ordered_rows = rows if season_labels is not None else list(reversed(rows))

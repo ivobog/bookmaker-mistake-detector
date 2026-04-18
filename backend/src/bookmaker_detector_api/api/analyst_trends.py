@@ -17,7 +17,7 @@ router = APIRouter(prefix="/analyst", tags=["analyst"])
 
 
 def _use_postgres_analyst_mode() -> bool:
-    return settings.api_env.lower() == "production"
+    return settings.use_postgres_stable_read_mode
 
 
 @router.get("/trends/summary", response_model=AnalystTrendResponse)

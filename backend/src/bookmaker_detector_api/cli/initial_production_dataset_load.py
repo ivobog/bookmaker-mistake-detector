@@ -32,7 +32,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Optional comma-separated season scope. Defaults to the last four completed "
-            "seasons in the reference table."
+            "seasons in the reference table; explicit labels may include the active season."
         ),
     )
     parser.add_argument(

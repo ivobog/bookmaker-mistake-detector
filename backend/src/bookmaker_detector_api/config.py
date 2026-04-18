@@ -7,6 +7,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 
 class Settings(BaseSettings):
     api_env: str = "development"
+    api_repository_mode: str | None = None
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     api_cors_origins: str = (
@@ -49,6 +50,15 @@ class Settings(BaseSettings):
         if self.postgres_allow_runtime_schema_mutation is not None:
             return self.postgres_allow_runtime_schema_mutation
         return False
+
+    @property
+    def use_postgres_stable_read_mode(self) -> bool:
+        configured_mode = (self.api_repository_mode or "").strip().lower()
+        if configured_mode == "postgres":
+            return True
+        if configured_mode == "in_memory":
+            return False
+        return self.api_env.strip().lower() == "production"
 
 
 settings = Settings()

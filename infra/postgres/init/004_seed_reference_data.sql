@@ -7,7 +7,8 @@ VALUES
     ('2021-2022', DATE '2021-10-19', DATE '2022-06-16', TRUE),
     ('2022-2023', DATE '2022-10-18', DATE '2023-06-12', TRUE),
     ('2023-2024', DATE '2023-10-24', DATE '2024-06-17', TRUE),
-    ('2024-2025', DATE '2024-10-22', DATE '2025-06-22', TRUE)
+    ('2024-2025', DATE '2024-10-22', DATE '2025-06-22', TRUE),
+    ('2025-2026', DATE '2025-10-21', DATE '2026-06-19', FALSE)
 ON CONFLICT (label) DO NOTHING;
 
 INSERT INTO team (code, name, conference, division)
@@ -43,4 +44,3 @@ VALUES
     ('UTA', 'Utah Jazz', 'West', 'Northwest'),
     ('WAS', 'Washington Wizards', 'East', 'Southeast')
 ON CONFLICT (code) DO NOTHING;
-

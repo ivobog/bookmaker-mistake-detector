@@ -28,7 +28,7 @@ class FutureSlateRequest(BaseModel):
 
 
 def _use_postgres_stable_read_mode() -> bool:
-    return settings.api_env.lower() == "production"
+    return settings.use_postgres_stable_read_mode
 
 
 def _prepare_in_memory_phase_three_model_repository(
