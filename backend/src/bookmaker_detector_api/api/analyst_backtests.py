@@ -12,7 +12,7 @@ from bookmaker_detector_api.api.schemas import (
 )
 from bookmaker_detector_api.config import settings
 from bookmaker_detector_api.db.postgres import postgres_connection
-from bookmaker_detector_api.repositories import InMemoryIngestionRepository
+from bookmaker_detector_api.services.repository_factory import build_in_memory_phase_three_modeling_store
 from bookmaker_detector_api.services.model_records import ModelBacktestRunRecord
 from bookmaker_detector_api.services.models import (
     get_model_backtest_detail_in_memory,
@@ -60,7 +60,7 @@ def _load_backtest_runs(filters: AnalystBacktestListFilters) -> tuple[str, list[
             )
         return "postgres", runs
 
-    repository = InMemoryIngestionRepository()
+    repository = build_in_memory_phase_three_modeling_store()
     runs = list_model_backtest_runs_in_memory(
         repository,
         target_task=filters.target_task,
@@ -79,7 +79,7 @@ def _load_backtest_detail(backtest_run_id: int) -> tuple[str, dict[str, object] 
             )
         return "postgres", backtest_run
 
-    repository = InMemoryIngestionRepository()
+    repository = build_in_memory_phase_three_modeling_store()
     backtest_run = get_model_backtest_detail_in_memory(
         repository,
         backtest_run_id=backtest_run_id,
@@ -110,3 +110,6 @@ def phase_four_model_backtest_detail(
             AnalystBacktestRun.model_validate(backtest_run) if backtest_run is not None else None
         ),
     )
+
+
+

@@ -12,7 +12,7 @@ from bookmaker_detector_api.api.schemas import (
 )
 from bookmaker_detector_api.config import settings
 from bookmaker_detector_api.db.postgres import postgres_connection
-from bookmaker_detector_api.repositories import InMemoryIngestionRepository
+from bookmaker_detector_api.services.repository_factory import build_in_memory_phase_three_modeling_store
 from bookmaker_detector_api.services.model_records import ModelOpportunityRecord
 from bookmaker_detector_api.services.models import (
     get_model_opportunity_detail_in_memory,
@@ -72,7 +72,7 @@ def _load_opportunities(
             )
         return "postgres", opportunities
 
-    repository = InMemoryIngestionRepository()
+    repository = build_in_memory_phase_three_modeling_store()
     opportunities = list_model_opportunities_in_memory(
         repository,
         target_task=filters.target_task,
@@ -94,7 +94,7 @@ def _load_opportunity_detail(opportunity_id: int) -> tuple[str, dict[str, object
             )
         return "postgres", opportunity
 
-    repository = InMemoryIngestionRepository()
+    repository = build_in_memory_phase_three_modeling_store()
     opportunity = get_model_opportunity_detail_in_memory(
         repository,
         opportunity_id=opportunity_id,
@@ -126,3 +126,6 @@ def phase_three_model_opportunity_detail(
             AnalystOpportunity.model_validate(opportunity) if opportunity is not None else None
         ),
     )
+
+
+

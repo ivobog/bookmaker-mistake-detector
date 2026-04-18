@@ -4,8 +4,8 @@ from dataclasses import asdict
 from datetime import date, datetime, timezone
 from typing import Any
 
-from bookmaker_detector_api.repositories import InMemoryIngestionRepository
-from bookmaker_detector_api.repositories.ingestion import _json_dumps
+from bookmaker_detector_api.repositories import ModelScoringArtifactStore
+from bookmaker_detector_api.repositories.ingestion_json import _json_dumps
 from bookmaker_detector_api.services import model_training_views
 from bookmaker_detector_api.services.model_market_board_views import _serialize_model_scoring_run
 from bookmaker_detector_api.services.model_records import ModelScoringRunRecord
@@ -77,7 +77,7 @@ def build_model_scoring_run(
 
 
 def save_model_scoring_run_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelScoringArtifactStore,
     scoring_run: ModelScoringRunRecord | None,
 ) -> ModelScoringRunRecord | None:
     if scoring_run is None:
@@ -171,7 +171,7 @@ def save_model_scoring_run_postgres(
 
 
 def list_model_scoring_runs_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelScoringArtifactStore,
     *,
     model_market_board_id: int | None = None,
     target_task: str | None = None,
@@ -281,7 +281,7 @@ def list_model_scoring_runs_postgres(
 
 
 def get_model_scoring_run_detail_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelScoringArtifactStore,
     *,
     scoring_run_id: int,
 ) -> dict[str, Any] | None:
@@ -313,7 +313,7 @@ def get_model_scoring_run_detail_postgres(
 
 
 def get_model_scoring_history_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelScoringArtifactStore,
     *,
     model_market_board_id: int | None = None,
     target_task: str | None = None,

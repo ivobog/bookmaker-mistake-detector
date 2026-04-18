@@ -12,7 +12,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from bookmaker_detector_api.config import settings
-from bookmaker_detector_api.repositories.ingestion import _json_dumps
+from bookmaker_detector_api.repositories.ingestion_json import _json_dumps
 from bookmaker_detector_api.services.model_records import (
     MarketBoardSourceProvider,
     ModelMarketBoardRecord,

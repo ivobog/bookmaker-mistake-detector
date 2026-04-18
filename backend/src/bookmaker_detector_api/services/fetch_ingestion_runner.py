@@ -5,8 +5,8 @@ from dataclasses import asdict
 from bookmaker_detector_api.config import settings
 from bookmaker_detector_api.fetching import store_raw_payload
 from bookmaker_detector_api.ingestion.providers import CoversHistoricalTeamPageProvider
-from bookmaker_detector_api.repositories import InMemoryIngestionRepository
-from bookmaker_detector_api.repositories.ingestion import IngestionRepository, PageRetrievalRecord
+from bookmaker_detector_api.repositories import InMemoryIngestionRepository, IngestionRepository
+from bookmaker_detector_api.repositories.ingestion_types import PageRetrievalRecord
 from bookmaker_detector_api.services.ingestion_pipeline import (
     HistoricalIngestionRequest,
     ingest_historical_team_page,

@@ -4,8 +4,8 @@ from dataclasses import asdict
 from datetime import date, datetime, timezone
 from typing import Any
 
-from bookmaker_detector_api.repositories import InMemoryIngestionRepository
-from bookmaker_detector_api.repositories.ingestion import _json_dumps
+from bookmaker_detector_api.repositories import MarketBoardOperationStore
+from bookmaker_detector_api.repositories.ingestion_json import _json_dumps
 from bookmaker_detector_api.services.model_records import (
     ModelMarketBoardCadenceBatchRecord,
     ModelMarketBoardRecord,
@@ -17,7 +17,7 @@ from bookmaker_detector_api.services.model_records import (
 
 
 def list_model_market_board_source_runs_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: MarketBoardOperationStore,
     *,
     target_task: str | None = None,
     source_name: str | None = None,
@@ -104,7 +104,7 @@ def list_model_market_board_source_runs_postgres(
 
 
 def list_model_market_boards_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: MarketBoardOperationStore,
     *,
     target_task: str | None = None,
     season_label: str | None = None,
@@ -177,7 +177,7 @@ def list_model_market_boards_postgres(
 
 
 def list_model_market_board_refresh_events_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: MarketBoardOperationStore,
     *,
     target_task: str | None = None,
     source_name: str | None = None,
@@ -252,7 +252,7 @@ def list_model_market_board_refresh_events_postgres(
 
 
 def list_model_market_board_refresh_batches_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: MarketBoardOperationStore,
     *,
     target_task: str | None = None,
     source_name: str | None = None,
@@ -337,7 +337,7 @@ def list_model_market_board_refresh_batches_postgres(
 
 
 def list_model_market_board_scoring_batches_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: MarketBoardOperationStore,
     *,
     target_task: str | None = None,
     source_name: str | None = None,
@@ -420,7 +420,7 @@ def list_model_market_board_scoring_batches_postgres(
 
 
 def list_model_market_board_cadence_batches_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: MarketBoardOperationStore,
     *,
     target_task: str | None = None,
     source_name: str | None = None,
@@ -503,7 +503,7 @@ def list_model_market_board_cadence_batches_postgres(
 
 
 def _find_model_market_board_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: MarketBoardOperationStore,
     *,
     board_key: str,
 ) -> ModelMarketBoardRecord | None:
@@ -643,7 +643,7 @@ def _build_model_market_board(
 
 
 def save_model_market_board_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: MarketBoardOperationStore,
     board: ModelMarketBoardRecord,
 ) -> ModelMarketBoardRecord:
     payload = asdict(board)
@@ -741,7 +741,7 @@ def save_model_market_board_postgres(
 
 
 def save_model_market_board_refresh_event_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: MarketBoardOperationStore,
     refresh_event: ModelMarketBoardRefreshRecord,
 ) -> ModelMarketBoardRefreshRecord:
     payload = asdict(refresh_event)
@@ -1063,7 +1063,7 @@ def _build_model_market_board_refresh_batch(
 
 
 def save_model_market_board_refresh_batch_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: MarketBoardOperationStore,
     batch: ModelMarketBoardRefreshBatchRecord,
 ) -> ModelMarketBoardRefreshBatchRecord:
     payload = asdict(batch)
@@ -1183,7 +1183,7 @@ def _build_model_market_board_source_run(
 
 
 def save_model_market_board_source_run_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: MarketBoardOperationStore,
     source_run: ModelMarketBoardSourceRunRecord,
 ) -> ModelMarketBoardSourceRunRecord:
     payload = asdict(source_run)
@@ -1277,7 +1277,7 @@ def _build_model_market_board_scoring_batch(
 
 
 def save_model_market_board_scoring_batch_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: MarketBoardOperationStore,
     batch: ModelMarketBoardScoringBatchRecord,
 ) -> ModelMarketBoardScoringBatchRecord:
     payload = asdict(batch)
@@ -1373,7 +1373,7 @@ def _build_model_market_board_cadence_batch(
 
 
 def save_model_market_board_cadence_batch_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: MarketBoardOperationStore,
     batch: ModelMarketBoardCadenceBatchRecord,
 ) -> ModelMarketBoardCadenceBatchRecord:
     payload = asdict(batch)

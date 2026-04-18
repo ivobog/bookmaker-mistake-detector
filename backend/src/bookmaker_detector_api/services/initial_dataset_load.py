@@ -10,7 +10,7 @@ from bookmaker_detector_api.ingestion.providers import (
     DiscoveredTeamPage,
 )
 from bookmaker_detector_api.repositories import PostgresIngestionRepository
-from bookmaker_detector_api.repositories.ingestion import PageRetrievalRecord
+from bookmaker_detector_api.repositories.ingestion_types import PageRetrievalRecord
 from bookmaker_detector_api.services.ingestion_pipeline import (
     HistoricalIngestionRequest,
     ingest_historical_team_page,
@@ -21,6 +21,16 @@ from bookmaker_detector_api.team_normalization import (
 )
 
 DEFAULT_COVERS_NBA_TEAMS_INDEX_URL = "https://www.covers.com/sport/basketball/nba/teams"
+
+
+def _build_bootstrap_repository(connection) -> PostgresIngestionRepository:
+    try:
+        return PostgresIngestionRepository(
+            connection,
+            allow_runtime_schema_mutation=True,
+        )
+    except TypeError:
+        return PostgresIngestionRepository(connection)
 
 
 @dataclass(frozen=True)
@@ -62,7 +72,7 @@ def run_initial_production_dataset_load(
             team_codes=team_codes,
             season_labels=season_labels,
         )
-        repository = PostgresIngestionRepository(connection)
+        repository = _build_bootstrap_repository(connection)
 
         results: list[dict[str, object]] = []
         stopped_early = False

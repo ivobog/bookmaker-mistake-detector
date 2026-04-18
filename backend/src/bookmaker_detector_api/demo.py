@@ -24,6 +24,9 @@ from bookmaker_detector_api.services.ingestion_pipeline import (
     ingest_historical_team_page,
 )
 from bookmaker_detector_api.services.metrics import calculate_game_metric
+from bookmaker_detector_api.services.repository_factory import (
+    build_bootstrap_postgres_ingestion_repository,
+)
 
 FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures"
 
@@ -257,7 +260,7 @@ def seed_phase_two_feature_postgres(
 ) -> tuple[PostgresIngestionRepository, object, dict[str, object]]:
     provider = CoversHistoricalTeamPageProvider()
     fixture_html = provider.load_fixture(FIXTURE_DIR / "covers_sample_team_page.html")
-    repository = PostgresIngestionRepository(connection)
+    repository = build_bootstrap_postgres_ingestion_repository(connection)
     ingest_result = ingest_historical_team_page(
         request=HistoricalIngestionRequest(
             provider_name=provider.provider_name,

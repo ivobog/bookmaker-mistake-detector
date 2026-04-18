@@ -4,7 +4,8 @@ from fastapi import APIRouter, Body, Query
 
 from bookmaker_detector_api.db.postgres import postgres_connection
 from bookmaker_detector_api.demo import seed_phase_two_feature_in_memory
-from bookmaker_detector_api.repositories import InMemoryIngestionRepository
+from bookmaker_detector_api.repositories import PhaseThreeModelingStore
+from bookmaker_detector_api.services.repository_factory import build_in_memory_phase_three_modeling_store
 from bookmaker_detector_api.services.models import (
     get_model_market_board_cadence_batch_history_in_memory,
     get_model_market_board_cadence_batch_history_postgres,
@@ -62,8 +63,8 @@ def _prepare_in_memory_market_board_refresh_repository(
     slate_label: str | None,
     game_count: int | None,
     source_path: str | None = None,
-) -> InMemoryIngestionRepository:
-    repository = InMemoryIngestionRepository()
+) -> PhaseThreeModelingStore:
+    repository = build_in_memory_phase_three_modeling_store()
     refresh_model_market_board_in_memory(
         repository,
         target_task=target_task,
@@ -91,7 +92,7 @@ def _prepare_in_memory_market_board_score_repository(
     total_line: float | None,
     train_ratio: float,
     validation_ratio: float,
-) -> tuple[InMemoryIngestionRepository, str]:
+) -> tuple[PhaseThreeModelingStore, str]:
     repository, _, _ = seed_phase_two_feature_in_memory()
     materialize_model_market_board_in_memory(
         repository,
@@ -142,7 +143,7 @@ def _prepare_in_memory_market_board_orchestration_repository(
     run_refresh_orchestration: bool = False,
     run_scoring_orchestration: bool = False,
     run_cadence_orchestration: bool = False,
-) -> InMemoryIngestionRepository:
+) -> PhaseThreeModelingStore:
     repository, _, _ = seed_phase_two_feature_in_memory()
     resolved_source_name = source_name or "demo_daily_lines_v1"
     refresh_model_market_board_in_memory(
@@ -233,7 +234,7 @@ def phase_three_model_market_board_refresh(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         result = refresh_model_market_board_in_memory(
             repository,
             target_task=target_task,
@@ -282,7 +283,7 @@ def phase_three_model_market_board_history(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         history = get_model_market_board_refresh_history_in_memory(
             repository,
             target_task=target_task,
@@ -329,7 +330,7 @@ def phase_three_model_market_board_source_runs(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         history = get_model_market_board_source_run_history_in_memory(
             repository,
             target_task=target_task,
@@ -380,7 +381,7 @@ def phase_three_model_market_board_refresh_queue(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         queue = get_model_market_board_refresh_queue_in_memory(
             repository,
             target_task=target_task,
@@ -434,7 +435,7 @@ def phase_three_model_market_board_queue(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         queue = get_model_market_board_scoring_queue_in_memory(
             repository,
             target_task=target_task,
@@ -738,7 +739,7 @@ def phase_three_model_market_board_refresh_orchestration_history(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         history = get_model_market_board_refresh_batch_history_in_memory(
             repository,
             target_task=target_task,
@@ -791,7 +792,7 @@ def phase_three_model_market_board_cadence_history(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         history = get_model_market_board_cadence_batch_history_in_memory(
             repository,
             target_task=target_task,
@@ -847,7 +848,7 @@ def phase_three_model_market_board_orchestration_history(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         history = get_model_market_board_scoring_batch_history_in_memory(
             repository,
             target_task=target_task,
@@ -902,7 +903,7 @@ def phase_three_model_market_board_cadence(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         dashboard = get_model_market_board_cadence_dashboard_in_memory(
             repository,
             target_task=target_task,
@@ -948,7 +949,7 @@ def phase_three_model_market_board_materialize(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         board_result = materialize_model_market_board_in_memory(
             repository,
             target_task=target_task,
@@ -987,7 +988,7 @@ def phase_three_model_market_boards(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         boards = list_model_market_boards_in_memory(
             repository,
             target_task=target_task,
@@ -1023,7 +1024,7 @@ def phase_three_model_market_board_detail(
             board = get_model_market_board_detail_postgres(connection, board_id=board_id)
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         board = get_model_market_board_detail_in_memory(repository, board_id=board_id)
         repository_mode = "in_memory"
 
@@ -1062,7 +1063,7 @@ def phase_three_model_market_board_operations(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         operations = get_model_market_board_operations_in_memory(
             repository,
             board_id=board_id,
@@ -1166,3 +1167,6 @@ def phase_three_model_market_board_score(
         },
         **result,
     }
+
+
+

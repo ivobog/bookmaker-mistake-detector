@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from bookmaker_detector_api.repositories import InMemoryIngestionRepository
+from bookmaker_detector_api.repositories import ModelTrainingArtifactStore
 from bookmaker_detector_api.services.model_records import (
     ModelEvaluationSnapshotRecord,
     ModelRegistryRecord,
@@ -13,7 +13,7 @@ from bookmaker_detector_api.services.model_records import (
 
 
 def list_model_registry_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelTrainingArtifactStore,
     *,
     target_task: str | None = None,
 ) -> list[ModelRegistryRecord]:
@@ -25,7 +25,7 @@ def list_model_registry_in_memory(
 
 
 def list_model_training_runs_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelTrainingArtifactStore,
     *,
     target_task: str | None = None,
     team_code: str | None = None,
@@ -49,7 +49,7 @@ def list_model_training_runs_in_memory(
 
 
 def get_model_training_run_detail_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelTrainingArtifactStore,
     *,
     run_id: int,
 ) -> ModelTrainingRunRecord | None:
@@ -178,7 +178,7 @@ def get_model_training_run_detail_postgres(
 
 
 def list_model_evaluation_snapshots_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelTrainingArtifactStore,
     *,
     target_task: str | None = None,
     model_family: str | None = None,
@@ -200,7 +200,7 @@ def list_model_evaluation_snapshots_in_memory(
 
 
 def get_model_evaluation_snapshot_detail_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelTrainingArtifactStore,
     *,
     snapshot_id: int,
 ) -> ModelEvaluationSnapshotRecord | None:
@@ -289,7 +289,7 @@ def get_model_evaluation_snapshot_detail_postgres(
 
 
 def get_model_training_summary_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelTrainingArtifactStore,
     *,
     target_task: str | None = None,
     team_code: str | None = None,
@@ -321,7 +321,7 @@ def get_model_training_summary_postgres(
 
 
 def get_model_training_history_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelTrainingArtifactStore,
     *,
     target_task: str | None = None,
     team_code: str | None = None,
@@ -355,7 +355,7 @@ def get_model_training_history_postgres(
 
 
 def get_model_evaluation_history_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelTrainingArtifactStore,
     *,
     target_task: str | None = None,
     model_family: str | None = None,
@@ -385,7 +385,7 @@ def get_model_evaluation_history_postgres(
 
 
 def list_model_selection_snapshots_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelTrainingArtifactStore,
     *,
     target_task: str | None = None,
     active_only: bool = False,
@@ -407,7 +407,7 @@ def list_model_selection_snapshots_in_memory(
 
 
 def get_model_selection_snapshot_detail_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelTrainingArtifactStore,
     *,
     selection_id: int,
 ) -> ModelSelectionSnapshotRecord | None:
@@ -487,7 +487,7 @@ def get_model_selection_snapshot_detail_postgres(
 
 
 def get_model_selection_history_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelTrainingArtifactStore,
     *,
     target_task: str | None = None,
     recent_limit: int = 10,

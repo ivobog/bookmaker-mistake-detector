@@ -7,7 +7,8 @@ from bookmaker_detector_api.demo import (
     run_phase_two_feature_demo as run_phase_two_feature_demo_job,
 )
 from bookmaker_detector_api.demo import seed_phase_two_feature_in_memory
-from bookmaker_detector_api.repositories import InMemoryIngestionRepository
+from bookmaker_detector_api.repositories import FeatureDatasetStore
+from bookmaker_detector_api.services.repository_factory import build_in_memory_feature_dataset_store
 from bookmaker_detector_api.services.features import (
     get_feature_analysis_artifact_catalog_in_memory,
     get_feature_analysis_artifact_catalog_postgres,
@@ -42,7 +43,7 @@ def _use_postgres_stable_read_mode() -> bool:
     return settings.api_env.lower() == "production"
 
 
-def _prepare_in_memory_feature_repository() -> InMemoryIngestionRepository:
+def _prepare_in_memory_feature_repository() -> FeatureDatasetStore:
     repository, _, _ = seed_phase_two_feature_in_memory()
     return repository
 
@@ -73,7 +74,7 @@ def feature_snapshots(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_feature_dataset_store()
         snapshot_result = get_feature_snapshot_catalog_in_memory(
             repository,
             feature_key=feature_key,
@@ -117,7 +118,7 @@ def feature_dataset(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_feature_dataset_store()
         dataset_result = get_feature_dataset_in_memory(
             repository,
             feature_key=feature_key,
@@ -157,7 +158,7 @@ def feature_dataset_profile(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_feature_dataset_store()
         profile_result = get_feature_dataset_profile_in_memory(
             repository,
             feature_key=feature_key,
@@ -304,7 +305,7 @@ def feature_analysis_artifacts(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_feature_dataset_store()
         artifact_result = get_feature_analysis_artifact_catalog_in_memory(
             repository,
             feature_key=feature_key,
@@ -382,7 +383,7 @@ def feature_analysis_history(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_feature_dataset_store()
         history_result = get_feature_analysis_artifact_history_in_memory(
             repository,
             feature_key=feature_key,
@@ -441,7 +442,7 @@ def feature_dataset_splits(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_feature_dataset_store()
         split_result = get_feature_dataset_splits_in_memory(
             repository,
             feature_key=feature_key,
@@ -491,7 +492,7 @@ def feature_dataset_training_view(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_feature_dataset_store()
         training_view = get_feature_training_view_in_memory(
             repository,
             feature_key=feature_key,
@@ -539,7 +540,7 @@ def feature_dataset_training_manifest(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_feature_dataset_store()
         training_manifest = get_feature_training_manifest_in_memory(
             repository,
             feature_key=feature_key,
@@ -589,7 +590,7 @@ def feature_dataset_training_bundle(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_feature_dataset_store()
         training_bundle = get_feature_training_bundle_in_memory(
             repository,
             feature_key=feature_key,
@@ -643,7 +644,7 @@ def feature_dataset_training_benchmark(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_feature_dataset_store()
         training_benchmark = get_feature_training_benchmark_in_memory(
             repository,
             feature_key=feature_key,
@@ -693,7 +694,7 @@ def feature_dataset_training_task_matrix(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_feature_dataset_store()
         training_task_matrix = get_feature_training_task_matrix_in_memory(
             repository,
             feature_key=feature_key,
@@ -717,3 +718,7 @@ def feature_dataset_training_task_matrix(
         },
         **training_task_matrix,
     }
+
+
+
+

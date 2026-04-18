@@ -4,8 +4,8 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Any
 
-from bookmaker_detector_api.repositories import InMemoryIngestionRepository
-from bookmaker_detector_api.repositories.ingestion import _json_dumps
+from bookmaker_detector_api.repositories import ModelTrainingArtifactStore
+from bookmaker_detector_api.repositories.ingestion_json import _json_dumps
 from bookmaker_detector_api.services import model_training_views
 from bookmaker_detector_api.services.model_records import (
     ModelEvaluationSnapshotRecord,
@@ -27,7 +27,7 @@ MODEL_FAMILY_CONFIGS = {
 
 
 def ensure_model_registry_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelTrainingArtifactStore,
     *,
     target_task: str,
     model_family: str,
@@ -60,7 +60,7 @@ def ensure_model_registry_in_memory(
 
 
 def save_model_training_run_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelTrainingArtifactStore,
     run: ModelTrainingRunRecord,
 ) -> ModelTrainingRunRecord:
     payload = asdict(run)
@@ -194,7 +194,7 @@ def save_model_training_run_postgres(
 
 
 def promote_best_model_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelTrainingArtifactStore,
     *,
     target_task: str,
     selection_policy_name: str = "validation_mae_candidate_v1",
@@ -276,7 +276,7 @@ def promote_best_model_postgres(
 
 
 def save_model_evaluation_snapshot_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelTrainingArtifactStore,
     run: ModelTrainingRunRecord,
 ) -> ModelEvaluationSnapshotRecord:
     payload = _build_model_evaluation_snapshot_payload(run)
@@ -352,7 +352,7 @@ def save_model_evaluation_snapshot_postgres(
 
 
 def save_model_selection_snapshot_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelTrainingArtifactStore,
     snapshot: ModelEvaluationSnapshotRecord,
     *,
     selection_policy_name: str,

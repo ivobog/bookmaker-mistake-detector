@@ -8,7 +8,7 @@ from bookmaker_detector_api.api.schemas import (
     AdminOpportunityHistoryResponse,
 )
 from bookmaker_detector_api.db.postgres import postgres_connection
-from bookmaker_detector_api.repositories import InMemoryIngestionRepository
+from bookmaker_detector_api.services.repository_factory import build_in_memory_phase_three_modeling_store
 from bookmaker_detector_api.services.models import (
     get_model_opportunity_history_in_memory,
     get_model_opportunity_history_postgres,
@@ -209,7 +209,7 @@ def phase_three_model_opportunity_history(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         history = get_model_opportunity_history_in_memory(
             repository,
             target_task=filters.target_task,
@@ -226,3 +226,6 @@ def phase_three_model_opportunity_history(
         filters=filters,
         model_opportunity_history=history,
     )
+
+
+

@@ -4,13 +4,13 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Any
 
-from bookmaker_detector_api.repositories import InMemoryIngestionRepository
-from bookmaker_detector_api.repositories.ingestion import _json_dumps
+from bookmaker_detector_api.repositories import ModelBacktestArtifactStore
+from bookmaker_detector_api.repositories.ingestion_json import _json_dumps
 from bookmaker_detector_api.services.model_records import ModelBacktestRunRecord
 
 
 def save_model_backtest_run_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelBacktestArtifactStore,
     backtest_run: ModelBacktestRunRecord,
 ) -> ModelBacktestRunRecord:
     payload = asdict(backtest_run)
@@ -88,7 +88,7 @@ def save_model_backtest_run_postgres(
 
 
 def list_model_backtest_runs_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelBacktestArtifactStore,
     *,
     target_task: str | None = None,
     team_code: str | None = None,
@@ -177,7 +177,7 @@ def list_model_backtest_runs_postgres(
 
 
 def get_model_backtest_history_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelBacktestArtifactStore,
     *,
     target_task: str | None = None,
     team_code: str | None = None,
@@ -213,7 +213,7 @@ def get_model_backtest_history_postgres(
 
 
 def get_model_backtest_detail_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelBacktestArtifactStore,
     *,
     backtest_run_id: int,
 ) -> dict[str, Any] | None:

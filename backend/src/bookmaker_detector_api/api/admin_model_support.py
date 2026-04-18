@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 from bookmaker_detector_api.config import settings
 from bookmaker_detector_api.demo import seed_phase_two_feature_in_memory
-from bookmaker_detector_api.repositories import InMemoryIngestionRepository
+from bookmaker_detector_api.repositories import PhaseThreeModelingStore
 from bookmaker_detector_api.services.models import (
     materialize_model_future_game_preview_in_memory,
     materialize_model_future_slate_in_memory,
@@ -40,7 +40,7 @@ def _prepare_in_memory_phase_three_model_repository(
     train_ratio: float,
     validation_ratio: float,
     promote_best: bool = False,
-) -> InMemoryIngestionRepository:
+) -> PhaseThreeModelingStore:
     repository, _, _ = seed_phase_two_feature_in_memory()
     if target_task is not None:
         train_phase_three_models_in_memory(
@@ -74,7 +74,7 @@ def _prepare_in_memory_future_game_scoring_repository(
     train_ratio: float,
     validation_ratio: float,
     materialize_preview: bool = False,
-) -> InMemoryIngestionRepository:
+) -> PhaseThreeModelingStore:
     repository = _prepare_in_memory_phase_three_model_repository(
         feature_key=feature_key,
         target_task=target_task,
@@ -118,7 +118,7 @@ def _prepare_in_memory_future_slate_repository(
     train_ratio: float,
     validation_ratio: float,
     materialize_slate: bool = False,
-) -> InMemoryIngestionRepository:
+) -> PhaseThreeModelingStore:
     repository = _prepare_in_memory_phase_three_model_repository(
         feature_key=feature_key,
         target_task=target_task,
@@ -143,3 +143,4 @@ def _prepare_in_memory_future_slate_repository(
             validation_ratio=validation_ratio,
         )
     return repository
+

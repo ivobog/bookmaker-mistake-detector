@@ -7,12 +7,12 @@ from bookmaker_detector_api.data_quality_taxonomy import canonical_severity_for_
 from bookmaker_detector_api.fetching import store_parser_snapshot
 from bookmaker_detector_api.ingestion.models import ParseStatus, RawGameRow
 from bookmaker_detector_api.ingestion.providers.base import HistoricalTeamPageProvider
-from bookmaker_detector_api.repositories.ingestion import (
+from bookmaker_detector_api.repositories.ingestion_types import (
     DataQualityIssueRecord,
-    IngestionRepository,
     PageRetrievalRecord,
     PersistedIngestionRun,
 )
+from bookmaker_detector_api.repositories import IngestionRepository
 from bookmaker_detector_api.services.canonical import canonicalize_rows
 from bookmaker_detector_api.services.metrics import calculate_game_metric
 

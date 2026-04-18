@@ -13,6 +13,9 @@ from bookmaker_detector_api.services.ingestion_pipeline import (
     HistoricalIngestionRequest,
     ingest_historical_team_page,
 )
+from bookmaker_detector_api.services.repository_factory import (
+    build_bootstrap_postgres_ingestion_repository,
+)
 
 FIXTURE_DIR = Path(__file__).resolve().parents[1] / "fixtures"
 
@@ -39,7 +42,7 @@ def run_fixture_ingestion(
 
     if repository_mode == "postgres":
         with postgres_connection() as connection:
-            repository = PostgresIngestionRepository(connection)
+            repository = build_bootstrap_postgres_ingestion_repository(connection)
             result = ingest_historical_team_page(
                 request=request,
                 provider=provider,

@@ -30,7 +30,7 @@ from bookmaker_detector_api.api.schemas import (
     AdminSelectionHistoryResponse,
 )
 from bookmaker_detector_api.db.postgres import postgres_connection
-from bookmaker_detector_api.repositories import InMemoryIngestionRepository
+from bookmaker_detector_api.services.repository_factory import build_in_memory_phase_three_modeling_store
 from bookmaker_detector_api.services.models import (
     get_model_backtest_history_in_memory,
     get_model_backtest_history_postgres,
@@ -276,7 +276,7 @@ def phase_four_model_backtest_history(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         history = get_model_backtest_history_in_memory(
             repository,
             target_task=filters.target_task,
@@ -305,7 +305,7 @@ def phase_three_model_registry(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         registries = list_model_registry_in_memory(
             repository,
             target_task=filters.target_task,
@@ -336,7 +336,7 @@ def phase_three_model_runs(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         runs = list_model_training_runs_in_memory(
             repository,
             target_task=filters.target_task,
@@ -362,7 +362,7 @@ def phase_three_model_run_detail(
             run = get_model_training_run_detail_postgres(connection, run_id=run_id)
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         run = get_model_training_run_detail_in_memory(repository, run_id=run_id)
         repository_mode = "in_memory"
 
@@ -386,7 +386,7 @@ def phase_three_model_summary(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         summary = get_model_training_summary_in_memory(
             repository,
             target_task=filters.target_task,
@@ -417,7 +417,7 @@ def phase_three_model_history(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         history = get_model_training_history_in_memory(
             repository,
             target_task=filters.target_task,
@@ -447,7 +447,7 @@ def phase_three_model_evaluations(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         snapshots = list_model_evaluation_snapshots_in_memory(
             repository,
             target_task=filters.target_task,
@@ -479,7 +479,7 @@ def phase_three_model_evaluation_history(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         history = get_model_evaluation_history_in_memory(
             repository,
             target_task=filters.target_task,
@@ -507,7 +507,7 @@ def phase_three_model_evaluation_detail(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         snapshot = get_model_evaluation_snapshot_detail_in_memory(
             repository,
             snapshot_id=snapshot_id,
@@ -582,7 +582,7 @@ def phase_three_model_selections(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         selections = list_model_selection_snapshots_in_memory(
             repository,
             target_task=filters.target_task,
@@ -613,7 +613,7 @@ def phase_three_model_selection_history(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         history = get_model_selection_history_in_memory(
             repository,
             target_task=filters.target_task,
@@ -640,7 +640,7 @@ def phase_three_model_selection_detail(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         selection = get_model_selection_snapshot_detail_in_memory(
             repository,
             selection_id=selection_id,
@@ -653,3 +653,6 @@ def phase_three_model_selection_detail(
             _serialize_selection_snapshot(selection) if selection is not None else None
         ),
     )
+
+
+

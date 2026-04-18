@@ -5,8 +5,8 @@ from datetime import date, datetime, timezone
 from statistics import mean, median, pstdev
 from typing import Any
 
-from bookmaker_detector_api.repositories import InMemoryIngestionRepository
-from bookmaker_detector_api.repositories.ingestion import _json_dumps
+from bookmaker_detector_api.repositories import FeatureDatasetStore
+from bookmaker_detector_api.repositories.ingestion_json import _json_dumps
 from bookmaker_detector_api.services.feature_evidence_scoring import (
     build_evidence_recommendation,
     build_evidence_strength_summary,
@@ -191,7 +191,7 @@ FEATURE_PATTERN_DIMENSIONS = {
 }
 
 def materialize_baseline_feature_snapshots_for_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: FeatureDatasetStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     version_label: str = "Baseline Team Features v1",
@@ -410,7 +410,7 @@ def build_future_feature_dataset_rows(
 
 
 def ensure_feature_version_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: FeatureDatasetStore,
     *,
     feature_key: str,
     version_label: str,
@@ -434,7 +434,7 @@ def ensure_feature_version_in_memory(
 
 
 def list_canonical_game_metric_records_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: FeatureDatasetStore,
 ) -> list[CanonicalGameMetricRecord]:
     metrics_by_game_id = {
         entry["canonical_game_id"]: entry for entry in repository.metrics
@@ -469,7 +469,7 @@ def list_canonical_game_metric_records_in_memory(
 
 
 def save_feature_snapshots_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: FeatureDatasetStore,
     snapshots: list[FeatureSnapshotRecord],
 ) -> int:
     saved_count = 0
@@ -497,7 +497,7 @@ def save_feature_snapshots_in_memory(
 
 
 def list_feature_snapshots_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: FeatureDatasetStore,
     *,
     feature_version_id: int | None = None,
     feature_key: str = DEFAULT_FEATURE_KEY,
@@ -536,7 +536,7 @@ def list_feature_snapshots_in_memory(
 
 
 def count_feature_snapshots_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: FeatureDatasetStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     team_code: str | None = None,
@@ -554,7 +554,7 @@ def count_feature_snapshots_in_memory(
 
 
 def save_feature_analysis_artifacts_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: FeatureDatasetStore,
     artifacts: list[FeatureAnalysisArtifactRecord],
 ) -> int:
     saved_count = 0
@@ -588,7 +588,7 @@ def save_feature_analysis_artifacts_in_memory(
 
 
 def list_feature_analysis_artifacts_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: FeatureDatasetStore,
     *,
     feature_version_id: int | None = None,
     feature_key: str = DEFAULT_FEATURE_KEY,
@@ -628,7 +628,7 @@ def list_feature_analysis_artifacts_in_memory(
 
 
 def get_feature_version_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: FeatureDatasetStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
 ) -> FeatureVersionRecord | None:
@@ -639,7 +639,7 @@ def get_feature_version_in_memory(
 
 
 def get_feature_snapshot_catalog_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: FeatureDatasetStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     team_code: str | None = None,
@@ -680,7 +680,7 @@ def get_feature_snapshot_catalog_in_memory(
 
 
 def get_feature_snapshot_summary_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: FeatureDatasetStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     team_code: str | None = None,
@@ -718,7 +718,7 @@ def get_feature_snapshot_summary_in_memory(
 
 
 def get_feature_dataset_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: FeatureDatasetStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     team_code: str | None = None,
@@ -758,7 +758,7 @@ def get_feature_dataset_in_memory(
 
 
 def get_feature_dataset_profile_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: FeatureDatasetStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     team_code: str | None = None,
@@ -796,7 +796,7 @@ def get_feature_dataset_profile_in_memory(
 
 
 def get_feature_training_view_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: FeatureDatasetStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     target_task: str,
@@ -846,7 +846,7 @@ def get_feature_training_view_in_memory(
 
 
 def get_feature_training_manifest_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: FeatureDatasetStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     target_task: str,
@@ -893,7 +893,7 @@ def get_feature_training_manifest_in_memory(
 
 
 def get_feature_training_task_matrix_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: FeatureDatasetStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     team_code: str | None = None,
@@ -939,7 +939,7 @@ def get_feature_training_task_matrix_in_memory(
 
 
 def get_feature_training_benchmark_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: FeatureDatasetStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     target_task: str,
@@ -990,7 +990,7 @@ def get_feature_training_benchmark_in_memory(
 
 
 def get_feature_pattern_catalog_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: FeatureDatasetStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     target_task: str,
@@ -1041,7 +1041,7 @@ def get_feature_pattern_catalog_in_memory(
 
 
 def get_feature_comparable_cases_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: FeatureDatasetStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     target_task: str,
@@ -1098,7 +1098,7 @@ def get_feature_comparable_cases_in_memory(
 
 
 def get_feature_evidence_bundle_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: FeatureDatasetStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     target_task: str,
@@ -1161,7 +1161,7 @@ def get_feature_evidence_bundle_in_memory(
 
 
 def get_feature_training_bundle_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: FeatureDatasetStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     target_task: str,
@@ -1215,7 +1215,7 @@ def get_feature_training_bundle_in_memory(
 
 
 def get_feature_dataset_splits_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: FeatureDatasetStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     team_code: str | None = None,
@@ -2185,7 +2185,7 @@ def get_feature_evidence_bundle_postgres(
 
 
 def materialize_feature_analysis_artifacts_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: FeatureDatasetStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     target_task: str,
@@ -2323,7 +2323,7 @@ def materialize_feature_analysis_artifacts_postgres(
 
 
 def get_feature_analysis_artifact_catalog_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: FeatureDatasetStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     artifact_type: str | None = None,
@@ -2415,7 +2415,7 @@ def get_feature_analysis_artifact_catalog_postgres(
 
 
 def get_feature_analysis_artifact_history_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: FeatureDatasetStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     artifact_type: str | None = None,

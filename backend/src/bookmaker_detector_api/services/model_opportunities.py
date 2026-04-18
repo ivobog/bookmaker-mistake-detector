@@ -3,8 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from bookmaker_detector_api.repositories import InMemoryIngestionRepository
-from bookmaker_detector_api.repositories.ingestion import _json_dumps
+from bookmaker_detector_api.repositories import ModelOpportunityStore
+from bookmaker_detector_api.repositories.ingestion_json import _json_dumps
 from bookmaker_detector_api.services import model_future_scenarios
 from bookmaker_detector_api.services.model_market_board_views import _serialize_model_opportunity
 from bookmaker_detector_api.services.model_records import ModelOpportunityRecord
@@ -203,7 +203,7 @@ def nested_get(payload: dict[str, Any] | None, *keys: str) -> Any:
 
 
 def save_model_opportunities_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelOpportunityStore,
     opportunities: list[ModelOpportunityRecord],
 ) -> list[ModelOpportunityRecord]:
     persisted: list[ModelOpportunityRecord] = []
@@ -366,7 +366,7 @@ def save_model_opportunities_postgres(
 
 
 def list_model_opportunities_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelOpportunityStore,
     *,
     target_task: str | None = None,
     team_code: str | None = None,
@@ -491,7 +491,7 @@ def list_model_opportunities_postgres(
 
 
 def get_model_opportunity_detail_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelOpportunityStore,
     *,
     opportunity_id: int,
 ) -> dict[str, Any] | None:
@@ -523,7 +523,7 @@ def get_model_opportunity_detail_postgres(
 
 
 def get_model_opportunity_history_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: ModelOpportunityStore,
     *,
     target_task: str | None = None,
     team_code: str | None = None,

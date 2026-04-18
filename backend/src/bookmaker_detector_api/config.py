@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     the_odds_api_odds_format: str = "american"
     the_odds_api_bookmakers: str | None = None
     the_odds_api_timeout_seconds: float = 10.0
+    postgres_allow_runtime_schema_mutation: bool | None = None
 
     model_config = SettingsConfigDict(
         env_file=str(REPO_ROOT / ".env"),
@@ -49,6 +50,12 @@ class Settings(BaseSettings):
             for origin in self.api_cors_origins.split(",")
             if origin.strip()
         ]
+
+    @property
+    def resolved_postgres_allow_runtime_schema_mutation(self) -> bool:
+        if self.postgres_allow_runtime_schema_mutation is not None:
+            return self.postgres_allow_runtime_schema_mutation
+        return self.api_env.lower() != "production"
 
 
 settings = Settings()

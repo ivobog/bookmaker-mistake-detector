@@ -14,7 +14,7 @@ from bookmaker_detector_api.api.schemas import (
 )
 from bookmaker_detector_api.config import settings
 from bookmaker_detector_api.db.postgres import postgres_connection
-from bookmaker_detector_api.repositories import InMemoryIngestionRepository
+from bookmaker_detector_api.services.repository_factory import build_in_memory_feature_dataset_store
 from bookmaker_detector_api.services.features import (
     get_feature_comparable_cases_in_memory,
     get_feature_comparable_cases_postgres,
@@ -58,7 +58,7 @@ def feature_patterns(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_feature_dataset_store()
         pattern_result = get_feature_pattern_catalog_in_memory(
             repository,
             feature_key=filters.feature_key,
@@ -107,7 +107,7 @@ def feature_comparables(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_feature_dataset_store()
         comparable_result = get_feature_comparable_cases_in_memory(
             repository,
             feature_key=filters.feature_key,
@@ -169,7 +169,7 @@ def feature_evidence(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_feature_dataset_store()
         evidence_result = get_feature_evidence_bundle_in_memory(
             repository,
             feature_key=filters.feature_key,
@@ -202,3 +202,6 @@ def feature_evidence(
         task=evidence_result.get("task"),
         evidence=evidence_result.get("evidence", {}),
     )
+
+
+

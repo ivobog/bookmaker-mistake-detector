@@ -7,8 +7,7 @@ from tempfile import mkdtemp
 
 from bookmaker_detector_api.config import settings
 from bookmaker_detector_api.ingestion.models import ParseStatus, RawGameRow
-from bookmaker_detector_api.repositories import InMemoryIngestionRepository
-from bookmaker_detector_api.repositories.ingestion import IngestionRepository
+from bookmaker_detector_api.repositories import InMemoryIngestionRepository, IngestionRepository
 from bookmaker_detector_api.services.fetch_ingestion_runner import run_fetch_and_ingest
 from bookmaker_detector_api.services.ingestion_pipeline import (
     HistoricalIngestionRequest,

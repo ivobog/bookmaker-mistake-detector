@@ -15,7 +15,7 @@ from bookmaker_detector_api.api.schemas import (
     AdminScoringRunsResponse,
 )
 from bookmaker_detector_api.db.postgres import postgres_connection
-from bookmaker_detector_api.repositories import InMemoryIngestionRepository
+from bookmaker_detector_api.services.repository_factory import build_in_memory_phase_three_modeling_store
 from bookmaker_detector_api.services.models import (
     get_model_future_game_preview_in_memory,
     get_model_future_game_preview_postgres,
@@ -96,7 +96,7 @@ def phase_three_model_score_preview(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         scoring_preview = get_model_scoring_preview_in_memory(
             repository,
             feature_key=filters.feature_key,
@@ -153,7 +153,7 @@ def phase_three_model_future_game_preview(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         preview = get_model_future_game_preview_in_memory(
             repository,
             feature_key=filters.feature_key,
@@ -297,7 +297,7 @@ def phase_three_model_future_game_preview_runs(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         scoring_runs = list_model_scoring_runs_in_memory(
             repository,
             target_task=filters.target_task,
@@ -338,7 +338,7 @@ def phase_three_model_future_game_preview_run_detail(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         scoring_run = get_model_scoring_run_detail_in_memory(
             repository,
             scoring_run_id=scoring_run_id,
@@ -378,7 +378,7 @@ def phase_three_model_future_game_preview_history(
             )
         repository_mode = "postgres"
     else:
-        repository = InMemoryIngestionRepository()
+        repository = build_in_memory_phase_three_modeling_store()
         history = get_model_scoring_history_in_memory(
             repository,
             target_task=filters.target_task,
@@ -537,3 +537,6 @@ def phase_three_model_future_slate_materialize(
         },
         **materialized,
     }
+
+
+

@@ -4,7 +4,7 @@ from dataclasses import asdict
 from datetime import date
 from typing import Any
 
-from bookmaker_detector_api.repositories import InMemoryIngestionRepository
+from bookmaker_detector_api.repositories import PhaseThreeModelingStore
 from bookmaker_detector_api.services.features import (
     DEFAULT_FEATURE_KEY,
     FeatureVersionRecord,
@@ -170,7 +170,7 @@ OPPORTUNITY_POLICY_CONFIGS = {
 
 
 def train_phase_three_models_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     target_task: str,
@@ -266,7 +266,7 @@ def train_phase_three_models_postgres(
 
 
 def list_model_registry_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     target_task: str | None = None,
 ) -> list[ModelRegistryRecord]:
@@ -277,7 +277,7 @@ def list_model_registry_in_memory(
 
 
 def list_model_training_runs_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     target_task: str | None = None,
     team_code: str | None = None,
@@ -292,7 +292,7 @@ def list_model_training_runs_in_memory(
 
 
 def get_model_training_run_detail_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     run_id: int,
 ) -> ModelTrainingRunRecord | None:
@@ -303,7 +303,7 @@ def get_model_training_run_detail_in_memory(
 
 
 def ensure_model_registry_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     target_task: str,
     model_family: str,
@@ -318,7 +318,7 @@ def ensure_model_registry_in_memory(
 
 
 def save_model_training_run_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     run: ModelTrainingRunRecord,
 ) -> ModelTrainingRunRecord:
     return model_training_lifecycle.save_model_training_run_in_memory(
@@ -385,7 +385,7 @@ def get_model_training_run_detail_postgres(
 
 
 def list_model_evaluation_snapshots_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     target_task: str | None = None,
     model_family: str | None = None,
@@ -398,7 +398,7 @@ def list_model_evaluation_snapshots_in_memory(
 
 
 def get_model_evaluation_snapshot_detail_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     snapshot_id: int,
 ) -> ModelEvaluationSnapshotRecord | None:
@@ -433,7 +433,7 @@ def get_model_evaluation_snapshot_detail_postgres(
 
 
 def get_model_training_summary_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     target_task: str | None = None,
     team_code: str | None = None,
@@ -463,7 +463,7 @@ def get_model_training_summary_postgres(
 
 
 def get_model_training_history_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     target_task: str | None = None,
     team_code: str | None = None,
@@ -497,7 +497,7 @@ def get_model_training_history_postgres(
 
 
 def get_model_evaluation_history_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     target_task: str | None = None,
     model_family: str | None = None,
@@ -527,7 +527,7 @@ def get_model_evaluation_history_postgres(
 
 
 def list_model_selection_snapshots_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     target_task: str | None = None,
     active_only: bool = False,
@@ -540,7 +540,7 @@ def list_model_selection_snapshots_in_memory(
 
 
 def get_model_selection_snapshot_detail_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     selection_id: int,
 ) -> ModelSelectionSnapshotRecord | None:
@@ -575,7 +575,7 @@ def get_model_selection_snapshot_detail_postgres(
 
 
 def promote_best_model_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     target_task: str,
     selection_policy_name: str = "validation_mae_candidate_v1",
@@ -601,7 +601,7 @@ def promote_best_model_postgres(
 
 
 def get_model_scoring_preview_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     target_task: str,
@@ -749,7 +749,7 @@ def get_model_scoring_preview_postgres(
 
 
 def get_model_future_game_preview_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     target_task: str,
@@ -927,7 +927,7 @@ def get_model_future_game_preview_postgres(
 
 
 def materialize_model_future_game_preview_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     model_market_board_id: int | None = None,
     feature_key: str = DEFAULT_FEATURE_KEY,
@@ -1031,7 +1031,7 @@ def materialize_model_future_game_preview_postgres(
 
 
 def list_model_scoring_runs_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     model_market_board_id: int | None = None,
     target_task: str | None = None,
@@ -1065,7 +1065,7 @@ def list_model_scoring_runs_postgres(
 
 
 def get_model_scoring_run_detail_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     scoring_run_id: int,
 ) -> dict[str, Any] | None:
@@ -1087,7 +1087,7 @@ def get_model_scoring_run_detail_postgres(
 
 
 def get_model_scoring_history_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     model_market_board_id: int | None = None,
     target_task: str | None = None,
@@ -1125,7 +1125,7 @@ def get_model_scoring_history_postgres(
 
 
 def materialize_model_opportunities_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     target_task: str,
@@ -1172,7 +1172,7 @@ def materialize_model_opportunities_in_memory(
 
 
 def materialize_model_future_opportunities_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     target_task: str,
@@ -1323,7 +1323,7 @@ def materialize_model_future_opportunities_postgres(
 
 
 def get_model_future_slate_preview_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     target_task: str,
@@ -1411,7 +1411,7 @@ def get_model_future_slate_preview_postgres(
 
 
 def materialize_model_future_slate_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     model_market_board_id: int | None = None,
     feature_key: str = DEFAULT_FEATURE_KEY,
@@ -1521,7 +1521,7 @@ def materialize_model_future_slate_postgres(
 
 
 def materialize_model_market_board_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     target_task: str,
     games: list[dict[str, Any]],
@@ -1554,7 +1554,7 @@ def materialize_model_market_board_postgres(
     )
 
 def refresh_model_market_board_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     target_task: str,
     source_name: str,
@@ -1656,7 +1656,7 @@ def refresh_model_market_board_postgres(
 
 
 def get_model_market_board_detail_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     board_id: int,
 ) -> dict[str, Any] | None:
@@ -1688,7 +1688,7 @@ def get_model_market_board_detail_postgres(
 
 
 def get_model_market_board_refresh_history_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     target_task: str | None = None,
     source_name: str | None = None,
@@ -1718,7 +1718,7 @@ def get_model_market_board_refresh_history_postgres(
 
 
 def get_model_market_board_source_run_history_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     target_task: str | None = None,
     source_name: str | None = None,
@@ -1752,7 +1752,7 @@ def get_model_market_board_source_run_history_postgres(
 
 
 def get_model_market_board_refresh_queue_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     target_task: str | None = None,
     season_label: str | None = None,
@@ -1808,7 +1808,7 @@ def get_model_market_board_refresh_queue_postgres(
 
 
 def get_model_market_board_scoring_queue_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     target_task: str | None = None,
     season_label: str | None = None,
@@ -1864,7 +1864,7 @@ def get_model_market_board_scoring_queue_postgres(
 
 
 def orchestrate_model_market_board_refresh_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     target_task: str | None = None,
     season_label: str | None = None,
@@ -1920,7 +1920,7 @@ def orchestrate_model_market_board_refresh_postgres(
 
 
 def orchestrate_model_market_board_scoring_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     target_task: str | None = None,
@@ -2008,7 +2008,7 @@ def orchestrate_model_market_board_scoring_postgres(
 
 
 def orchestrate_model_market_board_cadence_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     target_task: str | None = None,
@@ -2110,7 +2110,7 @@ def orchestrate_model_market_board_cadence_postgres(
 
 
 def get_model_market_board_refresh_batch_history_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     target_task: str | None = None,
     source_name: str | None = None,
@@ -2146,7 +2146,7 @@ def get_model_market_board_refresh_batch_history_postgres(
 
 
 def get_model_market_board_scoring_batch_history_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     target_task: str | None = None,
     source_name: str | None = None,
@@ -2182,7 +2182,7 @@ def get_model_market_board_scoring_batch_history_postgres(
 
 
 def get_model_market_board_cadence_batch_history_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     target_task: str | None = None,
     source_name: str | None = None,
@@ -2218,7 +2218,7 @@ def get_model_market_board_cadence_batch_history_postgres(
 
 
 def get_model_market_board_operations_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     board_id: int,
     recent_limit: int = 5,
@@ -2276,7 +2276,7 @@ def get_model_market_board_operations_postgres(
 
 
 def get_model_market_board_cadence_dashboard_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     target_task: str | None = None,
     season_label: str | None = None,
@@ -2320,7 +2320,7 @@ def get_model_market_board_cadence_dashboard_postgres(
 
 
 def score_model_market_board_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     board_id: int,
     feature_key: str = DEFAULT_FEATURE_KEY,
@@ -2398,7 +2398,7 @@ def score_model_market_board_postgres(
 
 
 def list_model_opportunities_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     target_task: str | None = None,
     team_code: str | None = None,
@@ -2440,7 +2440,7 @@ def list_model_opportunities_postgres(
 
 
 def get_model_opportunity_detail_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     opportunity_id: int,
 ) -> dict[str, Any] | None:
@@ -2462,7 +2462,7 @@ def get_model_opportunity_detail_postgres(
 
 
 def get_model_opportunity_history_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     target_task: str | None = None,
     team_code: str | None = None,
@@ -2504,7 +2504,7 @@ def get_model_opportunity_history_postgres(
 
 
 def run_model_backtest_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     feature_key: str = DEFAULT_FEATURE_KEY,
     target_task: str,
@@ -2614,7 +2614,7 @@ def run_model_backtest_postgres(
 
 
 def list_model_backtest_runs_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     target_task: str | None = None,
     team_code: str | None = None,
@@ -2644,7 +2644,7 @@ def list_model_backtest_runs_postgres(
 
 
 def get_model_backtest_history_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     target_task: str | None = None,
     team_code: str | None = None,
@@ -2680,7 +2680,7 @@ def get_model_backtest_history_postgres(
 
 
 def get_model_backtest_detail_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     backtest_run_id: int,
 ) -> dict[str, Any] | None:
@@ -3010,7 +3010,7 @@ def _train_tree_stump_model(
 
 
 def _load_training_dataset_rows_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     feature_version_id: int,
     team_code: str | None,
@@ -3145,7 +3145,7 @@ def _metric_value_or_inf(value: Any) -> float:
 
 
 def save_model_opportunities_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     opportunities: list[ModelOpportunityRecord],
 ) -> list[ModelOpportunityRecord]:
     return model_opportunities.save_model_opportunities_in_memory(repository, opportunities)
@@ -3159,7 +3159,7 @@ def save_model_opportunities_postgres(
 
 
 def save_model_backtest_run_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     backtest_run: ModelBacktestRunRecord,
 ) -> ModelBacktestRunRecord:
     return model_backtest_runs.save_model_backtest_run_in_memory(repository, backtest_run)
@@ -3190,7 +3190,7 @@ def _summarize_model_scoring_history(
 
 
 def get_model_selection_history_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     *,
     target_task: str | None = None,
     recent_limit: int = 10,
@@ -3216,7 +3216,7 @@ def get_model_selection_history_postgres(
 
 
 def save_model_evaluation_snapshot_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     run: ModelTrainingRunRecord,
 ) -> ModelEvaluationSnapshotRecord:
     return model_training_lifecycle.save_model_evaluation_snapshot_in_memory(repository, run)
@@ -3230,7 +3230,7 @@ def save_model_evaluation_snapshot_postgres(
 
 
 def save_model_selection_snapshot_in_memory(
-    repository: InMemoryIngestionRepository,
+    repository: PhaseThreeModelingStore,
     snapshot: ModelEvaluationSnapshotRecord,
     *,
     selection_policy_name: str,
@@ -3270,3 +3270,4 @@ def _select_best_evaluation_snapshot(
         snapshots,
         selection_policy_name=selection_policy_name,
     )
+
