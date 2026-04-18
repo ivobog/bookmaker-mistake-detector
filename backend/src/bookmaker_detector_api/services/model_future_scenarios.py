@@ -90,10 +90,7 @@ def build_future_slate_key(
     )
     first = ordered[0]
     last = ordered[-1]
-    return (
-        f"{target_task}:{first['game_date']}:{last['game_date']}:"
-        f"{len(serialized_inputs)}-games"
-    )
+    return f"{target_task}:{first['game_date']}:{last['game_date']}:{len(serialized_inputs)}-games"
 
 
 def materialize_future_game_preview(

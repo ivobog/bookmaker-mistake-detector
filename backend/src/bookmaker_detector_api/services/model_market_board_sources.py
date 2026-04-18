@@ -21,16 +21,14 @@ from bookmaker_detector_api.services.model_records import (
 MARKET_BOARD_SOURCE_CONFIGS = {
     "demo_daily_lines_v1": {
         "description": (
-            "Deterministic built-in upcoming slate source for local scoring "
-            "and refresh flows."
+            "Deterministic built-in upcoming slate source for local scoring and refresh flows."
         ),
         "default_game_count": 2,
         "supports_refresh": True,
     },
     "demo_source_failure_v1": {
         "description": (
-            "Intentional failing source provider for refresh diagnostics and "
-            "error-path testing."
+            "Intentional failing source provider for refresh diagnostics and error-path testing."
         ),
         "default_game_count": 2,
         "supports_refresh": True,
@@ -57,8 +55,7 @@ MARKET_BOARD_SOURCE_CONFIGS = {
     },
     "the_odds_api_v4_nba": {
         "description": (
-            "External NBA odds source backed by The Odds API v4 upcoming odds "
-            "endpoint."
+            "External NBA odds source backed by The Odds API v4 upcoming odds endpoint."
         ),
         "default_game_count": 0,
         "supports_refresh": True,
@@ -144,9 +141,7 @@ def _build_demo_failing_source_games(
     source_path: str | None = None,
 ) -> list[dict[str, Any]]:
     del season_label, game_date, game_count, source_path
-    raise RuntimeError(
-        "Demo market-board source failure triggered intentionally for diagnostics."
-    )
+    raise RuntimeError("Demo market-board source failure triggered intentionally for diagnostics.")
 
 
 def _build_demo_partial_source_games(
@@ -188,9 +183,7 @@ def _build_demo_partial_source_games(
 def _resolve_market_board_source_path(source_path: str) -> Path:
     if source_path.startswith("fixture://"):
         fixture_name = source_path.removeprefix("fixture://")
-        return (
-            Path(__file__).resolve().parents[1] / "fixtures" / fixture_name
-        ).resolve()
+        return (Path(__file__).resolve().parents[1] / "fixtures" / fixture_name).resolve()
     return Path(source_path).expanduser().resolve()
 
 
@@ -217,9 +210,7 @@ def _build_file_market_board_source_games(
         with resolved_path.open("r", encoding="utf-8", newline="") as handle:
             rows = list(csv.DictReader(handle))
     else:
-        raise ValueError(
-            "Unsupported market board source file format. Expected .json or .csv."
-        )
+        raise ValueError("Unsupported market board source file format. Expected .json or .csv.")
     games = []
     for row in rows:
         if not isinstance(row, dict):
@@ -243,9 +234,7 @@ def _fetch_the_odds_api_games() -> list[dict[str, Any]]:
     if settings.the_odds_api_bookmakers:
         params["bookmakers"] = settings.the_odds_api_bookmakers
     base_url = settings.the_odds_api_base_url.rstrip("/")
-    request_url = (
-        f"{base_url}/sports/{settings.the_odds_api_sport_key}/odds?{urlencode(params)}"
-    )
+    request_url = f"{base_url}/sports/{settings.the_odds_api_sport_key}/odds?{urlencode(params)}"
     request = Request(
         request_url,
         headers={
@@ -423,9 +412,7 @@ def _normalize_market_board_source_games(
         normalized_home_spread_line = None
         if raw_game.get("home_spread_line") is not None:
             try:
-                normalized_home_spread_line = _float_or_none_value(
-                    raw_game.get("home_spread_line")
-                )
+                normalized_home_spread_line = _float_or_none_value(raw_game.get("home_spread_line"))
             except Exception:
                 issues.append("invalid_home_spread_line")
         normalized_total_line = None

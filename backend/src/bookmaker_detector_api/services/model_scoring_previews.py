@@ -3,11 +3,11 @@ from __future__ import annotations
 from statistics import mean
 from typing import Any, Callable
 
+from bookmaker_detector_api.services import model_training_views
 from bookmaker_detector_api.services.features import (
     build_feature_evidence_bundle,
     resolve_feature_condition_values_for_row,
 )
-from bookmaker_detector_api.services import model_training_views
 from bookmaker_detector_api.services.model_records import (
     ModelEvaluationSnapshotRecord,
     ModelSelectionSnapshotRecord,

@@ -27,7 +27,9 @@ def build_ingestion_repository(repository_mode: str) -> tuple[IngestionRepositor
     raise ValueError(f"Unsupported repository mode: {repository_mode}")
 
 
-def build_bootstrap_postgres_ingestion_repository(connection: object) -> PostgresIngestionRepository:
+def build_bootstrap_postgres_ingestion_repository(
+    connection: object,
+) -> PostgresIngestionRepository:
     try:
         return PostgresIngestionRepository(
             connection,

@@ -259,10 +259,7 @@ class CoversHistoricalTeamPageProvider:
             for row in _find_descendant_paths(section, ("tbody", "tr")):
                 rows.append(
                     ProviderRow(
-                        cells=tuple(
-                            _itertext(cell).strip()
-                            for cell in _find_children(row, "td")
-                        ),
+                        cells=tuple(_itertext(cell).strip() for cell in _find_children(row, "td")),
                         metadata={
                             "source_section": section_name,
                             "row_html": _serialize_node(row),
@@ -339,9 +336,7 @@ class CoversHistoricalTeamPageProvider:
                 finally:
                     browser.close()
         except PlaywrightError as exc:
-            raise RuntimeError(
-                f"Playwright browser fallback failed for {url}: {exc}"
-            ) from exc
+            raise RuntimeError(f"Playwright browser fallback failed for {url}: {exc}") from exc
 
         return FetchedPage(
             source_url=url,
@@ -966,7 +961,7 @@ def _append_season_fragments(
         _wrap_season_fragment(season_label=season_label, fragment_html=fragment_html)
         for season_label, fragment_html in fragment_payloads.items()
     )
-    return f"{page_content}\n<div data-season-fragment-root=\"covers\">{synthetic_blocks}</div>"
+    return f'{page_content}\n<div data-season-fragment-root="covers">{synthetic_blocks}</div>'
 
 
 def _wrap_season_fragment(*, season_label: str, fragment_html: str) -> str:

@@ -139,28 +139,24 @@ class DataQualityIssueRecord:
 
 
 class IngestionRepository(Protocol):
-    def create_job_run(self, *, job_name: str, requested_by: str, payload: dict[str, Any]) -> int:
-        ...
+    def create_job_run(
+        self, *, job_name: str, requested_by: str, payload: dict[str, Any]
+    ) -> int: ...
 
-    def create_page_retrieval(self, *, job_id: int, record: PageRetrievalRecord) -> int:
-        ...
+    def create_page_retrieval(self, *, job_id: int, record: PageRetrievalRecord) -> int: ...
 
     def save_raw_rows(
         self,
         *,
         page_retrieval_id: int,
         rows: list[RawGameRow],
-    ) -> list[PersistedRawRow]:
-        ...
+    ) -> list[PersistedRawRow]: ...
 
-    def save_canonical_games(self, games: list[CanonicalGame]) -> list[PersistedCanonicalGame]:
-        ...
+    def save_canonical_games(self, games: list[CanonicalGame]) -> list[PersistedCanonicalGame]: ...
 
-    def save_game_metrics(self, metrics_by_game_id: list[tuple[int, GameMetric]]) -> int:
-        ...
+    def save_game_metrics(self, metrics_by_game_id: list[tuple[int, GameMetric]]) -> int: ...
 
-    def complete_job_run(self, *, job_id: int, summary: dict[str, Any], status: str) -> None:
-        ...
+    def complete_job_run(self, *, job_id: int, summary: dict[str, Any], status: str) -> None: ...
 
     def list_job_runs(
         self,
@@ -174,8 +170,7 @@ class IngestionRepository(Protocol):
         run_label: str | None = None,
         started_from: datetime | None = None,
         started_to: datetime | None = None,
-    ) -> list[JobRunRecord]:
-        ...
+    ) -> list[JobRunRecord]: ...
 
     def list_page_retrievals(
         self,
@@ -187,8 +182,7 @@ class IngestionRepository(Protocol):
         team_code: str | None = None,
         season_label: str | None = None,
         run_label: str | None = None,
-    ) -> list[PageRetrievalSnapshot]:
-        ...
+    ) -> list[PageRetrievalSnapshot]: ...
 
     def list_job_run_daily_summaries(
         self,
@@ -200,8 +194,7 @@ class IngestionRepository(Protocol):
         run_label: str | None = None,
         started_from: datetime | None = None,
         started_to: datetime | None = None,
-    ) -> list[DailyJobRunSummary]:
-        ...
+    ) -> list[DailyJobRunSummary]: ...
 
     def list_page_retrieval_daily_summaries(
         self,
@@ -213,8 +206,7 @@ class IngestionRepository(Protocol):
         run_label: str | None = None,
         retrieved_from: datetime | None = None,
         retrieved_to: datetime | None = None,
-    ) -> list[DailyPageRetrievalSummary]:
-        ...
+    ) -> list[DailyPageRetrievalSummary]: ...
 
     def list_job_run_quality_daily_summaries(
         self,
@@ -225,11 +217,9 @@ class IngestionRepository(Protocol):
         run_label: str | None = None,
         started_from: datetime | None = None,
         started_to: datetime | None = None,
-    ) -> list[DailyJobRunQualitySummary]:
-        ...
+    ) -> list[DailyJobRunQualitySummary]: ...
 
-    def save_data_quality_issues(self, issues: list[DataQualityIssueRecord]) -> int:
-        ...
+    def save_data_quality_issues(self, issues: list[DataQualityIssueRecord]) -> int: ...
 
     def list_data_quality_issues(
         self,
@@ -242,8 +232,7 @@ class IngestionRepository(Protocol):
         team_code: str | None = None,
         season_label: str | None = None,
         run_label: str | None = None,
-    ) -> list[DataQualityIssueRecord]:
-        ...
+    ) -> list[DataQualityIssueRecord]: ...
 
     def get_parse_status_counts(
         self,
@@ -252,8 +241,7 @@ class IngestionRepository(Protocol):
         team_code: str | None = None,
         season_label: str | None = None,
         run_label: str | None = None,
-    ) -> dict[str, int]:
-        ...
+    ) -> dict[str, int]: ...
 
     def get_reconciliation_status_counts(
         self,
@@ -262,8 +250,7 @@ class IngestionRepository(Protocol):
         team_code: str | None = None,
         season_label: str | None = None,
         run_label: str | None = None,
-    ) -> dict[str, int]:
-        ...
+    ) -> dict[str, int]: ...
 
     def get_data_quality_issue_type_counts(
         self,
@@ -272,8 +259,7 @@ class IngestionRepository(Protocol):
         team_code: str | None = None,
         season_label: str | None = None,
         run_label: str | None = None,
-    ) -> dict[str, int]:
-        ...
+    ) -> dict[str, int]: ...
 
     def get_data_quality_issue_severity_counts(
         self,
@@ -282,8 +268,7 @@ class IngestionRepository(Protocol):
         team_code: str | None = None,
         season_label: str | None = None,
         run_label: str | None = None,
-    ) -> dict[str, int]:
-        ...
+    ) -> dict[str, int]: ...
 
     def normalize_data_quality_issue_taxonomy(
         self,
@@ -292,5 +277,4 @@ class IngestionRepository(Protocol):
         team_code: str | None = None,
         season_label: str | None = None,
         dry_run: bool = True,
-    ) -> dict[str, int]:
-        ...
+    ) -> dict[str, int]: ...

@@ -7,15 +7,19 @@ import pytest
 
 from bookmaker_detector_api.config import Settings
 from bookmaker_detector_api.repositories import IngestionRepository as package_ingestion_repository
-from bookmaker_detector_api.services import repository_factory as repo_factory
-from bookmaker_detector_api.repositories.ingestion import IngestionRepository as shim_ingestion_repository
-from bookmaker_detector_api.repositories import ingestion_postgres_repository as postgres_repo_module
+from bookmaker_detector_api.repositories import (
+    ingestion_postgres_repository as postgres_repo_module,
+)
+from bookmaker_detector_api.repositories.ingestion import (
+    IngestionRepository as shim_ingestion_repository,
+)
 from bookmaker_detector_api.repositories.ingestion_postgres_repository import (
     PostgresIngestionRepository,
 )
 from bookmaker_detector_api.repositories.ingestion_types import (
     IngestionRepository as canonical_ingestion_repository,
 )
+from bookmaker_detector_api.services import repository_factory as repo_factory
 
 
 def test_settings_resolved_postgres_allow_runtime_schema_mutation_defaults_to_disabled() -> None:

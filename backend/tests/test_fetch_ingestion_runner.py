@@ -128,12 +128,16 @@ def test_fetch_and_ingest_stores_live_shape_payload_snapshot(monkeypatch, tmp_pa
 
 def test_fetch_and_ingest_records_failed_fetch_in_memory() -> None:
     missing_fixture_url = (
-        Path(__file__).resolve().parents[1]
-        / "src"
-        / "bookmaker_detector_api"
-        / "fixtures"
-        / "missing_team_page.html"
-    ).resolve().as_uri()
+        (
+            Path(__file__).resolve().parents[1]
+            / "src"
+            / "bookmaker_detector_api"
+            / "fixtures"
+            / "missing_team_page.html"
+        )
+        .resolve()
+        .as_uri()
+    )
 
     result = run_fetch_and_ingest(
         repository_mode="in_memory",
@@ -155,12 +159,16 @@ def test_fetch_and_ingest_records_failed_fetch_in_memory() -> None:
 
 def test_fetch_and_ingest_uses_ingestion_source_url_for_persistence() -> None:
     fixture_url = (
-        Path(__file__).resolve().parents[1]
-        / "src"
-        / "bookmaker_detector_api"
-        / "fixtures"
-        / "covers_sample_team_page.html"
-    ).resolve().as_uri()
+        (
+            Path(__file__).resolve().parents[1]
+            / "src"
+            / "bookmaker_detector_api"
+            / "fixtures"
+            / "covers_sample_team_page.html"
+        )
+        .resolve()
+        .as_uri()
+    )
     repository = InMemoryIngestionRepository()
     persisted_source_url = f"{fixture_url}#validation_run=phase-1-fetch-reporting-demo"
 
@@ -186,12 +194,16 @@ def test_fetch_and_ingest_uses_ingestion_source_url_for_persistence() -> None:
 
 def test_fetch_and_ingest_deduplicates_raw_rows_by_source_coordinates() -> None:
     fixture_url = (
-        Path(__file__).resolve().parents[1]
-        / "src"
-        / "bookmaker_detector_api"
-        / "fixtures"
-        / "covers_sample_team_page.html"
-    ).resolve().as_uri()
+        (
+            Path(__file__).resolve().parents[1]
+            / "src"
+            / "bookmaker_detector_api"
+            / "fixtures"
+            / "covers_sample_team_page.html"
+        )
+        .resolve()
+        .as_uri()
+    )
     repository = InMemoryIngestionRepository()
 
     first_result = run_fetch_and_ingest(
@@ -222,10 +234,9 @@ def test_fetch_and_ingest_deduplicates_raw_rows_by_source_coordinates() -> None:
     assert len(repository.metrics) == 3
     assert len(repository.data_quality_issues) == 3
     assert all(row["source_page_url"] == fixture_url for row in repository.raw_rows)
-    assert {
-        row["source_url"]
-        for row in repository.raw_rows
-    } == {f"{fixture_url}#validation_run=second"}
+    assert {row["source_url"] for row in repository.raw_rows} == {
+        f"{fixture_url}#validation_run=second"
+    }
 
 
 def test_ingestion_pipeline_deduplicates_canonical_games_and_metrics_on_rerun() -> None:

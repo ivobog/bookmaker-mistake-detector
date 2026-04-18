@@ -61,9 +61,7 @@ def test_ingestion_pipeline_persists_fixture_run_in_memory() -> None:
     assert repository.job_runs[0]["summary"]["data_quality_issue_type_counts"] == {
         "canonical.single_team_perspective_only": 3
     }
-    assert repository.job_runs[0]["summary"]["data_quality_issue_severity_counts"] == {
-        "warning": 3
-    }
+    assert repository.job_runs[0]["summary"]["data_quality_issue_severity_counts"] == {"warning": 3}
     assert repository.job_run_reporting_snapshots[0]["job_run_id"] == 1
     assert repository.job_run_reporting_snapshots[0]["team_code"] == "LAL"
     assert repository.job_run_reporting_snapshots[0]["season_label"] == "2024-2025"
@@ -139,9 +137,7 @@ def test_ingestion_pipeline_skips_invalid_rows_from_canonicalization() -> None:
     assert repository.job_runs[0]["summary"]["data_quality_issue_type_counts"] == {
         "parse.invalid_score_format": 1
     }
-    assert repository.job_runs[0]["summary"]["data_quality_issue_severity_counts"] == {
-        "error": 1
-    }
+    assert repository.job_runs[0]["summary"]["data_quality_issue_severity_counts"] == {"error": 1}
     assert repository.job_run_reporting_snapshots[0]["quality_issues_saved"] == 1
     assert repository.job_run_reporting_snapshots[0]["warning_count"] == 1
     assert repository.job_run_quality_snapshots[0]["parse_valid_count"] == 0
@@ -208,9 +204,7 @@ def test_ingestion_pipeline_persists_live_historical_fragment_snapshot(
     ]
     assert result.parser_snapshot_path is not None
 
-    parser_snapshot = json.loads(
-        Path(result.parser_snapshot_path).read_text(encoding="utf-8")
-    )
+    parser_snapshot = json.loads(Path(result.parser_snapshot_path).read_text(encoding="utf-8"))
     assert parser_snapshot["team_code"] == "LAL"
     assert parser_snapshot["season_label"] == "2023-2024"
     assert parser_snapshot["source_page_url"] == "https://example.com/covers/lal"
@@ -356,16 +350,12 @@ def test_ingestion_pipeline_tracks_parse_warnings_in_quality_snapshots() -> None
         "ats_parse_mode": {"line_only": 1},
         "ou_parse_mode": {"line_only": 1},
     }
-    assert repository.job_runs[0]["summary"]["parse_status_counts"] == {
-        "VALID_WITH_WARNINGS": 1
-    }
+    assert repository.job_runs[0]["summary"]["parse_status_counts"] == {"VALID_WITH_WARNINGS": 1}
     assert repository.job_runs[0]["summary"]["data_quality_issue_type_counts"] == {
         "parse.missing_ats_result": 1,
         "parse.missing_ou_result": 1,
         "canonical.single_team_perspective_only": 1,
     }
-    assert repository.job_runs[0]["summary"]["data_quality_issue_severity_counts"] == {
-        "warning": 3
-    }
+    assert repository.job_runs[0]["summary"]["data_quality_issue_severity_counts"] == {"warning": 3}
     assert repository.job_run_quality_snapshots[0]["parse_warning_count"] == 1
     assert repository.job_run_quality_snapshots[0]["quality_issue_warning_count"] == 3

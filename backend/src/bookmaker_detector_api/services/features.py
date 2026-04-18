@@ -190,6 +190,7 @@ FEATURE_PATTERN_DIMENSIONS = {
     "rolling_3_over_rate_bucket",
 }
 
+
 def materialize_baseline_feature_snapshots_for_in_memory(
     repository: FeatureDatasetStore,
     *,
@@ -340,11 +341,7 @@ def build_future_feature_dataset_rows(
     total_line: float | None = None,
 ) -> list[dict[str, Any]]:
     prior_games = sorted(
-        [
-            game
-            for game in canonical_games
-            if game.game_date < game_date
-        ],
+        [game for game in canonical_games if game.game_date < game_date],
         key=lambda game: (game.game_date, game.canonical_game_id),
     )
     team_history: dict[str, list[TeamPerspectiveGame]] = {}
@@ -436,9 +433,7 @@ def ensure_feature_version_in_memory(
 def list_canonical_game_metric_records_in_memory(
     repository: FeatureDatasetStore,
 ) -> list[CanonicalGameMetricRecord]:
-    metrics_by_game_id = {
-        entry["canonical_game_id"]: entry for entry in repository.metrics
-    }
+    metrics_by_game_id = {entry["canonical_game_id"]: entry for entry in repository.metrics}
     return [
         CanonicalGameMetricRecord(
             canonical_game_id=entry["id"],
@@ -1260,6 +1255,8 @@ def get_feature_dataset_splits_in_memory(
         "row_count": len(dataset_rows),
         **split_result,
     }
+
+
 def ensure_feature_version_postgres(
     connection: Any,
     *,
@@ -2594,9 +2591,7 @@ def build_feature_dataset_rows(
     canonical_games: list[CanonicalGameMetricRecord],
     team_code: str | None = None,
 ) -> list[dict[str, Any]]:
-    canonical_games_by_id = {
-        game.canonical_game_id: game for game in canonical_games
-    }
+    canonical_games_by_id = {game.canonical_game_id: game for game in canonical_games}
     dataset_rows: list[dict[str, Any]] = []
 
     for snapshot in snapshots:
@@ -2673,9 +2668,7 @@ def profile_feature_dataset_rows(dataset_rows: list[dict[str, Any]]) -> dict[str
         "opponent_count": len({row["opponent_code"] for row in dataset_rows}),
         "venue_counts": venue_counts,
         "label_balance": {
-            "covered_actual": _boolean_value_counts(
-                row["covered_actual"] for row in dataset_rows
-            ),
+            "covered_actual": _boolean_value_counts(row["covered_actual"] for row in dataset_rows),
             "went_over_actual": _boolean_value_counts(
                 row["went_over_actual"] for row in dataset_rows
             ),
@@ -2709,8 +2702,7 @@ def split_feature_dataset_rows(
             for split_name, rows in split_rows.items()
         },
         "split_previews": {
-            split_name: rows[:preview_limit]
-            for split_name, rows in split_rows.items()
+            split_name: rows[:preview_limit] for split_name, rows in split_rows.items()
         },
     }
 
@@ -2832,9 +2824,7 @@ def build_feature_training_benchmark(
     ]
     train_target_mean = _mean_or_none(train_target_values)
     train_positive_rate = _mean_or_none(
-        1.0 if row["target_value"] else 0.0
-        for row in train_rows
-        if row["target_value"] is not None
+        1.0 if row["target_value"] else 0.0 for row in train_rows if row["target_value"] is not None
     )
 
     baseline_specs = _get_training_benchmark_specs(
@@ -3031,11 +3021,7 @@ def _materialize_feature_analysis_artifacts(
     ]
 
     evidence_result = None
-    if (
-        canonical_game_id is not None
-        or condition_values is not None
-        or pattern_key is not None
-    ):
+    if canonical_game_id is not None or condition_values is not None or pattern_key is not None:
         evidence_result = build_feature_evidence_bundle(
             dataset_rows,
             target_task=target_task,
@@ -3213,14 +3199,11 @@ def build_feature_pattern_catalog(
         raise ValueError(f"Unsupported pattern dimensions: {', '.join(invalid_dimensions)}")
 
     target_column = task_config["target_column"]
-    rows_with_targets = [
-        row for row in dataset_rows if row.get(target_column) is not None
-    ]
+    rows_with_targets = [row for row in dataset_rows if row.get(target_column) is not None]
     grouped_rows: dict[tuple[str, ...], list[dict[str, Any]]] = {}
     for row in rows_with_targets:
         condition_key = tuple(
-            str(_pattern_dimension_value(row, dimension))
-            for dimension in normalized_dimensions
+            str(_pattern_dimension_value(row, dimension)) for dimension in normalized_dimensions
         )
         grouped_rows.setdefault(condition_key, []).append(row)
 
@@ -3294,9 +3277,7 @@ def build_feature_comparable_cases(
         if dimension not in FEATURE_PATTERN_DIMENSIONS
     ]
     if invalid_dimensions:
-        raise ValueError(
-            f"Unsupported comparable dimensions: {', '.join(invalid_dimensions)}"
-        )
+        raise ValueError(f"Unsupported comparable dimensions: {', '.join(invalid_dimensions)}")
 
     anchor_row = None
     if canonical_game_id is not None:
@@ -3408,17 +3389,12 @@ def _partition_feature_dataset_rows(
             test_game_count = game_count - train_game_count - validation_game_count
 
     train_games = set(game_order[:train_game_count])
-    validation_games = set(
-        game_order[train_game_count : train_game_count + validation_game_count]
-    )
+    validation_games = set(game_order[train_game_count : train_game_count + validation_game_count])
     test_games = set(game_order[train_game_count + validation_game_count :])
 
     return {
         "train": [
-            row
-            for game_id in game_order
-            for row in rows_by_game[game_id]
-            if game_id in train_games
+            row for game_id in game_order for row in rows_by_game[game_id] if game_id in train_games
         ],
         "validation": [
             row
@@ -3427,10 +3403,7 @@ def _partition_feature_dataset_rows(
             if game_id in validation_games
         ],
         "test": [
-            row
-            for game_id in game_order
-            for row in rows_by_game[game_id]
-            if game_id in test_games
+            row for game_id in game_order for row in rows_by_game[game_id] if game_id in test_games
         ],
     }
 
@@ -3487,9 +3460,7 @@ def build_feature_training_view(
             "target_column": target_column,
             "drop_null_targets": drop_null_targets,
             "excluded_label_columns": [
-                column
-                for column in FEATURE_DATASET_LABEL_COLUMNS
-                if column != target_column
+                column for column in FEATURE_DATASET_LABEL_COLUMNS if column != target_column
             ],
         },
         "training_manifest": profile_feature_training_rows(training_rows),
@@ -3508,9 +3479,7 @@ def _build_training_target_summary(training_rows: list[dict[str, Any]]) -> dict[
         }
 
     target_values = [
-        row["target_value"]
-        for row in training_rows
-        if row["target_value"] is not None
+        row["target_value"] for row in training_rows if row["target_value"] is not None
     ]
     return {
         "row_count": len(training_rows),
@@ -3535,11 +3504,7 @@ def profile_feature_training_rows(training_rows: list[dict[str, Any]]) -> dict[s
         }
 
     feature_columns = sorted(
-        {
-            feature_name
-            for row in training_rows
-            for feature_name in row["features"].keys()
-        }
+        {feature_name for row in training_rows for feature_name in row["features"].keys()}
     )
     numeric_feature_columns: list[str] = []
     boolean_feature_columns: list[str] = []
@@ -3558,9 +3523,7 @@ def profile_feature_training_rows(training_rows: list[dict[str, Any]]) -> dict[s
         "numeric_feature_columns": numeric_feature_columns,
         "boolean_feature_columns": boolean_feature_columns,
         "feature_coverage": {
-            column: _coverage_summary(
-                row["features"].get(column) for row in training_rows
-            )
+            column: _coverage_summary(row["features"].get(column) for row in training_rows)
             for column in feature_columns
         },
         "target_summary": _build_training_target_summary(training_rows),
@@ -3604,24 +3567,20 @@ def summarize_feature_snapshots(
                 if entry["payload"]["days_rest"] is not None
             ),
             "back_to_back_rate": _mean_or_none(
-                1.0 if entry["payload"]["is_back_to_back"] else 0.0
-                for entry in perspectives
+                1.0 if entry["payload"]["is_back_to_back"] else 0.0 for entry in perspectives
             ),
             "avg_cover_streak": _mean_or_none(
-                entry["payload"]["trend_signals"]["current_cover_streak"]
-                for entry in perspectives
+                entry["payload"]["trend_signals"]["current_cover_streak"] for entry in perspectives
             ),
             "avg_non_cover_streak": _mean_or_none(
                 entry["payload"]["trend_signals"]["current_non_cover_streak"]
                 for entry in perspectives
             ),
             "avg_over_streak": _mean_or_none(
-                entry["payload"]["trend_signals"]["current_over_streak"]
-                for entry in perspectives
+                entry["payload"]["trend_signals"]["current_over_streak"] for entry in perspectives
             ),
             "avg_under_streak": _mean_or_none(
-                entry["payload"]["trend_signals"]["current_under_streak"]
-                for entry in perspectives
+                entry["payload"]["trend_signals"]["current_under_streak"] for entry in perspectives
             ),
             "rolling_window_averages": {
                 str(window): _build_window_average_summary(
@@ -3831,11 +3790,7 @@ def _build_team_feature_payload(
     windows: tuple[int, ...],
 ) -> dict[str, Any]:
     last_game_date = prior_games[-1].game_date if prior_games else None
-    days_rest = (
-        (current_game_date - last_game_date).days
-        if last_game_date is not None
-        else None
-    )
+    days_rest = (current_game_date - last_game_date).days if last_game_date is not None else None
     season_games_played_prior = sum(
         1 for game in prior_games if game.season_label == current_season_label
     )
@@ -3848,8 +3803,7 @@ def _build_team_feature_payload(
         "days_rest": days_rest,
         "is_back_to_back": days_rest == 1 if days_rest is not None else False,
         "rolling_windows": {
-            str(window): _build_window_summary(prior_games[-window:])
-            for window in windows
+            str(window): _build_window_summary(prior_games[-window:]) for window in windows
         },
         "rolling_home_windows": {
             str(window): _build_window_summary(
@@ -3913,9 +3867,7 @@ def _build_window_average_summary(
         if window in entry["payload"]["rolling_windows"]
     ]
     return {
-        "avg_sample_size": _mean_or_none(
-            payload["sample_size"] for payload in window_payloads
-        ),
+        "avg_sample_size": _mean_or_none(payload["sample_size"] for payload in window_payloads),
         "avg_point_margin": _mean_or_none(
             payload["avg_point_margin"]
             for payload in window_payloads
@@ -3942,9 +3894,7 @@ def _build_window_average_summary(
             if payload["cover_rate"] is not None
         ),
         "avg_over_rate": _mean_or_none(
-            payload["over_rate"]
-            for payload in window_payloads
-            if payload["over_rate"] is not None
+            payload["over_rate"] for payload in window_payloads if payload["over_rate"] is not None
         ),
         "avg_point_margin_volatility": _mean_or_none(
             payload["point_margin_volatility"]
@@ -3970,12 +3920,8 @@ def _build_window_summary(prior_games: list[TeamPerspectiveGame]) -> dict[str, A
         "avg_total_error": _mean_or_none(
             game.total_error for game in prior_games if game.total_error is not None
         ),
-        "point_margin_volatility": _pstdev_or_none(
-            game.point_margin for game in prior_games
-        ),
-        "total_points_volatility": _pstdev_or_none(
-            game.total_points for game in prior_games
-        ),
+        "point_margin_volatility": _pstdev_or_none(game.point_margin for game in prior_games),
+        "total_points_volatility": _pstdev_or_none(game.total_points for game in prior_games),
         "spread_error_volatility": _pstdev_or_none(
             game.spread_error for game in prior_games if game.spread_error is not None
         ),
@@ -3983,14 +3929,10 @@ def _build_window_summary(prior_games: list[TeamPerspectiveGame]) -> dict[str, A
             game.total_error for game in prior_games if game.total_error is not None
         ),
         "cover_rate": _mean_or_none(
-            1.0 if game.covered else 0.0
-            for game in prior_games
-            if game.covered is not None
+            1.0 if game.covered else 0.0 for game in prior_games if game.covered is not None
         ),
         "over_rate": _mean_or_none(
-            1.0 if game.went_over else 0.0
-            for game in prior_games
-            if game.went_over is not None
+            1.0 if game.went_over else 0.0 for game in prior_games if game.went_over is not None
         ),
     }
 
@@ -4109,14 +4051,10 @@ def _boolean_streak(
 
 def _delta_between_windows(recent_games, baseline_games, *, value_getter) -> float | None:
     recent_average = _mean_or_none(
-        value_getter(game)
-        for game in recent_games
-        if value_getter(game) is not None
+        value_getter(game) for game in recent_games if value_getter(game) is not None
     )
     baseline_average = _mean_or_none(
-        value_getter(game)
-        for game in baseline_games
-        if value_getter(game) is not None
+        value_getter(game) for game in baseline_games if value_getter(game) is not None
     )
     if recent_average is None or baseline_average is None:
         return None
@@ -4177,9 +4115,7 @@ def _get_training_benchmark_specs(
             "train_mean_baseline": lambda _row, value=train_target_mean: value,
             **{
                 baseline_name: (
-                    lambda row, feature_column=feature_column: row["features"].get(
-                        feature_column
-                    )
+                    lambda row, feature_column=feature_column: row["features"].get(feature_column)
                 )
                 for baseline_name, feature_column in feature_baselines.items()
             },
@@ -4190,9 +4126,7 @@ def _get_training_benchmark_specs(
         "train_rate_baseline": lambda _row, value=train_positive_rate: value,
         **{
             baseline_name: (
-                lambda row, feature_column=feature_column: row["features"].get(
-                    feature_column
-                )
+                lambda row, feature_column=feature_column: row["features"].get(feature_column)
             )
             for baseline_name, feature_column in feature_baselines.items()
         },
@@ -4231,9 +4165,7 @@ def _score_regression_baseline(training_rows, *, predictor) -> dict[str, Any]:
     squared_errors = [row["squared_error"] for row in scored_rows]
     return {
         "prediction_count": len(scored_rows),
-        "coverage_rate": round(len(scored_rows) / len(training_rows), 4)
-        if training_rows
-        else 0.0,
+        "coverage_rate": round(len(scored_rows) / len(training_rows), 4) if training_rows else 0.0,
         "mae": _mean_or_none(absolute_errors),
         "rmse": round(float(mean(squared_errors) ** 0.5), 4) if squared_errors else None,
         "mean_prediction": _mean_or_none(row["prediction"] for row in scored_rows),
@@ -4259,37 +4191,24 @@ def _score_classification_baseline(training_rows, *, predictor) -> dict[str, Any
         )
 
     true_positive = sum(
-        1
-        for row in scored_rows
-        if row["actual_label"] is True and row["predicted_label"] is True
+        1 for row in scored_rows if row["actual_label"] is True and row["predicted_label"] is True
     )
     true_negative = sum(
-        1
-        for row in scored_rows
-        if row["actual_label"] is False and row["predicted_label"] is False
+        1 for row in scored_rows if row["actual_label"] is False and row["predicted_label"] is False
     )
     false_positive = sum(
-        1
-        for row in scored_rows
-        if row["actual_label"] is False and row["predicted_label"] is True
+        1 for row in scored_rows if row["actual_label"] is False and row["predicted_label"] is True
     )
     false_negative = sum(
-        1
-        for row in scored_rows
-        if row["actual_label"] is True and row["predicted_label"] is False
+        1 for row in scored_rows if row["actual_label"] is True and row["predicted_label"] is False
     )
     brier_scores = [
-        (row["probability"] - (1.0 if row["actual_label"] else 0.0)) ** 2
-        for row in scored_rows
+        (row["probability"] - (1.0 if row["actual_label"] else 0.0)) ** 2 for row in scored_rows
     ]
     return {
         "prediction_count": len(scored_rows),
-        "coverage_rate": round(len(scored_rows) / len(training_rows), 4)
-        if training_rows
-        else 0.0,
-        "accuracy": round(
-            (true_positive + true_negative) / len(scored_rows), 4
-        )
+        "coverage_rate": round(len(scored_rows) / len(training_rows), 4) if training_rows else 0.0,
+        "accuracy": round((true_positive + true_negative) / len(scored_rows), 4)
         if scored_rows
         else None,
         "brier_score": _mean_or_none(brier_scores),
@@ -4415,10 +4334,7 @@ def _resolve_comparable_condition_values(
         return tuple(condition_values)
     if anchor_row is None:
         raise ValueError("Provide either canonical_game_id or explicit condition_values.")
-    return tuple(
-        str(_pattern_dimension_value(anchor_row, dimension))
-        for dimension in dimensions
-    )
+    return tuple(str(_pattern_dimension_value(anchor_row, dimension)) for dimension in dimensions)
 
 
 def _is_same_anchor_case(
@@ -4447,8 +4363,7 @@ def _serialize_anchor_case(
         "opponent_code": anchor_row["opponent_code"],
         "venue": anchor_row["venue"],
         "matched_conditions": {
-            dimension: _pattern_dimension_value(anchor_row, dimension)
-            for dimension in dimensions
+            dimension: _pattern_dimension_value(anchor_row, dimension) for dimension in dimensions
         },
         "target_values": {
             "point_margin_actual": anchor_row["point_margin_actual"],
@@ -4475,8 +4390,7 @@ def _serialize_comparable_case(
         "opponent_code": row["opponent_code"],
         "venue": row["venue"],
         "matched_conditions": {
-            dimension: _pattern_dimension_value(row, dimension)
-            for dimension in dimensions
+            dimension: _pattern_dimension_value(row, dimension) for dimension in dimensions
         },
         "similarity_score": similarity_score,
         "similarity_breakdown": similarity_breakdown or {},
@@ -4495,8 +4409,7 @@ def _build_pattern_key(
     condition_values: tuple[str, ...],
 ) -> str:
     return "|".join(
-        f"{dimension}={value}"
-        for dimension, value in zip(dimensions, condition_values)
+        f"{dimension}={value}" for dimension, value in zip(dimensions, condition_values)
     )
 
 
@@ -4615,9 +4528,7 @@ def _build_pattern_metrics(
         "target_median": target_median,
         "target_stddev": target_stddev,
         "hit_rate": None,
-        "variance": round(target_stddev * target_stddev, 4)
-        if target_stddev is not None
-        else None,
+        "variance": round(target_stddev * target_stddev, 4) if target_stddev is not None else None,
         "target_value_counts": {},
         "signal_strength": round(abs(target_mean), 4) if target_mean is not None else None,
     }

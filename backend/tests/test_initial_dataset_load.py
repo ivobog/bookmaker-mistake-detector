@@ -314,9 +314,7 @@ def test_run_initial_production_dataset_load_uses_browser_fallback_only_when_nee
         browser_fallback=True,
     )
 
-    assert fetch_calls == [
-        ("https://example.com/lal", ("2021-2022", "2022-2023"), True)
-    ]
+    assert fetch_calls == [("https://example.com/lal", ("2021-2022", "2022-2023"), True)]
     assert result["results"][0]["diagnostics"] == [
         "browser_fallback_requested",
         "browser_fallback_used",

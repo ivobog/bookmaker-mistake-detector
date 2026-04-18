@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, Query
 
 from bookmaker_detector_api.config import settings
@@ -8,7 +7,6 @@ from bookmaker_detector_api.demo import (
 )
 from bookmaker_detector_api.demo import seed_phase_two_feature_in_memory
 from bookmaker_detector_api.repositories import FeatureDatasetStore
-from bookmaker_detector_api.services.repository_factory import build_in_memory_feature_dataset_store
 from bookmaker_detector_api.services.features import (
     get_feature_analysis_artifact_catalog_in_memory,
     get_feature_analysis_artifact_catalog_postgres,
@@ -35,6 +33,7 @@ from bookmaker_detector_api.services.features import (
     materialize_feature_analysis_artifacts_in_memory,
     materialize_feature_analysis_artifacts_postgres,
 )
+from bookmaker_detector_api.services.repository_factory import build_in_memory_feature_dataset_store
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -718,7 +717,3 @@ def feature_dataset_training_task_matrix(
         },
         **training_task_matrix,
     }
-
-
-
-

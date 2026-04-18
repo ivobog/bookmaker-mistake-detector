@@ -6,9 +6,9 @@ from bookmaker_detector_api.api.schemas import (
     AdminBacktestHistoryFilters,
     AdminBacktestHistoryResponse,
     AdminEvaluationDetailResponse,
-    AdminEvaluationSnapshot,
     AdminEvaluationHistoryFilters,
     AdminEvaluationHistoryResponse,
+    AdminEvaluationSnapshot,
     AdminModelEvaluationsFilters,
     AdminModelEvaluationsResponse,
     AdminModelHistoryFilters,
@@ -24,13 +24,12 @@ from bookmaker_detector_api.api.schemas import (
     AdminModelSelectionsResponse,
     AdminModelSummaryFilters,
     AdminModelSummaryResponse,
-    AdminSelectionSnapshot,
     AdminSelectionDetailResponse,
     AdminSelectionHistoryFilters,
     AdminSelectionHistoryResponse,
+    AdminSelectionSnapshot,
 )
 from bookmaker_detector_api.db.postgres import postgres_connection
-from bookmaker_detector_api.services.repository_factory import build_in_memory_phase_three_modeling_store
 from bookmaker_detector_api.services.models import (
     get_model_backtest_history_in_memory,
     get_model_backtest_history_postgres,
@@ -62,6 +61,9 @@ from bookmaker_detector_api.services.models import (
     run_model_backtest_postgres,
     train_phase_three_models_in_memory,
     train_phase_three_models_postgres,
+)
+from bookmaker_detector_api.services.repository_factory import (
+    build_in_memory_phase_three_modeling_store,
 )
 
 from .admin_model_support import (
@@ -316,9 +318,7 @@ def phase_three_model_registry(
         repository_mode=repository_mode,
         filters=filters,
         model_registry_count=len(registries),
-        model_registry=[
-            _serialize_model_registry_entry(entry) for entry in registries
-        ],
+        model_registry=[_serialize_model_registry_entry(entry) for entry in registries],
     )
 
 
@@ -459,9 +459,7 @@ def phase_three_model_evaluations(
         repository_mode=repository_mode,
         filters=filters,
         evaluation_snapshot_count=len(snapshots),
-        evaluation_snapshots=[
-            _serialize_evaluation_snapshot(snapshot) for snapshot in snapshots
-        ],
+        evaluation_snapshots=[_serialize_evaluation_snapshot(snapshot) for snapshot in snapshots],
     )
 
 
@@ -594,9 +592,7 @@ def phase_three_model_selections(
         repository_mode=repository_mode,
         filters=filters,
         selection_count=len(selections),
-        selections=[
-            _serialize_selection_snapshot(selection) for selection in selections
-        ],
+        selections=[_serialize_selection_snapshot(selection) for selection in selections],
     )
 
 
@@ -649,10 +645,5 @@ def phase_three_model_selection_detail(
 
     return AdminSelectionDetailResponse(
         repository_mode=repository_mode,
-        selection=(
-            _serialize_selection_snapshot(selection) if selection is not None else None
-        ),
+        selection=(_serialize_selection_snapshot(selection) if selection is not None else None),
     )
-
-
-

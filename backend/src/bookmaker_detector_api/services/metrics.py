@@ -4,9 +4,7 @@ from bookmaker_detector_api.ingestion.models import CanonicalGame, GameMetric
 
 
 def calculate_game_metric(game: CanonicalGame) -> GameMetric:
-    total_error = (
-        game.final_total_points - game.total_line if game.total_line is not None else None
-    )
+    total_error = game.final_total_points - game.total_line if game.total_line is not None else None
     spread_error_home = (
         game.final_home_margin + game.home_spread_line
         if game.home_spread_line is not None
@@ -32,4 +30,3 @@ def calculate_game_metric(game: CanonicalGame) -> GameMetric:
         went_over=went_over,
         went_under=went_under,
     )
-

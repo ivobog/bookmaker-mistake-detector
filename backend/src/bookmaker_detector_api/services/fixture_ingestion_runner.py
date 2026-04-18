@@ -7,7 +7,6 @@ from bookmaker_detector_api.db.postgres import postgres_connection
 from bookmaker_detector_api.ingestion.providers import CoversHistoricalTeamPageProvider
 from bookmaker_detector_api.repositories import (
     InMemoryIngestionRepository,
-    PostgresIngestionRepository,
 )
 from bookmaker_detector_api.services.ingestion_pipeline import (
     HistoricalIngestionRequest,

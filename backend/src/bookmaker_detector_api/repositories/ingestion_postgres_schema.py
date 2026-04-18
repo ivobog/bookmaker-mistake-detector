@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-
 REPO_ROOT = Path(__file__).resolve().parents[4]
 
 
@@ -31,7 +30,8 @@ RUNTIME_SCHEMA_MUTATION_OWNERSHIP: tuple[RuntimeSchemaMutationOwnership, ...] = 
             "CREATE UNIQUE INDEX ux_raw_team_game_row_source_coordinates",
         ),
         target_state=(
-            "Keep owned by bootstrap SQL today; move to versioned migration tooling if schema evolution "
+            "Keep owned by bootstrap SQL today; move to versioned migration tooling if "
+            "schema evolution "
             "resumes beyond the current init-chain."
         ),
     ),
@@ -45,7 +45,8 @@ RUNTIME_SCHEMA_MUTATION_OWNERSHIP: tuple[RuntimeSchemaMutationOwnership, ...] = 
             "CREATE UNIQUE INDEX ux_data_quality_issue_identity",
         ),
         target_state=(
-            "Keep owned by bootstrap SQL today; treat duplicate cleanup plus index creation as migration-owned "
+            "Keep owned by bootstrap SQL today; treat duplicate cleanup plus index "
+            "creation as migration-owned "
             "work if this table evolves again."
         ),
     ),

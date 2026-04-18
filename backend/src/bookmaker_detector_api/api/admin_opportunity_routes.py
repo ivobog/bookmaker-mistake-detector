@@ -8,7 +8,6 @@ from bookmaker_detector_api.api.schemas import (
     AdminOpportunityHistoryResponse,
 )
 from bookmaker_detector_api.db.postgres import postgres_connection
-from bookmaker_detector_api.services.repository_factory import build_in_memory_phase_three_modeling_store
 from bookmaker_detector_api.services.models import (
     get_model_opportunity_history_in_memory,
     get_model_opportunity_history_postgres,
@@ -16,8 +15,9 @@ from bookmaker_detector_api.services.models import (
     materialize_model_future_opportunities_postgres,
     materialize_model_opportunities_in_memory,
     materialize_model_opportunities_postgres,
-    promote_best_model_in_memory,
-    train_phase_three_models_in_memory,
+)
+from bookmaker_detector_api.services.repository_factory import (
+    build_in_memory_phase_three_modeling_store,
 )
 
 from .admin_model_support import (
@@ -226,6 +226,3 @@ def phase_three_model_opportunity_history(
         filters=filters,
         model_opportunity_history=history,
     )
-
-
-

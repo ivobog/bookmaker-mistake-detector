@@ -1,3 +1,5 @@
+import json
+import logging
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
@@ -53,10 +55,19 @@ from bookmaker_detector_api.services.models import (
     score_model_market_board_in_memory,
     train_phase_three_models_in_memory,
 )
+from bookmaker_detector_api.services.workflow_logging import WORKFLOW_LOGGER_NAME
 
 
 def _utc_today() -> date:
     return datetime.now(timezone.utc).date()
+
+
+def _workflow_events(caplog: pytest.LogCaptureFixture) -> list[dict[str, object]]:
+    return [
+        json.loads(record.getMessage())
+        for record in caplog.records
+        if record.name == WORKFLOW_LOGGER_NAME
+    ]
 
 
 def test_train_phase_three_models_in_memory_persists_baseline_runs() -> None:
@@ -141,6 +152,34 @@ def test_run_model_backtest_in_memory_persists_walk_forward_summary() -> None:
     )
     assert len(runs) == 1
     assert runs[0].fold_count == result["summary"]["fold_count"]
+
+
+def test_run_model_backtest_in_memory_emits_structured_workflow_logs(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    repository, _, _ = seed_phase_two_feature_in_memory()
+
+    with caplog.at_level(logging.INFO, logger=WORKFLOW_LOGGER_NAME):
+        result = run_model_backtest_in_memory(
+            repository,
+            target_task="spread_error_regression",
+            minimum_train_games=1,
+            test_window_games=1,
+            train_ratio=0.5,
+            validation_ratio=0.25,
+        )
+
+    events = _workflow_events(caplog)
+    assert [entry["event"] for entry in events] == [
+        "workflow_started",
+        "workflow_succeeded",
+    ]
+    assert events[0]["workflow_name"] == "model_backtest.run"
+    assert events[0]["storage_mode"] == "in_memory"
+    assert events[1]["backtest_run_id"] == result["backtest_run"]["id"]
+    assert events[1]["fold_count"] == result["summary"]["fold_count"]
+    assert events[1]["dataset_game_count"] == result["summary"]["dataset_game_count"]
+    assert isinstance(events[1]["duration_ms"], float)
 
 
 def test_model_backtest_history_and_detail_in_memory_return_recent_runs() -> None:
@@ -380,6 +419,47 @@ def test_materialize_model_opportunities_in_memory_persists_reviewable_signal() 
     )
     assert len(stored) == 1
     assert stored[0].status == "review_manually"
+
+
+def test_materialize_model_opportunities_in_memory_emits_structured_workflow_logs(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    repository, _, _ = seed_phase_two_feature_in_memory()
+    train_phase_three_models_in_memory(
+        repository,
+        target_task="spread_error_regression",
+        team_code="LAL",
+        season_label="2024-2025",
+        train_ratio=0.5,
+        validation_ratio=0.25,
+    )
+    promote_best_model_in_memory(
+        repository,
+        target_task="spread_error_regression",
+    )
+
+    with caplog.at_level(logging.INFO, logger=WORKFLOW_LOGGER_NAME):
+        materialized = materialize_model_opportunities_in_memory(
+            repository,
+            target_task="spread_error_regression",
+            team_code="LAL",
+            season_label="2024-2025",
+            canonical_game_id=3,
+            limit=5,
+            include_evidence=True,
+            train_ratio=0.5,
+            validation_ratio=0.25,
+        )
+
+    events = _workflow_events(caplog)
+    assert [entry["event"] for entry in events] == [
+        "workflow_started",
+        "workflow_succeeded",
+    ]
+    assert events[0]["workflow_name"] == "model_opportunities.materialize"
+    assert events[1]["opportunity_count"] == materialized["opportunity_count"]
+    assert events[1]["materialized_count"] == materialized["materialized_count"]
+    assert events[1]["scoring_preview_count"] == materialized["scored_prediction_count"]
 
 
 def test_get_model_future_game_preview_in_memory_scores_both_perspectives() -> None:
@@ -1375,6 +1455,67 @@ def test_orchestrate_model_market_board_cadence_in_memory_runs_refresh_then_scor
     assert result["refresh_result"]["queue_before"]["overview"]["pending_refresh_count"] == 1
     assert result["scoring_result"]["queue_after"]["overview"]["pending_board_count"] == 0
     assert result["cadence_batch"]["refreshed_board_count"] == 1
+
+
+def test_orchestrate_model_market_board_cadence_in_memory_emits_structured_workflow_logs(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    repository, _, _ = seed_phase_two_feature_in_memory()
+    train_phase_three_models_in_memory(
+        repository,
+        target_task="spread_error_regression",
+        train_ratio=0.5,
+        validation_ratio=0.25,
+    )
+    promote_best_model_in_memory(repository, target_task="spread_error_regression")
+    refresh_model_market_board_in_memory(
+        repository,
+        target_task="spread_error_regression",
+        source_name="demo_daily_lines_v1",
+        season_label="2025-2026",
+        game_date=date(2026, 4, 20),
+        slate_label="demo-refresh-board",
+        game_count=2,
+    )
+    repository.model_market_boards[0]["payload"]["source"]["refreshed_at"] = (
+        _utc_today() - timedelta(days=2)
+    ).isoformat()
+
+    with caplog.at_level(logging.INFO, logger=WORKFLOW_LOGGER_NAME):
+        result = orchestrate_model_market_board_cadence_in_memory(
+            repository,
+            target_task="spread_error_regression",
+            season_label="2025-2026",
+            source_name="demo_daily_lines_v1",
+            refresh_freshness_status="stale",
+            refresh_pending_only=True,
+            scoring_freshness_status="fresh",
+            scoring_pending_only=True,
+            train_ratio=0.5,
+            validation_ratio=0.25,
+            recent_limit=5,
+        )
+
+    events = _workflow_events(caplog)
+    workflow_names = [
+        entry["workflow_name"] for entry in events if entry["event"] == "workflow_succeeded"
+    ]
+    assert "model_market_board.refresh" in workflow_names
+    assert "model_market_board.refresh_orchestration" in workflow_names
+    assert "model_market_board.scoring_orchestration" in workflow_names
+    assert "model_market_board.cadence_orchestration" in workflow_names
+    cadence_success = next(
+        entry
+        for entry in events
+        if entry["event"] == "workflow_succeeded"
+        and entry["workflow_name"] == "model_market_board.cadence_orchestration"
+    )
+    assert cadence_success["refreshed_board_count"] == result["refreshed_board_count"]
+    assert cadence_success["scored_board_count"] == result["scored_board_count"]
+    assert (
+        cadence_success["materialized_opportunity_count"]
+        == result["materialized_opportunity_count"]
+    )
 
 
 def test_market_board_cadence_batch_history_in_memory_rolls_up_batches() -> None:

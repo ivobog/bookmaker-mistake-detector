@@ -24,11 +24,13 @@ POSTGRES_JSON_PROMOTION_CANDIDATES: tuple[JsonPromotionCandidate, ...] = (
         priority="high",
         current_action="defer",
         promotion_trigger=(
-            "Promote when operator-facing dashboards or release gates need SQL-side ordering or filtering "
+            "Promote when operator-facing dashboards or release gates need SQL-side "
+            "ordering or filtering "
             "by best backtest ROI."
         ),
         rationale=(
-            "Current history views compute ROI from payload after load, so no SQL filter depends on it yet. "
+            "Current history views compute ROI from payload after load, so no SQL "
+            "filter depends on it yet. "
             "This is the strongest future candidate because it is a headline backtest outcome."
         ),
     ),
@@ -40,11 +42,13 @@ POSTGRES_JSON_PROMOTION_CANDIDATES: tuple[JsonPromotionCandidate, ...] = (
         priority="high",
         current_action="defer",
         promotion_trigger=(
-            "Promote alongside ROI if operators need SQL-side ranking, thresholds, or trend charts on "
+            "Promote alongside ROI if operators need SQL-side ranking, thresholds, "
+            "or trend charts on "
             "profit performance."
         ),
         rationale=(
-            "Profit units is used in history summaries, but only after loading payload JSON into Python."
+            "Profit units is used in history summaries, but only after loading "
+            "payload JSON into Python."
         ),
     ),
     JsonPromotionCandidate(
@@ -55,11 +59,13 @@ POSTGRES_JSON_PROMOTION_CANDIDATES: tuple[JsonPromotionCandidate, ...] = (
         priority="medium",
         current_action="defer",
         promotion_trigger=(
-            "Promote if operator workflows require direct comparison or filtering on hit rate without "
+            "Promote if operator workflows require direct comparison or filtering "
+            "on hit rate without "
             "loading full payloads."
         ),
         rationale=(
-            "Useful as a companion metric, but lower priority than ROI and profit units for current review flows."
+            "Useful as a companion metric, but lower priority than ROI and profit "
+            "units for current review flows."
         ),
     ),
     JsonPromotionCandidate(
@@ -70,10 +76,12 @@ POSTGRES_JSON_PROMOTION_CANDIDATES: tuple[JsonPromotionCandidate, ...] = (
         priority="medium",
         current_action="defer",
         promotion_trigger=(
-            "Promote when scoring-run queues or dashboards need SQL-side sorting by strongest surfaced signal."
+            "Promote when scoring-run queues or dashboards need SQL-side sorting by "
+            "strongest surfaced signal."
         ),
         rationale=(
-            "Scoring runs already expose structured counts and scenario identity, so payload summary metrics "
+            "Scoring runs already expose structured counts and scenario identity, so "
+            "payload summary metrics "
             "are not yet required in SQL."
         ),
     ),
@@ -85,10 +93,12 @@ POSTGRES_JSON_PROMOTION_CANDIDATES: tuple[JsonPromotionCandidate, ...] = (
         priority="medium",
         current_action="defer",
         promotion_trigger=(
-            "Promote if source-run operations move from in-memory summary calculation to SQL dashboards or alerts."
+            "Promote if source-run operations move from in-memory summary "
+            "calculation to SQL dashboards or alerts."
         ),
         rationale=(
-            "The current history summary reads this from payload in Python, so there is no immediate schema need."
+            "The current history summary reads this from payload in Python, so "
+            "there is no immediate schema need."
         ),
     ),
     JsonPromotionCandidate(
@@ -99,11 +109,13 @@ POSTGRES_JSON_PROMOTION_CANDIDATES: tuple[JsonPromotionCandidate, ...] = (
         priority="low",
         current_action="defer",
         promotion_trigger=(
-            "Promote only if evidence-artifact reporting shifts to direct Postgres filtering instead of artifact "
+            "Promote only if evidence-artifact reporting shifts to direct Postgres "
+            "filtering instead of artifact "
             "materialization in service code."
         ),
         rationale=(
-            "Current evidence aggregation is handled after artifact load, and operator opportunity flows already "
+            "Current evidence aggregation is handled after artifact load, and "
+            "operator opportunity flows already "
             "have dedicated structured columns for recommendation/evidence status."
         ),
     ),

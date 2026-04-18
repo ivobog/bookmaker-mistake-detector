@@ -651,8 +651,7 @@ def _summarize_model_evaluation_history(
         },
         "daily_buckets": [daily_rollups[key] for key in sorted(daily_rollups.keys())],
         "recent_snapshots": [
-            _serialize_model_evaluation_snapshot(snapshot)
-            for snapshot in snapshots[:recent_limit]
+            _serialize_model_evaluation_snapshot(snapshot) for snapshot in snapshots[:recent_limit]
         ],
     }
 
@@ -669,9 +668,7 @@ def _summarize_model_selection_history(
         policy_counts[selection.selection_policy_name] = (
             policy_counts.get(selection.selection_policy_name, 0) + 1
         )
-        family_counts[selection.model_family] = (
-            family_counts.get(selection.model_family, 0) + 1
-        )
+        family_counts[selection.model_family] = family_counts.get(selection.model_family, 0) + 1
         if selection.is_active:
             active_count += 1
     return {

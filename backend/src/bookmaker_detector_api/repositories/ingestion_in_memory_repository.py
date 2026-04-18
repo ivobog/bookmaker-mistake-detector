@@ -205,13 +205,9 @@ class InMemoryIngestionRepository:
                 None,
             )
             if existing_metric is None:
-                self.metrics.append(
-                    {"canonical_game_id": canonical_game_id, **metric.as_dict()}
-                )
+                self.metrics.append({"canonical_game_id": canonical_game_id, **metric.as_dict()})
             else:
-                existing_metric.update(
-                    {"canonical_game_id": canonical_game_id, **metric.as_dict()}
-                )
+                existing_metric.update({"canonical_game_id": canonical_game_id, **metric.as_dict()})
         return len(metrics_by_game_id)
 
     def complete_job_run(self, *, job_id: int, summary: dict[str, Any], status: str) -> None:
@@ -735,4 +731,3 @@ class InMemoryIngestionRepository:
             "issue_type_updates": issue_type_updates,
             "severity_updates": severity_updates,
         }
-

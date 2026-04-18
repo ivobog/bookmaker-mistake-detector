@@ -6,9 +6,7 @@ from bookmaker_detector_api.fetching import FetchedPage
 from bookmaker_detector_api.ingestion.providers import CoversHistoricalTeamPageProvider
 
 DEFAULT_INDEX_URL = "https://www.covers.com/sport/basketball/nba/teams"
-DEFAULT_TEAM_PAGE_URL = (
-    "https://www.covers.com/sport/basketball/nba/teams/main/los-angeles-lakers"
-)
+DEFAULT_TEAM_PAGE_URL = "https://www.covers.com/sport/basketball/nba/teams/main/los-angeles-lakers"
 DEFAULT_SCHEDULE_FRAGMENT_TOKEN = "getschedule/schedule/175/47854"
 
 
@@ -45,9 +43,7 @@ def build_fixture_backed_covers_provider(
     browser_page_html: str | None = None,
 ):
     resolved_index_html = index_html or build_covers_index_html()
-    resolved_team_page_html = team_page_html or load_covers_fixture(
-        "covers_live_team_page.html"
-    )
+    resolved_team_page_html = team_page_html or load_covers_fixture("covers_live_team_page.html")
 
     class FixtureBackedCoversProvider(CoversHistoricalTeamPageProvider):
         def fetch_page(self, *, url: str) -> FetchedPage:

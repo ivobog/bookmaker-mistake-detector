@@ -14,6 +14,22 @@ Use it together with:
 - [docs/release_acceptance_checklist.md](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/docs/release_acceptance_checklist.md)
 - [docs/manual_smoke_checklist.md](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/docs/manual_smoke_checklist.md)
 - [docs/known_issues.md](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/docs/known_issues.md)
+- [docs/phase5_operational_hardening.md](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/docs/phase5_operational_hardening.md)
+
+## Workflow Logging
+- High-value operator workflows now emit structured JSON log lines through the `bookmaker_detector_api.workflow` logger.
+- Current first-wave coverage includes:
+  - backtest execution
+  - opportunity materialization
+  - market-board refresh
+  - market-board refresh/scoring/cadence orchestration
+- Each workflow log line includes:
+  - `workflow_name`
+  - `workflow_run_id`
+  - `event`
+  - key filter/context fields
+  - `duration_ms` on success/failure
+- When a release-candidate pass fails, capture the matching `workflow_run_id` from these logs before retrying the workflow.
 
 ## Schema Contract
 - PostgreSQL schema ownership lives in `infra/postgres/init/`.

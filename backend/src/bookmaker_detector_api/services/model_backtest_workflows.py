@@ -248,9 +248,7 @@ def build_backtest_fold_summary(
     candidate_strategy = evaluate_backtest_strategy(
         predictions=predictions,
         target_task=target_task,
-        threshold=float(
-            opportunity_policy_configs[target_task]["candidate_min_signal_strength"]
-        ),
+        threshold=float(opportunity_policy_configs[target_task]["candidate_min_signal_strength"]),
         strategy_name="candidate_threshold",
     )
     review_strategy = evaluate_backtest_strategy(
@@ -294,14 +292,10 @@ def summarize_walk_forward_backtest(
     predictions: list[dict[str, Any]],
 ) -> dict[str, Any]:
     candidate_bets = [
-        bet
-        for fold in fold_summaries
-        for bet in fold["strategies"]["candidate_threshold"]["bets"]
+        bet for fold in fold_summaries for bet in fold["strategies"]["candidate_threshold"]["bets"]
     ]
     review_bets = [
-        bet
-        for fold in fold_summaries
-        for bet in fold["strategies"]["review_threshold"]["bets"]
+        bet for fold in fold_summaries for bet in fold["strategies"]["review_threshold"]["bets"]
     ]
     selected_family_counts: dict[str, int] = {}
     for fold in fold_summaries:

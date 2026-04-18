@@ -31,7 +31,8 @@ POSTGRES_JSON_COLUMN_OWNERSHIP: tuple[PostgresJsonColumnOwnership, ...] = (
         classification="workflow_result_provenance",
         structured_columns=("job_name", "status", "started_at", "completed_at"),
         rationale=(
-            "Stores raw completion summaries and provenance-rich counts, while query-facing counts are "
+            "Stores raw completion summaries and provenance-rich counts, while "
+            "query-facing counts are "
             "copied into reporting snapshot tables."
         ),
         promotion_candidates=(
@@ -65,7 +66,8 @@ POSTGRES_JSON_COLUMN_OWNERSHIP: tuple[PostgresJsonColumnOwnership, ...] = (
             "parse_status",
         ),
         rationale=(
-            "Keeps warning code lists attached to a specific raw row. Row identity and parse status stay "
+            "Keeps warning code lists attached to a specific raw row. Row identity "
+            "and parse status stay "
             "in structured columns for joins and operator filters."
         ),
     ),
@@ -81,7 +83,8 @@ POSTGRES_JSON_COLUMN_OWNERSHIP: tuple[PostgresJsonColumnOwnership, ...] = (
             "reconciliation_status",
         ),
         rationale=(
-            "Preserves raw-row lineage for reconciliation without turning variable-length source references "
+            "Preserves raw-row lineage for reconciliation without turning "
+            "variable-length source references "
             "into relational child tables."
         ),
     ),
@@ -96,7 +99,10 @@ POSTGRES_JSON_COLUMN_OWNERSHIP: tuple[PostgresJsonColumnOwnership, ...] = (
             "away_team_id",
             "reconciliation_status",
         ),
-        rationale="Stores reconciliation warning code lists while the main game identity remains structured.",
+        rationale=(
+            "Stores reconciliation warning code lists while the main game identity "
+            "remains structured."
+        ),
     ),
     PostgresJsonColumnOwnership(
         table_name="data_quality_issue",
@@ -104,7 +110,8 @@ POSTGRES_JSON_COLUMN_OWNERSHIP: tuple[PostgresJsonColumnOwnership, ...] = (
         classification="quality_issue_provenance",
         structured_columns=("issue_type", "severity", "raw_team_game_row_id", "canonical_game_id"),
         rationale=(
-            "Issue identity and severity are queryable columns; the nested issue explanation remains JSON "
+            "Issue identity and severity are queryable columns; the nested issue "
+            "explanation remains JSON "
             "for audit and review detail."
         ),
     ),
@@ -113,7 +120,10 @@ POSTGRES_JSON_COLUMN_OWNERSHIP: tuple[PostgresJsonColumnOwnership, ...] = (
         column_name="config_json",
         classification="versioned_config",
         structured_columns=("feature_key", "version_label", "description", "created_at"),
-        rationale="Feature version lookup is relational; configuration stays JSON because it is version metadata.",
+        rationale=(
+            "Feature version lookup is relational; configuration stays JSON because "
+            "it is version metadata."
+        ),
     ),
     PostgresJsonColumnOwnership(
         table_name="game_feature_snapshot",
@@ -128,7 +138,8 @@ POSTGRES_JSON_COLUMN_OWNERSHIP: tuple[PostgresJsonColumnOwnership, ...] = (
             "away_team_id",
         ),
         rationale=(
-            "High-dimensional feature vectors are intentionally stored as JSON, while dataset slicing uses "
+            "High-dimensional feature vectors are intentionally stored as JSON, "
+            "while dataset slicing uses "
             "game, season, team, and version columns."
         ),
     ),
@@ -144,7 +155,10 @@ POSTGRES_JSON_COLUMN_OWNERSHIP: tuple[PostgresJsonColumnOwnership, ...] = (
             "scope_season_label",
             "artifact_key",
         ),
-        rationale="Artifact identity is structured; dimension lists remain JSON because they are variable metadata.",
+        rationale=(
+            "Artifact identity is structured; dimension lists remain JSON because "
+            "they are variable metadata."
+        ),
     ),
     PostgresJsonColumnOwnership(
         table_name="feature_analysis_artifact",
@@ -172,7 +186,10 @@ POSTGRES_JSON_COLUMN_OWNERSHIP: tuple[PostgresJsonColumnOwnership, ...] = (
             "description",
             "created_at",
         ),
-        rationale="Registry identity and family are relational; config JSON captures model-family-specific metadata.",
+        rationale=(
+            "Registry identity and family are relational; config JSON captures "
+            "model-family-specific metadata."
+        ),
     ),
     PostgresJsonColumnOwnership(
         table_name="model_training_run",
@@ -191,7 +208,8 @@ POSTGRES_JSON_COLUMN_OWNERSHIP: tuple[PostgresJsonColumnOwnership, ...] = (
             "completed_at",
         ),
         rationale=(
-            "Stores trainer-specific learned artifacts and split details. Training scope and lifecycle state "
+            "Stores trainer-specific learned artifacts and split details. Training "
+            "scope and lifecycle state "
             "remain structured."
         ),
         promotion_candidates=("selected_feature", "fallback_strategy"),
@@ -211,7 +229,8 @@ POSTGRES_JSON_COLUMN_OWNERSHIP: tuple[PostgresJsonColumnOwnership, ...] = (
             "completed_at",
         ),
         rationale=(
-            "Retains full training metrics payloads, while the operator-facing evaluation snapshot promotes the "
+            "Retains full training metrics payloads, while the operator-facing "
+            "evaluation snapshot promotes the "
             "primary validation/test metrics and prediction counts."
         ),
         promotion_candidates=(
@@ -239,7 +258,10 @@ POSTGRES_JSON_COLUMN_OWNERSHIP: tuple[PostgresJsonColumnOwnership, ...] = (
             "test_prediction_count",
             "created_at",
         ),
-        rationale="Detailed evaluation payload stays JSON after the high-value summary fields are promoted.",
+        rationale=(
+            "Detailed evaluation payload stays JSON after the high-value summary "
+            "fields are promoted."
+        ),
     ),
     PostgresJsonColumnOwnership(
         table_name="model_selection_snapshot",
@@ -256,7 +278,10 @@ POSTGRES_JSON_COLUMN_OWNERSHIP: tuple[PostgresJsonColumnOwnership, ...] = (
             "is_active",
             "created_at",
         ),
-        rationale="Selection audit rationale is JSON; selection identity and active-state filters are structured.",
+        rationale=(
+            "Selection audit rationale is JSON; selection identity and active-state "
+            "filters are structured."
+        ),
     ),
     PostgresJsonColumnOwnership(
         table_name="model_scoring_run",
@@ -282,7 +307,8 @@ POSTGRES_JSON_COLUMN_OWNERSHIP: tuple[PostgresJsonColumnOwnership, ...] = (
             "created_at",
         ),
         rationale=(
-            "Preserves full prediction and preview context, while counts, scenario identity, and task filters are "
+            "Preserves full prediction and preview context, while counts, scenario "
+            "identity, and task filters are "
             "already explicit columns."
         ),
     ),
@@ -311,7 +337,8 @@ POSTGRES_JSON_COLUMN_OWNERSHIP: tuple[PostgresJsonColumnOwnership, ...] = (
             "updated_at",
         ),
         rationale=(
-            "The payload keeps the full prediction, evidence, and policy snapshot used to materialize the "
+            "The payload keeps the full prediction, evidence, and policy snapshot "
+            "used to materialize the "
             "opportunity; queue and detail filtering uses structured columns."
         ),
     ),
@@ -336,7 +363,8 @@ POSTGRES_JSON_COLUMN_OWNERSHIP: tuple[PostgresJsonColumnOwnership, ...] = (
             "completed_at",
         ),
         rationale=(
-            "Backtest payloads include fold summaries, bet ledgers, and performance detail that are too nested "
+            "Backtest payloads include fold summaries, bet ledgers, and performance "
+            "detail that are too nested "
             "for direct relational modeling. The operator-facing execution knobs remain structured."
         ),
         promotion_candidates=("roi_pct", "win_rate", "net_units"),
@@ -356,7 +384,10 @@ POSTGRES_JSON_COLUMN_OWNERSHIP: tuple[PostgresJsonColumnOwnership, ...] = (
             "created_at",
             "updated_at",
         ),
-        rationale="Board identity and cadence filters are structured; the full slate snapshot remains JSON.",
+        rationale=(
+            "Board identity and cadence filters are structured; the full slate "
+            "snapshot remains JSON."
+        ),
     ),
     PostgresJsonColumnOwnership(
         table_name="model_market_board_refresh_event",
@@ -371,7 +402,10 @@ POSTGRES_JSON_COLUMN_OWNERSHIP: tuple[PostgresJsonColumnOwnership, ...] = (
             "game_count",
             "created_at",
         ),
-        rationale="Refresh event summaries are filterable by board/task/source/status; nested diffs remain JSON.",
+        rationale=(
+            "Refresh event summaries are filterable by board/task/source/status; "
+            "nested diffs remain JSON."
+        ),
     ),
     PostgresJsonColumnOwnership(
         table_name="model_market_board_source_run",
@@ -388,7 +422,10 @@ POSTGRES_JSON_COLUMN_OWNERSHIP: tuple[PostgresJsonColumnOwnership, ...] = (
             "status",
             "created_at",
         ),
-        rationale="Stores raw/generated game payloads and validation detail while source-run identity stays relational.",
+        rationale=(
+            "Stores raw/generated game payloads and validation detail while "
+            "source-run identity stays relational."
+        ),
     ),
     PostgresJsonColumnOwnership(
         table_name="model_market_board_refresh_batch",
@@ -407,7 +444,10 @@ POSTGRES_JSON_COLUMN_OWNERSHIP: tuple[PostgresJsonColumnOwnership, ...] = (
             "unchanged_board_count",
             "created_at",
         ),
-        rationale="Batch-level queue snapshots and refresh run detail remain JSON after summary counters are promoted.",
+        rationale=(
+            "Batch-level queue snapshots and refresh run detail remain JSON after "
+            "summary counters are promoted."
+        ),
     ),
     PostgresJsonColumnOwnership(
         table_name="model_market_board_scoring_batch",
@@ -425,7 +465,10 @@ POSTGRES_JSON_COLUMN_OWNERSHIP: tuple[PostgresJsonColumnOwnership, ...] = (
             "materialized_opportunity_count",
             "created_at",
         ),
-        rationale="Batch orchestration context remains JSON while queue/counter dashboards stay in explicit columns.",
+        rationale=(
+            "Batch orchestration context remains JSON while queue/counter dashboards "
+            "stay in explicit columns."
+        ),
     ),
     PostgresJsonColumnOwnership(
         table_name="model_market_board_cadence_batch",
@@ -443,7 +486,10 @@ POSTGRES_JSON_COLUMN_OWNERSHIP: tuple[PostgresJsonColumnOwnership, ...] = (
             "materialized_opportunity_count",
             "created_at",
         ),
-        rationale="Combined cadence orchestration detail stays JSON after the operational summary is promoted.",
+        rationale=(
+            "Combined cadence orchestration detail stays JSON after the operational "
+            "summary is promoted."
+        ),
     ),
 )
 

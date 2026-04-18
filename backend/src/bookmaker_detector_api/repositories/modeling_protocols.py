@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
-
 RecordList = list[dict[str, Any]]
 
 
@@ -49,13 +48,11 @@ class ModelingRepositoryStore(
     ModelBacktestArtifactStore,
     MarketBoardOperationStore,
     Protocol,
-):
-    ...
+): ...
 
 
 class PhaseThreeModelingStore(
     FeatureDatasetStore,
     ModelingRepositoryStore,
     Protocol,
-):
-    ...
+): ...

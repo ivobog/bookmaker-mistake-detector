@@ -3,6 +3,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from bookmaker_detector_api import demo as demo_module
 from bookmaker_detector_api.api import admin_feature_routes as admin_feature_api
 from bookmaker_detector_api.api import admin_market_board_routes as admin_market_board_api
 from bookmaker_detector_api.api import admin_model_routes as admin_model_api
@@ -12,7 +13,6 @@ from bookmaker_detector_api.api import analyst_backtests as analyst_backtests_ap
 from bookmaker_detector_api.api import analyst_opportunities as analyst_opportunities_api
 from bookmaker_detector_api.api import analyst_patterns as analyst_patterns_api
 from bookmaker_detector_api.api import analyst_trends as analyst_trends_api
-from bookmaker_detector_api import demo as demo_module
 from bookmaker_detector_api.main import app
 from bookmaker_detector_api.repositories import InMemoryIngestionRepository
 from bookmaker_detector_api.services import (
@@ -155,8 +155,7 @@ def test_phase_two_feature_demo_endpoint_exposes_feature_snapshot_summary() -> N
     assert payload["feature_result"]["canonical_game_count"] == 3
     assert payload["feature_result"]["snapshots_saved"] == 3
     assert (
-        payload["feature_result"]["feature_version"]["feature_key"]
-        == "baseline_team_features_v1"
+        payload["feature_result"]["feature_version"]["feature_key"] == "baseline_team_features_v1"
     )
     assert len(payload["feature_result"]["feature_snapshots"]) == 3
 
@@ -218,7 +217,9 @@ def test_phase_three_model_registry_endpoint_returns_existing_rows(monkeypatch) 
     assert payload["repository_mode"] == "in_memory"
     assert payload["model_registry_count"] == 1
     assert payload["model_registry"][0]["model_family"] == "linear_feature"
-    assert payload["model_registry"][0]["model_key"] == "spread_error_regression_linear_feature_global"
+    assert (
+        payload["model_registry"][0]["model_key"] == "spread_error_regression_linear_feature_global"
+    )
 
 
 def test_phase_three_model_runs_endpoint_returns_empty_without_hidden_seeding() -> None:
@@ -358,7 +359,9 @@ def test_phase_three_model_summary_endpoint_returns_existing_rollup(monkeypatch)
 
 
 def test_phase_three_model_history_endpoint_returns_empty_without_hidden_seeding() -> None:
-    response = client.get("/api/v1/admin/models/history?target_task=spread_error_regression&recent_limit=5")
+    response = client.get(
+        "/api/v1/admin/models/history?target_task=spread_error_regression&recent_limit=5"
+    )
 
     assert response.status_code == 200
     payload = response.json()
@@ -386,12 +389,17 @@ def test_phase_three_model_history_endpoint_returns_existing_rollup(monkeypatch)
         },
     )
 
-    response = client.get("/api/v1/admin/models/history?target_task=spread_error_regression&recent_limit=5")
+    response = client.get(
+        "/api/v1/admin/models/history?target_task=spread_error_regression&recent_limit=5"
+    )
 
     assert response.status_code == 200
     payload = response.json()
     assert payload["model_history"]["overview"]["run_count"] == 2
-    assert payload["model_history"]["overview"]["best_overall"]["artifact"]["model_family"] == "linear_feature"
+    assert (
+        payload["model_history"]["overview"]["best_overall"]["artifact"]["model_family"]
+        == "linear_feature"
+    )
     assert payload["model_history"]["overview"]["fallback_run_count"] == 1
     assert payload["model_history"]["daily_buckets"][0]["run_count"] == 2
     assert len(payload["model_history"]["recent_runs"]) == 2
@@ -491,8 +499,12 @@ def test_phase_three_model_evaluation_detail_endpoint_returns_existing_payload(
     assert payload["evaluation_snapshot"]["validation_prediction_count"] == 5
 
 
-def test_phase_three_model_evaluation_history_endpoint_returns_empty_without_hidden_seeding() -> None:
-    response = client.get("/api/v1/admin/models/evaluations/history?target_task=spread_error_regression&recent_limit=5")
+def test_phase_three_model_evaluation_history_endpoint_returns_empty_without_hidden_seeding() -> (
+    None
+):
+    response = client.get(
+        "/api/v1/admin/models/evaluations/history?target_task=spread_error_regression&recent_limit=5"
+    )
 
     assert response.status_code == 200
     payload = response.json()
@@ -517,12 +529,16 @@ def test_phase_three_model_evaluation_history_endpoint_returns_existing_rollup(
         },
     )
 
-    response = client.get("/api/v1/admin/models/evaluations/history?target_task=spread_error_regression&recent_limit=5")
+    response = client.get(
+        "/api/v1/admin/models/evaluations/history?target_task=spread_error_regression&recent_limit=5"
+    )
 
     assert response.status_code == 200
     payload = response.json()
     assert payload["model_evaluation_history"]["overview"]["snapshot_count"] == 2
-    assert payload["model_evaluation_history"]["overview"]["fallback_strategy_counts"] == {"constant_mean": 1}
+    assert payload["model_evaluation_history"]["overview"]["fallback_strategy_counts"] == {
+        "constant_mean": 1
+    }
     assert len(payload["model_evaluation_history"]["daily_buckets"]) == 1
     assert len(payload["model_evaluation_history"]["recent_snapshots"]) == 2
 
@@ -631,8 +647,12 @@ def test_phase_three_model_selection_detail_endpoint_returns_existing_payload(
     assert payload["selection"]["is_active"] is True
 
 
-def test_phase_three_model_selection_history_endpoint_returns_empty_without_hidden_seeding() -> None:
-    response = client.get("/api/v1/admin/models/selections/history?target_task=spread_error_regression&recent_limit=5")
+def test_phase_three_model_selection_history_endpoint_returns_empty_without_hidden_seeding() -> (
+    None
+):
+    response = client.get(
+        "/api/v1/admin/models/selections/history?target_task=spread_error_regression&recent_limit=5"
+    )
 
     assert response.status_code == 200
     payload = response.json()
@@ -657,13 +677,18 @@ def test_phase_three_model_selection_history_endpoint_returns_existing_rollup(
         },
     )
 
-    response = client.get("/api/v1/admin/models/selections/history?target_task=spread_error_regression&recent_limit=5")
+    response = client.get(
+        "/api/v1/admin/models/selections/history?target_task=spread_error_regression&recent_limit=5"
+    )
 
     assert response.status_code == 200
     payload = response.json()
     assert payload["model_selection_history"]["overview"]["selection_count"] == 1
     assert payload["model_selection_history"]["overview"]["active_selection_count"] == 1
-    assert payload["model_selection_history"]["overview"]["latest_selection"]["model_family"] == "linear_feature"
+    assert (
+        payload["model_selection_history"]["overview"]["latest_selection"]["model_family"]
+        == "linear_feature"
+    )
     assert len(payload["model_selection_history"]["recent_selections"]) == 1
 
 
@@ -724,7 +749,9 @@ def test_phase_three_model_score_preview_endpoint_returns_existing_predictions(
     assert payload["predictions"][0]["team_code"] == "LAL"
 
 
-def test_phase_three_model_future_game_preview_endpoint_returns_empty_without_hidden_seeding() -> None:
+def test_phase_three_model_future_game_preview_endpoint_returns_empty_without_hidden_seeding() -> (
+    None
+):
     response = client.get(
         "/api/v1/admin/models/future-game-preview"
         "?target_task=spread_error_regression&season_label=2025-2026&game_date=2026-04-20"
@@ -794,7 +821,8 @@ def test_phase_three_model_future_game_preview_materialize_endpoint_returns_scor
     assert payload["scoring_run"]["away_team_code"] == "BOS"
 
 
-def test_phase_three_model_future_game_preview_runs_endpoint_returns_empty_without_hidden_materialization() -> None:
+def test_phase_three_future_game_preview_runs_returns_empty_without_hidden_materialization(
+) -> None:
     response = client.get(
         "/api/v1/admin/models/future-game-preview/runs"
         "?target_task=spread_error_regression&season_label=2025-2026&game_date=2026-04-20"
@@ -851,7 +879,8 @@ def test_phase_three_model_future_game_preview_runs_endpoint_returns_existing_ru
     assert payload["scoring_runs"][0]["home_team_code"] == "LAL"
 
 
-def test_phase_three_model_future_game_preview_run_detail_endpoint_returns_null_without_hidden_materialization() -> None:
+def test_phase_three_future_game_preview_run_detail_returns_null_without_hidden_materialization(
+) -> None:
     response = client.get(
         "/api/v1/admin/models/future-game-preview/runs/1"
         "?target_task=spread_error_regression&season_label=2025-2026&game_date=2026-04-20"
@@ -889,7 +918,8 @@ def test_phase_three_model_future_game_preview_run_detail_endpoint_returns_exist
     assert payload["scoring_run"]["payload"]["scenario"]["away_team_code"] == "BOS"
 
 
-def test_phase_three_model_future_game_preview_history_endpoint_returns_empty_without_hidden_materialization() -> None:
+def test_phase_three_future_game_preview_history_returns_empty_without_hidden_materialization(
+) -> None:
     response = client.get(
         "/api/v1/admin/models/future-game-preview/history"
         "?target_task=spread_error_regression&season_label=2025-2026&game_date=2026-04-20"
@@ -1061,9 +1091,7 @@ def test_phase_three_model_market_board_sources_endpoint_lists_builtin_sources()
     payload = response.json()
     assert payload["sources"]
     assert payload["sources"][0]["source_name"] == "demo_daily_lines_v1"
-    assert any(
-        source["source_name"] == "demo_source_failure_v1" for source in payload["sources"]
-    )
+    assert any(source["source_name"] == "demo_source_failure_v1" for source in payload["sources"])
     assert any(source["source_name"] == "file_market_board_v1" for source in payload["sources"])
 
 
@@ -1191,7 +1219,9 @@ def test_phase_three_model_market_board_refresh_endpoint_supports_external_odds_
     assert payload["generated_games"][0]["home_team_code"] == "PHX"
 
 
-def test_phase_three_model_market_board_history_endpoint_returns_empty_without_hidden_refresh() -> None:
+def test_phase_three_model_market_board_history_endpoint_returns_empty_without_hidden_refresh() -> (
+    None
+):
     response = client.get(
         "/api/v1/admin/models/market-board/history"
         "?target_task=spread_error_regression&source_name=demo_daily_lines_v1"
@@ -1220,9 +1250,7 @@ def test_phase_three_model_market_board_history_endpoint_returns_existing_rollup
                 "source_counts": {"demo_daily_lines_v1": 1},
             },
             "daily_buckets": [{"date": "2026-04-18", "refresh_event_count": 1}],
-            "recent_refresh_events": [
-                {"payload": {"change_summary": {"added_game_count": 2}}}
-            ],
+            "recent_refresh_events": [{"payload": {"change_summary": {"added_game_count": 2}}}],
         },
     )
 
@@ -1244,7 +1272,8 @@ def test_phase_three_model_market_board_history_endpoint_returns_existing_rollup
     )
 
 
-def test_phase_three_model_market_board_source_runs_endpoint_returns_empty_without_hidden_refresh() -> None:
+def test_phase_three_model_market_board_source_runs_endpoint_returns_empty_without_hidden_refresh(
+) -> None:
     response = client.get(
         "/api/v1/admin/models/market-board/source-runs"
         "?target_task=spread_error_regression&source_name=demo_daily_lines_v1"
@@ -1298,12 +1327,12 @@ def test_phase_three_model_market_board_source_runs_endpoint_returns_existing_hi
     assert history["overview"]["warning_count"] == 1
     assert history["recent_source_runs"][0]["payload"]["request"]["requested_game_count"] == 2
     assert (
-        history["recent_source_runs"][0]["payload"]["validation_summary"]["invalid_row_count"]
-        == 2
+        history["recent_source_runs"][0]["payload"]["validation_summary"]["invalid_row_count"] == 2
     )
 
 
-def test_phase_three_model_market_board_refresh_queue_endpoint_returns_empty_without_hidden_refresh() -> None:
+def test_phase_three_model_market_board_refresh_queue_endpoint_returns_empty_without_hidden_refresh(
+) -> None:
     response = client.get(
         "/api/v1/admin/models/market-board/refresh-queue"
         "?target_task=spread_error_regression&source_name=demo_daily_lines_v1"
@@ -1351,7 +1380,9 @@ def test_phase_three_model_market_board_refresh_queue_endpoint_returns_existing_
     assert queue["queue_entries"][0]["freshness_status"] == "fresh"
 
 
-def test_phase_three_model_market_board_queue_endpoint_returns_empty_without_hidden_scoring() -> None:
+def test_phase_three_model_market_board_queue_endpoint_returns_empty_without_hidden_scoring() -> (
+    None
+):
     response = client.get(
         "/api/v1/admin/models/market-board/queue"
         "?target_task=spread_error_regression&source_name=demo_daily_lines_v1"
@@ -1471,7 +1502,7 @@ def test_phase_three_model_market_board_refresh_orchestration_history_endpoint_r
     assert history["recent_batches"] == []
 
 
-def test_phase_three_model_market_board_refresh_orchestration_history_endpoint_returns_existing_batches(
+def test_phase_three_market_board_refresh_orchestration_history_returns_existing_batches(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
@@ -1500,7 +1531,8 @@ def test_phase_three_model_market_board_refresh_orchestration_history_endpoint_r
     assert history["recent_batches"][0]["target_task"] == "spread_error_regression"
 
 
-def test_phase_three_model_market_board_cadence_history_endpoint_returns_empty_without_hidden_orchestration() -> None:
+def test_phase_three_market_board_cadence_history_returns_empty_without_hidden_orchestration(
+) -> None:
     response = client.get(
         "/api/v1/admin/models/market-board/cadence-history"
         "?target_task=spread_error_regression&source_name=demo_daily_lines_v1"
@@ -1547,7 +1579,8 @@ def test_phase_three_model_market_board_cadence_history_endpoint_returns_existin
     assert history["recent_batches"][0]["target_task"] == "spread_error_regression"
 
 
-def test_phase_three_model_market_board_orchestration_history_endpoint_returns_empty_without_hidden_orchestration() -> None:
+def test_phase_three_market_board_orchestration_history_returns_empty_without_hidden_orchestration(
+) -> None:
     response = client.get(
         "/api/v1/admin/models/market-board/orchestration-history"
         "?target_task=spread_error_regression&source_name=demo_daily_lines_v1"
@@ -1592,7 +1625,8 @@ def test_phase_three_model_market_board_orchestration_history_endpoint_returns_e
     assert history["recent_batches"][0]["target_task"] == "spread_error_regression"
 
 
-def test_phase_three_model_market_board_operations_endpoint_returns_null_without_hidden_orchestration() -> None:
+def test_phase_three_market_board_operations_returns_null_without_hidden_orchestration(
+) -> None:
     response = client.get(
         "/api/v1/admin/models/market-board/1/operations"
         "?target_task=spread_error_regression&source_name=demo_daily_lines_v1"
@@ -1642,7 +1676,8 @@ def test_phase_three_model_market_board_operations_endpoint_returns_existing_sum
     assert operations["orchestration"]["batch_count"] == 1
 
 
-def test_phase_three_model_market_board_cadence_endpoint_returns_empty_without_hidden_orchestration() -> None:
+def test_phase_three_model_market_board_cadence_endpoint_returns_empty_without_hidden_orchestration(
+) -> None:
     response = client.get(
         "/api/v1/admin/models/market-board/cadence"
         "?target_task=spread_error_regression&source_name=demo_daily_lines_v1"
@@ -1685,7 +1720,8 @@ def test_phase_three_model_market_board_cadence_endpoint_returns_existing_dashbo
     assert dashboard["cadence_entries"][0]["priority"] == "low"
 
 
-def test_phase_three_model_market_board_list_and_detail_endpoints_return_empty_without_hidden_materialization() -> None:
+def test_phase_three_market_board_list_and_detail_return_empty_without_hidden_materialization(
+) -> None:
     list_response = client.get(
         "/api/v1/admin/models/market-board"
         "?target_task=spread_error_regression"
@@ -1788,7 +1824,8 @@ def test_phase_three_model_opportunity_materialize_endpoint_returns_opportunitie
     assert payload["opportunities"][0]["status"] == "review_manually"
 
 
-def test_phase_three_model_opportunities_endpoint_returns_empty_without_hidden_materialization() -> None:
+def test_phase_three_model_opportunities_endpoint_returns_empty_without_hidden_materialization(
+) -> None:
     response = client.get(
         "/api/v1/analyst/opportunities"
         "?target_task=spread_error_regression&team_code=LAL&season_label=2024-2025"
@@ -1856,7 +1893,8 @@ def test_phase_three_model_opportunities_endpoint_returns_existing_rows(
     assert payload["opportunities"][0]["team_code"] == "LAL"
 
 
-def test_phase_three_model_opportunity_detail_endpoint_returns_null_without_hidden_materialization() -> None:
+def test_phase_three_model_opportunity_detail_endpoint_returns_null_without_hidden_materialization(
+) -> None:
     response = client.get("/api/v1/analyst/opportunities/1")
 
     assert response.status_code == 200
@@ -1910,7 +1948,9 @@ def test_phase_three_model_opportunity_detail_endpoint_returns_existing_payload(
     assert payload["opportunity"]["payload"]["scenario"]["home_team_code"] == "LAL"
 
 
-def test_phase_three_model_opportunity_history_endpoint_returns_empty_without_hidden_seeding() -> None:
+def test_phase_three_model_opportunity_history_endpoint_returns_empty_without_hidden_seeding() -> (
+    None
+):
     response = client.get(
         "/api/v1/admin/models/opportunities/history"
         "?target_task=spread_error_regression&team_code=LAL&season_label=2024-2025&recent_limit=5"
@@ -1961,9 +2001,7 @@ def test_phase_three_model_opportunity_history_endpoint_returns_existing_rollup(
 
 
 def test_feature_snapshots_endpoint_returns_empty_without_hidden_seeding() -> None:
-    response = client.get(
-        "/api/v1/admin/features/snapshots?team_code=MIA&season_label=2024-2025"
-    )
+    response = client.get("/api/v1/admin/features/snapshots?team_code=MIA&season_label=2024-2025")
 
     assert response.status_code == 200
     payload = response.json()
@@ -1989,9 +2027,7 @@ def test_feature_snapshots_endpoint_returns_existing_rows(monkeypatch) -> None:
                         "home_team": {
                             "rolling_home_windows": {"3": {"sample_size": 1}},
                             "volatility": {},
-                            "trend_signals": {
-                                "recent_point_margin_delta_3_vs_10": 0.0
-                            },
+                            "trend_signals": {"recent_point_margin_delta_3_vs_10": 0.0},
                         }
                     },
                 }
@@ -1999,9 +2035,7 @@ def test_feature_snapshots_endpoint_returns_existing_rows(monkeypatch) -> None:
         },
     )
 
-    response = client.get(
-        "/api/v1/admin/features/snapshots?team_code=MIA&season_label=2024-2025"
-    )
+    response = client.get("/api/v1/admin/features/snapshots?team_code=MIA&season_label=2024-2025")
 
     assert response.status_code == 200
     payload = response.json()
@@ -2015,10 +2049,7 @@ def test_feature_snapshots_endpoint_returns_existing_rows(monkeypatch) -> None:
 
 
 def test_feature_summary_endpoint_returns_empty_without_hidden_seeding() -> None:
-    response = client.get(
-        "/api/v1/analyst/trends/summary"
-        "?team_code=LAL&season_label=2024-2025"
-    )
+    response = client.get("/api/v1/analyst/trends/summary?team_code=LAL&season_label=2024-2025")
 
     assert response.status_code == 200
     payload = response.json()
@@ -2069,9 +2100,7 @@ def test_feature_summary_endpoint_returns_existing_rollup(monkeypatch) -> None:
 
 
 def test_feature_dataset_endpoint_returns_empty_without_hidden_seeding() -> None:
-    response = client.get(
-        "/api/v1/admin/features/dataset?team_code=LAL&season_label=2024-2025"
-    )
+    response = client.get("/api/v1/admin/features/dataset?team_code=LAL&season_label=2024-2025")
 
     assert response.status_code == 200
     payload = response.json()
@@ -2102,9 +2131,7 @@ def test_feature_dataset_endpoint_returns_existing_rows(monkeypatch) -> None:
         },
     )
 
-    response = client.get(
-        "/api/v1/admin/features/dataset?team_code=LAL&season_label=2024-2025"
-    )
+    response = client.get("/api/v1/admin/features/dataset?team_code=LAL&season_label=2024-2025")
 
     assert response.status_code == 200
     payload = response.json()
@@ -2161,9 +2188,7 @@ def test_feature_dataset_profile_endpoint_returns_existing_rollup(monkeypatch) -
     assert payload["profile"]["season_count"] == 1
     assert payload["profile"]["team_count"] == 1
     assert (
-        payload["profile"]["venue_counts"]["home"]
-        + payload["profile"]["venue_counts"]["away"]
-        == 3
+        payload["profile"]["venue_counts"]["home"] + payload["profile"]["venue_counts"]["away"] == 3
     )
     assert "covered_actual" in payload["profile"]["label_balance"]
     assert "days_rest" in payload["profile"]["feature_coverage"]
@@ -2326,7 +2351,9 @@ def test_feature_evidence_endpoint_returns_existing_analysis_payload(monkeypatch
                     "status": "review_manually",
                     "policy_profile": {"target_task": "spread_error_regression"},
                 },
-                "pattern": {"selected_pattern": {"pattern_key": "venue=home|days_rest_bucket=unknown_rest"}},
+                "pattern": {
+                    "selected_pattern": {"pattern_key": "venue=home|days_rest_bucket=unknown_rest"}
+                },
                 "comparables": {"anchor_case": {"canonical_game_id": 3}},
                 "benchmark_context": {"benchmark_rankings": []},
             },
@@ -2371,14 +2398,8 @@ def test_feature_analysis_materialize_endpoint_persists_pattern_and_evidence_art
     assert payload["materialized_count"] >= 2
     assert payload["artifact_counts"]["pattern_summary"] >= 1
     assert payload["artifact_counts"]["evidence_bundle"] == 1
-    assert any(
-        artifact["artifact_type"] == "pattern_summary"
-        for artifact in payload["artifacts"]
-    )
-    assert any(
-        artifact["artifact_type"] == "evidence_bundle"
-        for artifact in payload["artifacts"]
-    )
+    assert any(artifact["artifact_type"] == "pattern_summary" for artifact in payload["artifacts"])
+    assert any(artifact["artifact_type"] == "evidence_bundle" for artifact in payload["artifacts"])
 
 
 def test_feature_analysis_artifacts_endpoint_returns_empty_without_hidden_materialization() -> None:
@@ -2422,14 +2443,8 @@ def test_feature_analysis_artifacts_endpoint_returns_existing_artifacts(
     assert response.status_code == 200
     payload = response.json()
     assert payload["artifact_count"] == 2
-    assert any(
-        artifact["artifact_type"] == "pattern_summary"
-        for artifact in payload["artifacts"]
-    )
-    assert any(
-        artifact["artifact_type"] == "evidence_bundle"
-        for artifact in payload["artifacts"]
-    )
+    assert any(artifact["artifact_type"] == "pattern_summary" for artifact in payload["artifacts"])
+    assert any(artifact["artifact_type"] == "evidence_bundle" for artifact in payload["artifacts"])
 
 
 def test_feature_analysis_history_endpoint_returns_empty_without_hidden_materialization() -> None:
@@ -2733,7 +2748,9 @@ def test_feature_dataset_training_benchmark_endpoint_returns_existing_baselines(
     assert payload["benchmark_rankings"][0]["primary_metric"] == "mae"
 
 
-def test_feature_dataset_training_task_matrix_endpoint_returns_empty_without_hidden_seeding() -> None:
+def test_feature_dataset_training_task_matrix_endpoint_returns_empty_without_hidden_seeding() -> (
+    None
+):
     response = client.get(
         "/api/v1/admin/features/dataset/training-task-matrix"
         "?team_code=LAL&season_label=2024-2025"
@@ -2781,9 +2798,7 @@ def test_feature_dataset_training_task_matrix_endpoint_returns_existing_matrix(
         == "spread_error_actual"
     )
     assert (
-        payload["task_matrix"]["spread_error_regression"]["bundle_summary"]["train"][
-            "game_count"
-        ]
+        payload["task_matrix"]["spread_error_regression"]["bundle_summary"]["train"]["game_count"]
         == 1
     )
 
@@ -2811,9 +2826,7 @@ def test_phase_one_fetch_reporting_demo_uses_distinct_ingestion_source_url(monke
     assert payload["fetch_result"]["status"] == "COMPLETED"
     assert captured["source_url"] != captured["ingestion_source_url"]
     assert str(captured["ingestion_source_url"]).startswith(str(captured["source_url"]))
-    assert "#validation_run=phase-1-fetch-reporting-demo:" in str(
-        captured["ingestion_source_url"]
-    )
+    assert "#validation_run=phase-1-fetch-reporting-demo:" in str(captured["ingestion_source_url"])
 
 
 def test_recent_job_runs_endpoint_returns_repository_backed_rows() -> None:
@@ -2924,7 +2937,9 @@ def test_data_quality_issues_endpoint_supports_run_label_filter() -> None:
             / "bookmaker_detector_api"
             / "fixtures"
             / "covers_sample_team_page.html"
-        ).resolve().as_uri(),
+        )
+        .resolve()
+        .as_uri(),
         requested_by="test-suite",
         run_label="phase-1-fetch-reporting-demo",
         persist_payload=False,
@@ -2939,9 +2954,9 @@ def test_data_quality_issues_endpoint_supports_run_label_filter() -> None:
         run_label="phase-1-fetch-reporting-demo",
     )
     assert len(diagnostics["data_quality_issues"]) == 3
-    assert {
-        issue["issue_type"] for issue in diagnostics["data_quality_issues"]
-    } == {"canonical.single_team_perspective_only"}
+    assert {issue["issue_type"] for issue in diagnostics["data_quality_issues"]} == {
+        "canonical.single_team_perspective_only"
+    }
 
 
 def test_ingestion_stats_endpoint_returns_breakdowns() -> None:
@@ -2964,8 +2979,7 @@ def test_ingestion_stats_endpoint_returns_breakdowns() -> None:
 
 def test_ingestion_issues_endpoint_supports_scope_filters() -> None:
     response = client.get(
-        "/api/v1/admin/ingestion/issues"
-        "?status=SUCCESS&team_code=NYK&season_label=2023-2024"
+        "/api/v1/admin/ingestion/issues?status=SUCCESS&team_code=NYK&season_label=2023-2024"
     )
 
     assert response.status_code == 200
@@ -2992,9 +3006,7 @@ def test_recent_job_runs_endpoint_forwards_run_label_filter(monkeypatch) -> None
         fake_get_admin_diagnostics,
     )
 
-    response = client.get(
-        "/api/v1/admin/jobs/recent?run_label=validation-demo"
-    )
+    response = client.get("/api/v1/admin/jobs/recent?run_label=validation-demo")
 
     assert response.status_code == 200
     assert captured["run_label"] == "validation-demo"
@@ -3002,9 +3014,7 @@ def test_recent_job_runs_endpoint_forwards_run_label_filter(monkeypatch) -> None
 
 
 def test_ingestion_stats_endpoint_supports_scope_filters() -> None:
-    response = client.get(
-        "/api/v1/admin/ingestion/stats?team_code=NYK&season_label=2023-2024"
-    )
+    response = client.get("/api/v1/admin/ingestion/stats?team_code=NYK&season_label=2023-2024")
 
     assert response.status_code == 200
     payload = response.json()
@@ -3020,20 +3030,22 @@ def test_ingestion_stats_endpoint_supports_scope_filters() -> None:
         "canonical.score_mismatch": 1,
     }
     assert payload["stats"]["data_quality_issue_severity_counts"] == {"warning": 2, "error": 1}
-    assert payload["stats"]["diagnostic_counts"] == {
-        "season_block_selector_match:page-fallback": 1
-    }
+    assert payload["stats"]["diagnostic_counts"] == {"season_block_selector_match:page-fallback": 1}
 
 
 def test_ingestion_stats_supports_run_label_filter() -> None:
     repository = InMemoryIngestionRepository()
     fixture_url = (
-        Path(__file__).resolve().parents[1]
-        / "src"
-        / "bookmaker_detector_api"
-        / "fixtures"
-        / "covers_sample_team_page.html"
-    ).resolve().as_uri()
+        (
+            Path(__file__).resolve().parents[1]
+            / "src"
+            / "bookmaker_detector_api"
+            / "fixtures"
+            / "covers_sample_team_page.html"
+        )
+        .resolve()
+        .as_uri()
+    )
     run_fetch_and_ingest(
         repository_mode="in_memory",
         team_code="LAL",
@@ -3052,9 +3064,7 @@ def test_ingestion_stats_supports_run_label_filter() -> None:
         run_label="phase-1-fetch-reporting-demo",
     )
     assert diagnostics["stats"]["parse_status_counts"] == {"VALID": 3}
-    assert diagnostics["stats"]["reconciliation_status_counts"] == {
-        "PARTIAL_SINGLE_ROW": 3
-    }
+    assert diagnostics["stats"]["reconciliation_status_counts"] == {"PARTIAL_SINGLE_ROW": 3}
     assert diagnostics["stats"]["data_quality_issue_type_counts"] == {
         "canonical.single_team_perspective_only": 3
     }
@@ -3085,9 +3095,7 @@ def test_ingestion_stats_endpoint_forwards_run_label_filter(monkeypatch) -> None
         fake_get_admin_diagnostics,
     )
 
-    response = client.get(
-        "/api/v1/admin/ingestion/stats?run_label=validation-demo"
-    )
+    response = client.get("/api/v1/admin/ingestion/stats?run_label=validation-demo")
 
     assert response.status_code == 200
     assert captured["run_label"] == "validation-demo"
@@ -3234,9 +3242,7 @@ def test_validation_run_comparison_endpoint_forwards_filters(monkeypatch) -> Non
         fake_get_admin_diagnostics,
     )
 
-    response = client.get(
-        "/api/v1/admin/validation-runs/compare?run_label=validation-demo&limit=6"
-    )
+    response = client.get("/api/v1/admin/validation-runs/compare?run_label=validation-demo&limit=6")
 
     assert response.status_code == 200
     assert captured["run_label"] == "validation-demo"
@@ -3247,9 +3253,7 @@ def test_validation_run_comparison_endpoint_forwards_filters(monkeypatch) -> Non
 
 
 def test_ingestion_stats_endpoint_supports_provider_filter() -> None:
-    response = client.get(
-        "/api/v1/admin/ingestion/stats?provider_name=missing-provider"
-    )
+    response = client.get("/api/v1/admin/ingestion/stats?provider_name=missing-provider")
 
     assert response.status_code == 200
     payload = response.json()
@@ -3272,17 +3276,14 @@ def test_ingestion_trends_endpoint_returns_recent_run_rollup() -> None:
     assert overview["failed_jobs"] == 1
     assert overview["total_warning_count"] == 5
     assert overview["total_quality_issues_saved"] == 8
-    assert overview["diagnostic_counts"] == {
-        "season_block_selector_match:page-fallback": 2
-    }
+    assert overview["diagnostic_counts"] == {"season_block_selector_match:page-fallback": 2}
     assert len(payload["trends"]["recent_runs"]) == 5
     assert payload["trends"]["recent_runs"][0]["status"] == "FAILED"
     assert payload["trends"]["recent_runs"][1]["reconciliation_status_counts"] == {
         "CONFLICT_SCORE": 1
     }
     assert any(
-        run["payload_storage_path"] is not None
-        and run["parser_snapshot_path"] is not None
+        run["payload_storage_path"] is not None and run["parser_snapshot_path"] is not None
         for run in payload["trends"]["recent_runs"]
     )
     assert len(payload["trends"]["daily_buckets"]) == 4
@@ -3398,13 +3399,18 @@ def test_ingestion_quality_trends_endpoint_returns_rollup() -> None:
         "parser_provenance_counts" in bucket
         for bucket in payload["quality_trends"]["daily_buckets"]
     )
-    assert sum(
-        bucket["parser_provenance_counts"].get("opponent_resolution_mode", {}).get(
-            "direct_code",
-            0,
+    assert (
+        sum(
+            bucket["parser_provenance_counts"]
+            .get("opponent_resolution_mode", {})
+            .get(
+                "direct_code",
+                0,
+            )
+            for bucket in payload["quality_trends"]["daily_buckets"]
         )
-        for bucket in payload["quality_trends"]["daily_buckets"]
-    ) == 6
+        == 6
+    )
 
 
 def test_ingestion_quality_trends_endpoint_supports_scope_filters() -> None:
@@ -3438,9 +3444,7 @@ def test_ingestion_quality_trends_endpoint_supports_scope_filters() -> None:
 
 
 def test_recent_job_runs_endpoint_supports_started_window() -> None:
-    response = client.get(
-        "/api/v1/admin/jobs/recent?started_from=2026-04-15&started_to=2026-04-16"
-    )
+    response = client.get("/api/v1/admin/jobs/recent?started_from=2026-04-15&started_to=2026-04-16")
 
     assert response.status_code == 200
     payload = response.json()
@@ -3514,7 +3518,9 @@ def test_phase_four_model_backtest_run_endpoint_returns_walk_forward_summary() -
     )
 
 
-def test_phase_four_model_backtest_history_endpoint_returns_empty_without_hidden_execution() -> None:
+def test_phase_four_model_backtest_history_endpoint_returns_empty_without_hidden_execution() -> (
+    None
+):
     response = client.get(
         "/api/v1/admin/models/backtests/history",
         params={
@@ -3554,7 +3560,10 @@ def test_phase_four_model_backtest_history_endpoint_returns_existing_runs(
     assert response.status_code == 200
     payload = response.json()
     assert payload["model_backtest_history"]["overview"]["run_count"] == 1
-    assert payload["model_backtest_history"]["overview"]["latest_run"]["target_task"] == "spread_error_regression"
+    assert (
+        payload["model_backtest_history"]["overview"]["latest_run"]["target_task"]
+        == "spread_error_regression"
+    )
 
 
 def test_phase_four_model_backtests_endpoint_returns_empty_without_hidden_execution() -> None:

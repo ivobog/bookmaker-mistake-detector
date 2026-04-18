@@ -19,11 +19,7 @@ def build_evidence_strength_summary(
         benchmark_rankings=benchmark_rankings,
     )
     overall_score = round(
-        (
-            pattern_component["score"]
-            + comparable_component["score"]
-            + benchmark_component["score"]
-        )
+        (pattern_component["score"] + comparable_component["score"] + benchmark_component["score"])
         / 3,
         4,
     )
@@ -105,9 +101,7 @@ def build_evidence_recommendation(
     if top_similarity is not None:
         rationale.append(f"top comparable similarity={top_similarity}")
     if benchmark_name is not None:
-        rationale.append(
-            f"best benchmark={benchmark_name} (stability={benchmark_stability_score})"
-        )
+        rationale.append(f"best benchmark={benchmark_name} (stability={benchmark_stability_score})")
 
     next_steps = {
         "candidate_signal": [
@@ -142,9 +136,7 @@ def build_evidence_recommendation(
                 "review_min_pattern_sample": policy["review_min_pattern_sample"],
                 "candidate_min_comparables": policy["candidate_min_comparables"],
                 "review_min_comparables": policy["review_min_comparables"],
-                "candidate_min_benchmark_stability": policy[
-                    "candidate_min_benchmark_stability"
-                ],
+                "candidate_min_benchmark_stability": policy["candidate_min_benchmark_stability"],
             },
         },
         "rationale": rationale,

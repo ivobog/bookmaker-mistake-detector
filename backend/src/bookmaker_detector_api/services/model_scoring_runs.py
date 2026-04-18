@@ -66,7 +66,9 @@ def build_model_scoring_run(
         home_spread_line=model_training_views._float_or_none(scenario.get("home_spread_line")),
         total_line=model_training_views._float_or_none(scenario.get("total_line")),
         policy_name=(
-            str(opportunity_preview[0]["policy_name"]) if opportunity_preview else default_policy_name
+            str(opportunity_preview[0]["policy_name"])
+            if opportunity_preview
+            else default_policy_name
         ),
         prediction_count=int(preview.get("scored_prediction_count", 0)),
         candidate_opportunity_count=int(status_counts.get("candidate_signal", 0)),

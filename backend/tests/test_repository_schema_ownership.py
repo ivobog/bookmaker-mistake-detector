@@ -17,4 +17,3 @@ def test_runtime_schema_mutation_ownership_inventory_points_to_real_bootstrap_sq
         assert entry.operations
         assert entry.target_state
         assert entry.bootstrap_sql_abspath.exists()
-

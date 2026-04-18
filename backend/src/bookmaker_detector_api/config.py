@@ -10,10 +10,7 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     api_cors_origins: str = (
-        "http://localhost:5173,"
-        "http://127.0.0.1:5173,"
-        "http://localhost:4173,"
-        "http://127.0.0.1:4173"
+        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173"
     )
     database_url: str = "postgresql://bookmaker:bookmaker@localhost:5432/bookmaker_detector"
     raw_payload_dir: str = "artifacts/raw-pages"
@@ -45,11 +42,7 @@ class Settings(BaseSettings):
 
     @property
     def api_cors_origin_list(self) -> list[str]:
-        return [
-            origin.strip()
-            for origin in self.api_cors_origins.split(",")
-            if origin.strip()
-        ]
+        return [origin.strip() for origin in self.api_cors_origins.split(",") if origin.strip()]
 
     @property
     def resolved_postgres_allow_runtime_schema_mutation(self) -> bool:

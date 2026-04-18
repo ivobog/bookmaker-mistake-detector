@@ -78,6 +78,7 @@ Use it together with:
 | --- | --- | --- |
 | Regression path for release candidate | `pass` | [scripts/run_phase5_regression.ps1](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/scripts/run_phase5_regression.ps1). |
 | Manual release smoke path | `pass` | [docs/manual_smoke_checklist.md](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/docs/manual_smoke_checklist.md). |
+| Structured workflow logging for operator golden paths | `pass` | [backend/src/bookmaker_detector_api/services/workflow_logging.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/workflow_logging.py) plus instrumented backtest, opportunity-materialization, and market-board orchestration services. |
 | Optional browser-route smoke harness | `pass` | Playwright smoke scaffolding now exists in [frontend/playwright.config.ts](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend/playwright.config.ts) and [frontend/e2e/phase5-smoke.spec.ts](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend/e2e/phase5-smoke.spec.ts). |
 | Known-issues tracking | `pass` | [docs/known_issues.md](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/docs/known_issues.md). |
 | Live external source validation | `manual-check` | External provider exists, but should be validated with a real `THE_ODDS_API_KEY` during release smoke. |

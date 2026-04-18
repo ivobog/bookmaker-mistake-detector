@@ -7,11 +7,11 @@ from fastapi import APIRouter, Depends
 from bookmaker_detector_api.api.schemas import AnalystTrendFilters, AnalystTrendResponse
 from bookmaker_detector_api.config import settings
 from bookmaker_detector_api.db.postgres import postgres_connection
-from bookmaker_detector_api.services.repository_factory import build_in_memory_feature_dataset_store
 from bookmaker_detector_api.services.features import (
     get_feature_snapshot_summary_in_memory,
     get_feature_snapshot_summary_postgres,
 )
+from bookmaker_detector_api.services.repository_factory import build_in_memory_feature_dataset_store
 
 router = APIRouter(prefix="/analyst", tags=["analyst"])
 
@@ -52,6 +52,3 @@ def feature_summary(
         summary=summary_result.get("summary", {}),
         latest_perspective=summary_result.get("latest_perspective"),
     )
-
-
-

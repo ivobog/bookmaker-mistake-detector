@@ -13,6 +13,10 @@
 - `waived`
 - `not-run`
 
+## Workflow Log Capture
+- For any failed or slow golden-path workflow, capture the matching `workflow_run_id` from the `bookmaker_detector_api.workflow` logger before retrying.
+- Current structured-log coverage includes backtests, opportunity materialization, and market-board refresh/orchestration flows.
+
 ## 1. Environment Bring-up
 | Step | Result | Notes |
 | --- | --- | --- |

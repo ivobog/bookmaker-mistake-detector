@@ -12,13 +12,15 @@ from bookmaker_detector_api.api.schemas import (
 )
 from bookmaker_detector_api.config import settings
 from bookmaker_detector_api.db.postgres import postgres_connection
-from bookmaker_detector_api.services.repository_factory import build_in_memory_phase_three_modeling_store
 from bookmaker_detector_api.services.model_records import ModelBacktestRunRecord
 from bookmaker_detector_api.services.models import (
     get_model_backtest_detail_in_memory,
     get_model_backtest_detail_postgres,
     list_model_backtest_runs_in_memory,
     list_model_backtest_runs_postgres,
+)
+from bookmaker_detector_api.services.repository_factory import (
+    build_in_memory_phase_three_modeling_store,
 )
 
 router = APIRouter(prefix="/analyst", tags=["analyst"])
@@ -49,7 +51,9 @@ def _serialize_backtest_run(run: ModelBacktestRunRecord) -> AnalystBacktestRun:
     )
 
 
-def _load_backtest_runs(filters: AnalystBacktestListFilters) -> tuple[str, list[ModelBacktestRunRecord]]:
+def _load_backtest_runs(
+    filters: AnalystBacktestListFilters,
+) -> tuple[str, list[ModelBacktestRunRecord]]:
     if _use_postgres_analyst_mode():
         with postgres_connection() as connection:
             runs = list_model_backtest_runs_postgres(
@@ -110,6 +114,3 @@ def phase_four_model_backtest_detail(
             AnalystBacktestRun.model_validate(backtest_run) if backtest_run is not None else None
         ),
     )
-
-
-

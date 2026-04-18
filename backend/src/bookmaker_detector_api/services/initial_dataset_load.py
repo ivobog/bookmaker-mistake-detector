@@ -143,8 +143,7 @@ def build_initial_dataset_load_targets(
     missing_team_codes = sorted(selected_team_codes - discovered_team_codes)
     if missing_team_codes:
         raise ValueError(
-            "Unable to resolve Covers team pages for team codes: "
-            f"{', '.join(missing_team_codes)}."
+            f"Unable to resolve Covers team pages for team codes: {', '.join(missing_team_codes)}."
         )
 
     return targets
@@ -414,10 +413,7 @@ def _load_season_scope(
         raise ValueError("No completed seasons matched the requested initial dataset scope.")
 
     ordered_rows = rows if season_labels is not None else list(reversed(rows))
-    return [
-        {"label": row[0], "start_date": row[1], "end_date": row[2]}
-        for row in ordered_rows
-    ]
+    return [{"label": row[0], "start_date": row[1], "end_date": row[2]} for row in ordered_rows]
 
 
 def _match_discovered_team_pages(
@@ -466,9 +462,7 @@ def _match_team(
         discovered_team_page.team_name,
         discovered_team_page.team_slug,
     )
-    matches = [
-        team for team in teams if discovered_keys & _team_record_identity_keys(team)
-    ]
+    matches = [team for team in teams if discovered_keys & _team_record_identity_keys(team)]
     if len(matches) == 1:
         return matches[0]
     if len(matches) > 1:

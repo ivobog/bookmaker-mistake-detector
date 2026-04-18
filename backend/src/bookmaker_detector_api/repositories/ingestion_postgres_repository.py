@@ -3,18 +3,39 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from bookmaker_detector_api.ingestion.models import CanonicalGame, GameMetric, RawGameRow
 from bookmaker_detector_api.repositories.ingestion_json import _json_dumps
 from bookmaker_detector_api.repositories.ingestion_postgres_reporting import (
     get_data_quality_issue_severity_counts as get_data_quality_issue_severity_counts_query,
+)
+from bookmaker_detector_api.repositories.ingestion_postgres_reporting import (
     get_data_quality_issue_type_counts as get_data_quality_issue_type_counts_query,
+)
+from bookmaker_detector_api.repositories.ingestion_postgres_reporting import (
     get_parse_status_counts as get_parse_status_counts_query,
+)
+from bookmaker_detector_api.repositories.ingestion_postgres_reporting import (
     get_reconciliation_status_counts as get_reconciliation_status_counts_query,
+)
+from bookmaker_detector_api.repositories.ingestion_postgres_reporting import (
     list_data_quality_issues as list_data_quality_issues_query,
+)
+from bookmaker_detector_api.repositories.ingestion_postgres_reporting import (
     list_job_run_daily_summaries as list_job_run_daily_summaries_query,
+)
+from bookmaker_detector_api.repositories.ingestion_postgres_reporting import (
     list_job_run_quality_daily_summaries as list_job_run_quality_daily_summaries_query,
+)
+from bookmaker_detector_api.repositories.ingestion_postgres_reporting import (
     list_job_runs as list_job_runs_query,
+)
+from bookmaker_detector_api.repositories.ingestion_postgres_reporting import (
     list_page_retrieval_daily_summaries as list_page_retrieval_daily_summaries_query,
+)
+from bookmaker_detector_api.repositories.ingestion_postgres_reporting import (
     list_page_retrievals as list_page_retrievals_query,
+)
+from bookmaker_detector_api.repositories.ingestion_postgres_reporting import (
     normalize_data_quality_issue_taxonomy as normalize_data_quality_issue_taxonomy_query,
 )
 from bookmaker_detector_api.repositories.ingestion_postgres_schema import (
@@ -24,8 +45,13 @@ from bookmaker_detector_api.repositories.ingestion_postgres_schema import (
     verify_raw_row_source_identity_schema,
 )
 from bookmaker_detector_api.repositories.ingestion_types import (
+    DailyJobRunQualitySummary,
+    DailyJobRunSummary,
+    DailyPageRetrievalSummary,
     DataQualityIssueRecord,
+    JobRunRecord,
     PageRetrievalRecord,
+    PageRetrievalSnapshot,
     PersistedCanonicalGame,
     PersistedRawRow,
 )
@@ -844,4 +870,3 @@ class PostgresIngestionRepository:
                 "before postgres-backed quality issue writes."
             )
         self._data_quality_issue_identity_ready = True
-

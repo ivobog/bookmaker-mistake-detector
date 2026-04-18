@@ -273,9 +273,7 @@ def _build_market_board_refresh_queue(
             continue
         queue_status_counts[queue_status] = queue_status_counts.get(queue_status, 0) + 1
         freshness_key = resolved_freshness_status or "unspecified"
-        freshness_status_counts[freshness_key] = (
-            freshness_status_counts.get(freshness_key, 0) + 1
-        )
+        freshness_status_counts[freshness_key] = freshness_status_counts.get(freshness_key, 0) + 1
         queue_entries.append(
             {
                 "board": board_payload,
@@ -320,9 +318,7 @@ def _build_market_board_scoring_queue(
     for scoring_run in scoring_runs:
         if scoring_run.model_market_board_id is None:
             continue
-        scoring_runs_by_board.setdefault(scoring_run.model_market_board_id, []).append(
-            scoring_run
-        )
+        scoring_runs_by_board.setdefault(scoring_run.model_market_board_id, []).append(scoring_run)
 
     queue_entries = []
     scoring_status_counts: dict[str, int] = {}
@@ -464,8 +460,7 @@ def _summarize_model_market_board_scoring_batch_history(
         },
         "daily_buckets": [daily_buckets[key] for key in sorted(daily_buckets.keys())],
         "recent_batches": [
-            _serialize_model_market_board_scoring_batch(entry)
-            for entry in batches[:recent_limit]
+            _serialize_model_market_board_scoring_batch(entry) for entry in batches[:recent_limit]
         ],
     }
 
@@ -530,8 +525,7 @@ def _summarize_model_market_board_refresh_batch_history(
         },
         "daily_buckets": [daily_buckets[key] for key in sorted(daily_buckets.keys())],
         "recent_batches": [
-            _serialize_model_market_board_refresh_batch(entry)
-            for entry in batches[:recent_limit]
+            _serialize_model_market_board_refresh_batch(entry) for entry in batches[:recent_limit]
         ],
     }
 
@@ -587,8 +581,7 @@ def _summarize_model_market_board_cadence_batch_history(
         },
         "daily_buckets": [daily_buckets[key] for key in sorted(daily_buckets.keys())],
         "recent_batches": [
-            _serialize_model_market_board_cadence_batch(entry)
-            for entry in batches[:recent_limit]
+            _serialize_model_market_board_cadence_batch(entry) for entry in batches[:recent_limit]
         ],
     }
 
@@ -688,9 +681,7 @@ def _build_market_board_cadence_result(
 def _resolve_market_board_refresh_game_date(board_payload: dict[str, Any]) -> date:
     freshness = board_payload.get("freshness")
     refresh_target_date = (
-        freshness.get("refresh_target_date")
-        if isinstance(freshness, dict)
-        else None
+        freshness.get("refresh_target_date") if isinstance(freshness, dict) else None
     )
     if isinstance(refresh_target_date, str):
         return date.fromisoformat(refresh_target_date)

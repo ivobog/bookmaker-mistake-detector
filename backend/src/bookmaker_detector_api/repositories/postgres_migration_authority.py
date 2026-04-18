@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[4]
 
 
@@ -32,7 +31,9 @@ BOOTSTRAP_SQL_CHAIN: tuple[BootstrapSqlFile, ...] = (
     BootstrapSqlFile(3, "infra/postgres/init/003_phase1_ingestion_schema.sql", "ingestion tables"),
     BootstrapSqlFile(4, "infra/postgres/init/004_seed_reference_data.sql", "reference seed data"),
     BootstrapSqlFile(5, "infra/postgres/init/005_phase2_feature_schema.sql", "feature tables"),
-    BootstrapSqlFile(6, "infra/postgres/init/006_phase3_model_schema.sql", "model registry and runs"),
+    BootstrapSqlFile(
+        6, "infra/postgres/init/006_phase3_model_schema.sql", "model registry and runs"
+    ),
     BootstrapSqlFile(
         7,
         "infra/postgres/init/007_phase3_model_evaluation_schema.sql",
@@ -100,13 +101,18 @@ POSTGRES_MIGRATION_AUTHORITY = MigrationAuthorityDecision(
     alembic_status="deferred",
     rationale=(
         "The repository has no Alembic or migration package today.",
-        "Normal runtime flows are now verification-only and no longer depend on request-time schema mutation.",
-        "Remaining schema ownership is explicitly mapped to bootstrap SQL files and JSON-column inventories.",
+        "Normal runtime flows are now verification-only and no longer depend on "
+        "request-time schema mutation.",
+        "Remaining schema ownership is explicitly mapped to bootstrap SQL files "
+        "and JSON-column inventories.",
     ),
     introduction_triggers=(
-        "a new schema change must be applied to already-populated environments without rebuilding from bootstrap SQL",
-        "a JSON promotion candidate needs a multi-step backfill across existing production-like data",
-        "parallel branches are expected to evolve Postgres schema in overlapping release windows",
+        "a new schema change must be applied to already-populated environments "
+        "without rebuilding from bootstrap SQL",
+        "a JSON promotion candidate needs a multi-step backfill across existing "
+        "production-like data",
+        "parallel branches are expected to evolve Postgres schema in overlapping "
+        "release windows",
     ),
 )
 

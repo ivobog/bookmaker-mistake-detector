@@ -5,25 +5,9 @@ from datetime import date
 from typing import Any
 
 from bookmaker_detector_api.repositories import PhaseThreeModelingStore
-from bookmaker_detector_api.services.features import (
-    DEFAULT_FEATURE_KEY,
-    FeatureVersionRecord,
-    _partition_feature_dataset_rows,
-    build_feature_dataset_rows,
-    build_feature_evidence_bundle,
-    build_feature_training_view,
-    build_future_feature_dataset_rows,
-    get_feature_version_in_memory,
-    get_feature_version_postgres,
-    list_canonical_game_metric_records_in_memory,
-    list_canonical_game_metric_records_postgres,
-    list_feature_snapshots_in_memory,
-    list_feature_snapshots_postgres,
-    resolve_feature_condition_values_for_row,
-)
 from bookmaker_detector_api.services import (
-    model_backtest_workflows,
     model_backtest_runs,
+    model_backtest_workflows,
     model_future_scenarios,
     model_market_board_orchestration,
     model_opportunities,
@@ -32,6 +16,20 @@ from bookmaker_detector_api.services import (
     model_training_algorithms,
     model_training_lifecycle,
     model_training_views,
+)
+from bookmaker_detector_api.services.features import (
+    DEFAULT_FEATURE_KEY,
+    FeatureVersionRecord,
+    _partition_feature_dataset_rows,
+    build_feature_dataset_rows,
+    build_feature_training_view,
+    build_future_feature_dataset_rows,
+    get_feature_version_in_memory,
+    get_feature_version_postgres,
+    list_canonical_game_metric_records_in_memory,
+    list_canonical_game_metric_records_postgres,
+    list_feature_snapshots_in_memory,
+    list_feature_snapshots_postgres,
 )
 from bookmaker_detector_api.services.model_market_board_sources import (
     MARKET_BOARD_SOURCE_CONFIGS,
@@ -103,6 +101,7 @@ from bookmaker_detector_api.services.model_records import (
     ModelSelectionSnapshotRecord,
     ModelTrainingRunRecord,
 )
+from bookmaker_detector_api.services.workflow_logging import start_workflow_span
 
 list_model_market_board_sources = _list_model_market_board_sources
 
@@ -325,6 +324,8 @@ def save_model_training_run_in_memory(
         repository,
         run,
     )
+
+
 def ensure_model_registry_postgres(
     connection: Any,
     *,
@@ -1141,34 +1142,56 @@ def materialize_model_opportunities_in_memory(
     validation_ratio: float = 0.15,
     drop_null_targets: bool = True,
 ) -> dict[str, Any]:
-    scoring_preview = get_model_scoring_preview_in_memory(
-        repository,
+    span = start_workflow_span(
+        workflow_name="model_opportunities.materialize",
+        storage_mode="in_memory",
         feature_key=feature_key,
         target_task=target_task,
         team_code=team_code,
         season_label=season_label,
         canonical_game_id=canonical_game_id,
         limit=limit,
-        include_evidence=include_evidence,
-        evidence_dimensions=evidence_dimensions,
-        comparable_limit=comparable_limit,
-        min_pattern_sample_size=min_pattern_sample_size,
-        train_ratio=train_ratio,
-        validation_ratio=validation_ratio,
-        drop_null_targets=drop_null_targets,
     )
-    return model_opportunities.materialize_model_opportunities(
-        scoring_preview=scoring_preview,
-        target_task=target_task,
-        build_opportunities=lambda **kwargs: model_opportunities.build_model_opportunities(
-            **kwargs,
-            policy=OPPORTUNITY_POLICY_CONFIGS.get(target_task),
-        ),
-        save_opportunities=lambda opportunities: model_opportunities.save_model_opportunities_in_memory(
+    try:
+        scoring_preview = get_model_scoring_preview_in_memory(
             repository,
-            opportunities,
-        ),
+            feature_key=feature_key,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            canonical_game_id=canonical_game_id,
+            limit=limit,
+            include_evidence=include_evidence,
+            evidence_dimensions=evidence_dimensions,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            drop_null_targets=drop_null_targets,
+        )
+        result = model_opportunities.materialize_model_opportunities(
+            scoring_preview=scoring_preview,
+            target_task=target_task,
+            build_opportunities=lambda **kwargs: model_opportunities.build_model_opportunities(
+                **kwargs,
+                policy=OPPORTUNITY_POLICY_CONFIGS.get(target_task),
+            ),
+            save_opportunities=lambda opportunities: (
+                model_opportunities.save_model_opportunities_in_memory(
+                    repository,
+                    opportunities,
+                )
+            ),
+        )
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    span.success(
+        scoring_preview_count=int(scoring_preview.get("scored_prediction_count", 0)),
+        opportunity_count=int(result.get("opportunity_count", 0)),
+        materialized_count=int(result.get("materialized_count", 0)),
     )
+    return result
 
 
 def materialize_model_future_opportunities_in_memory(
@@ -1240,34 +1263,56 @@ def materialize_model_opportunities_postgres(
     validation_ratio: float = 0.15,
     drop_null_targets: bool = True,
 ) -> dict[str, Any]:
-    scoring_preview = get_model_scoring_preview_postgres(
-        connection,
+    span = start_workflow_span(
+        workflow_name="model_opportunities.materialize",
+        storage_mode="postgres",
         feature_key=feature_key,
         target_task=target_task,
         team_code=team_code,
         season_label=season_label,
         canonical_game_id=canonical_game_id,
         limit=limit,
-        include_evidence=include_evidence,
-        evidence_dimensions=evidence_dimensions,
-        comparable_limit=comparable_limit,
-        min_pattern_sample_size=min_pattern_sample_size,
-        train_ratio=train_ratio,
-        validation_ratio=validation_ratio,
-        drop_null_targets=drop_null_targets,
     )
-    return model_opportunities.materialize_model_opportunities(
-        scoring_preview=scoring_preview,
-        target_task=target_task,
-        build_opportunities=lambda **kwargs: model_opportunities.build_model_opportunities(
-            **kwargs,
-            policy=OPPORTUNITY_POLICY_CONFIGS.get(target_task),
-        ),
-        save_opportunities=lambda opportunities: model_opportunities.save_model_opportunities_postgres(
+    try:
+        scoring_preview = get_model_scoring_preview_postgres(
             connection,
-            opportunities,
-        ),
+            feature_key=feature_key,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            canonical_game_id=canonical_game_id,
+            limit=limit,
+            include_evidence=include_evidence,
+            evidence_dimensions=evidence_dimensions,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            drop_null_targets=drop_null_targets,
+        )
+        result = model_opportunities.materialize_model_opportunities(
+            scoring_preview=scoring_preview,
+            target_task=target_task,
+            build_opportunities=lambda **kwargs: model_opportunities.build_model_opportunities(
+                **kwargs,
+                policy=OPPORTUNITY_POLICY_CONFIGS.get(target_task),
+            ),
+            save_opportunities=lambda opportunities: (
+                model_opportunities.save_model_opportunities_postgres(
+                    connection,
+                    opportunities,
+                )
+            ),
+        )
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    span.success(
+        scoring_preview_count=int(scoring_preview.get("scored_prediction_count", 0)),
+        opportunity_count=int(result.get("opportunity_count", 0)),
+        materialized_count=int(result.get("materialized_count", 0)),
     )
+    return result
 
 
 def materialize_model_future_opportunities_postgres(
@@ -1553,6 +1598,7 @@ def materialize_model_market_board_postgres(
         serialize_market_board=_serialize_model_market_board,
     )
 
+
 def refresh_model_market_board_in_memory(
     repository: PhaseThreeModelingStore,
     *,
@@ -1564,7 +1610,9 @@ def refresh_model_market_board_in_memory(
     game_count: int | None = None,
     source_path: str | None = None,
 ) -> dict[str, Any]:
-    return model_market_board_orchestration.refresh_model_market_board(
+    span = start_workflow_span(
+        workflow_name="model_market_board.refresh",
+        storage_mode="in_memory",
         target_task=target_task,
         source_name=source_name,
         season_label=season_label,
@@ -1572,36 +1620,60 @@ def refresh_model_market_board_in_memory(
         slate_label=slate_label,
         game_count=game_count,
         source_path=source_path,
-        default_game_count=int(MARKET_BOARD_SOURCE_CONFIGS[source_name]["default_game_count"]),
-        build_source_request_context=_build_market_board_source_request_context,
-        load_source_games=build_model_market_board_source_games,
-        normalize_source_games=_normalize_market_board_source_games,
-        build_source_payload_fingerprints=_build_market_board_source_payload_fingerprints,
-        build_source_run=_build_model_market_board_source_run,
-        save_source_run=lambda source_run: save_model_market_board_source_run_in_memory(
-            repository,
-            source_run,
-        ),
-        serialize_source_run=_serialize_model_market_board_source_run,
-        find_existing_board=lambda **kwargs: _find_model_market_board_in_memory(
-            repository,
-            **kwargs,
-        ),
-        materialize_board=lambda **kwargs: materialize_model_market_board_in_memory(
-            repository,
-            **kwargs,
-        ),
-        build_fingerprint_comparison=_build_market_board_source_fingerprint_comparison,
-        build_refresh_change_summary=_build_market_board_refresh_change_summary,
-        resolve_refresh_status=_resolve_market_board_refresh_status,
-        resolve_refresh_count=_resolve_market_board_refresh_count,
-        save_market_board=lambda board: save_model_market_board_in_memory(repository, board),
-        save_refresh_event=lambda event: save_model_market_board_refresh_event_in_memory(
-            repository,
-            event,
-        ),
-        serialize_market_board=_serialize_model_market_board,
     )
+    try:
+        result = model_market_board_orchestration.refresh_model_market_board(
+            target_task=target_task,
+            source_name=source_name,
+            season_label=season_label,
+            game_date=game_date,
+            slate_label=slate_label,
+            game_count=game_count,
+            source_path=source_path,
+            default_game_count=int(MARKET_BOARD_SOURCE_CONFIGS[source_name]["default_game_count"]),
+            build_source_request_context=_build_market_board_source_request_context,
+            load_source_games=build_model_market_board_source_games,
+            normalize_source_games=_normalize_market_board_source_games,
+            build_source_payload_fingerprints=_build_market_board_source_payload_fingerprints,
+            build_source_run=_build_model_market_board_source_run,
+            save_source_run=lambda source_run: save_model_market_board_source_run_in_memory(
+                repository,
+                source_run,
+            ),
+            serialize_source_run=_serialize_model_market_board_source_run,
+            find_existing_board=lambda **kwargs: _find_model_market_board_in_memory(
+                repository,
+                **kwargs,
+            ),
+            materialize_board=lambda **kwargs: materialize_model_market_board_in_memory(
+                repository,
+                **kwargs,
+            ),
+            build_fingerprint_comparison=_build_market_board_source_fingerprint_comparison,
+            build_refresh_change_summary=_build_market_board_refresh_change_summary,
+            resolve_refresh_status=_resolve_market_board_refresh_status,
+            resolve_refresh_count=_resolve_market_board_refresh_count,
+            save_market_board=lambda board: save_model_market_board_in_memory(repository, board),
+            save_refresh_event=lambda event: save_model_market_board_refresh_event_in_memory(
+                repository,
+                event,
+            ),
+            serialize_market_board=_serialize_model_market_board,
+        )
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    validation_summary = result.get("validation_summary") or {}
+    source_run = result.get("source_run") or {}
+    board = result.get("board") or {}
+    span.success(
+        refresh_status=result.get("status"),
+        generated_game_count=int(result.get("generated_game_count", 0)),
+        invalid_row_count=int(validation_summary.get("invalid_row_count", 0)),
+        source_run_id=source_run.get("id"),
+        board_id=board.get("id"),
+    )
+    return result
 
 
 def refresh_model_market_board_postgres(
@@ -1615,7 +1687,9 @@ def refresh_model_market_board_postgres(
     game_count: int | None = None,
     source_path: str | None = None,
 ) -> dict[str, Any]:
-    return model_market_board_orchestration.refresh_model_market_board(
+    span = start_workflow_span(
+        workflow_name="model_market_board.refresh",
+        storage_mode="postgres",
         target_task=target_task,
         source_name=source_name,
         season_label=season_label,
@@ -1623,36 +1697,60 @@ def refresh_model_market_board_postgres(
         slate_label=slate_label,
         game_count=game_count,
         source_path=source_path,
-        default_game_count=int(MARKET_BOARD_SOURCE_CONFIGS[source_name]["default_game_count"]),
-        build_source_request_context=_build_market_board_source_request_context,
-        load_source_games=build_model_market_board_source_games,
-        normalize_source_games=_normalize_market_board_source_games,
-        build_source_payload_fingerprints=_build_market_board_source_payload_fingerprints,
-        build_source_run=_build_model_market_board_source_run,
-        save_source_run=lambda source_run: save_model_market_board_source_run_postgres(
-            connection,
-            source_run,
-        ),
-        serialize_source_run=_serialize_model_market_board_source_run,
-        find_existing_board=lambda **kwargs: _find_model_market_board_postgres(
-            connection,
-            **kwargs,
-        ),
-        materialize_board=lambda **kwargs: materialize_model_market_board_postgres(
-            connection,
-            **kwargs,
-        ),
-        build_fingerprint_comparison=_build_market_board_source_fingerprint_comparison,
-        build_refresh_change_summary=_build_market_board_refresh_change_summary,
-        resolve_refresh_status=_resolve_market_board_refresh_status,
-        resolve_refresh_count=_resolve_market_board_refresh_count,
-        save_market_board=lambda board: save_model_market_board_postgres(connection, board),
-        save_refresh_event=lambda event: save_model_market_board_refresh_event_postgres(
-            connection,
-            event,
-        ),
-        serialize_market_board=_serialize_model_market_board,
     )
+    try:
+        result = model_market_board_orchestration.refresh_model_market_board(
+            target_task=target_task,
+            source_name=source_name,
+            season_label=season_label,
+            game_date=game_date,
+            slate_label=slate_label,
+            game_count=game_count,
+            source_path=source_path,
+            default_game_count=int(MARKET_BOARD_SOURCE_CONFIGS[source_name]["default_game_count"]),
+            build_source_request_context=_build_market_board_source_request_context,
+            load_source_games=build_model_market_board_source_games,
+            normalize_source_games=_normalize_market_board_source_games,
+            build_source_payload_fingerprints=_build_market_board_source_payload_fingerprints,
+            build_source_run=_build_model_market_board_source_run,
+            save_source_run=lambda source_run: save_model_market_board_source_run_postgres(
+                connection,
+                source_run,
+            ),
+            serialize_source_run=_serialize_model_market_board_source_run,
+            find_existing_board=lambda **kwargs: _find_model_market_board_postgres(
+                connection,
+                **kwargs,
+            ),
+            materialize_board=lambda **kwargs: materialize_model_market_board_postgres(
+                connection,
+                **kwargs,
+            ),
+            build_fingerprint_comparison=_build_market_board_source_fingerprint_comparison,
+            build_refresh_change_summary=_build_market_board_refresh_change_summary,
+            resolve_refresh_status=_resolve_market_board_refresh_status,
+            resolve_refresh_count=_resolve_market_board_refresh_count,
+            save_market_board=lambda board: save_model_market_board_postgres(connection, board),
+            save_refresh_event=lambda event: save_model_market_board_refresh_event_postgres(
+                connection,
+                event,
+            ),
+            serialize_market_board=_serialize_model_market_board,
+        )
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    validation_summary = result.get("validation_summary") or {}
+    source_run = result.get("source_run") or {}
+    board = result.get("board") or {}
+    span.success(
+        refresh_status=result.get("status"),
+        generated_game_count=int(result.get("generated_game_count", 0)),
+        invalid_row_count=int(validation_summary.get("invalid_row_count", 0)),
+        source_run_id=source_run.get("id"),
+        board_id=board.get("id"),
+    )
+    return result
 
 
 def get_model_market_board_detail_in_memory(
@@ -1661,11 +1759,7 @@ def get_model_market_board_detail_in_memory(
     board_id: int,
 ) -> dict[str, Any] | None:
     board = next(
-        (
-            entry
-            for entry in list_model_market_boards_in_memory(repository)
-            if entry.id == board_id
-        ),
+        (entry for entry in list_model_market_boards_in_memory(repository) if entry.id == board_id),
         None,
     )
     return _serialize_model_market_board(board)
@@ -1677,11 +1771,7 @@ def get_model_market_board_detail_postgres(
     board_id: int,
 ) -> dict[str, Any] | None:
     board = next(
-        (
-            entry
-            for entry in list_model_market_boards_postgres(connection)
-            if entry.id == board_id
-        ),
+        (entry for entry in list_model_market_boards_postgres(connection) if entry.id == board_id),
         None,
     )
     return _serialize_model_market_board(board)
@@ -1873,22 +1963,47 @@ def orchestrate_model_market_board_refresh_in_memory(
     pending_only: bool = True,
     recent_limit: int = 10,
 ) -> dict[str, Any]:
-    return model_market_board_orchestration.orchestrate_model_market_board_refresh(
+    span = start_workflow_span(
+        workflow_name="model_market_board.refresh_orchestration",
+        storage_mode="in_memory",
         target_task=target_task,
         season_label=season_label,
         source_name=source_name,
         freshness_status=freshness_status,
         pending_only=pending_only,
         recent_limit=recent_limit,
-        get_queue=lambda **kwargs: get_model_market_board_refresh_queue_in_memory(
-            repository,
-            **kwargs,
-        ),
-        refresh_board=lambda **kwargs: refresh_model_market_board_in_memory(repository, **kwargs),
-        build_batch=_build_model_market_board_refresh_batch,
-        save_batch=lambda batch: save_model_market_board_refresh_batch_in_memory(repository, batch),
-        serialize_batch=_serialize_model_market_board_refresh_batch,
     )
+    try:
+        result = model_market_board_orchestration.orchestrate_model_market_board_refresh(
+            target_task=target_task,
+            season_label=season_label,
+            source_name=source_name,
+            freshness_status=freshness_status,
+            pending_only=pending_only,
+            recent_limit=recent_limit,
+            get_queue=lambda **kwargs: get_model_market_board_refresh_queue_in_memory(
+                repository,
+                **kwargs,
+            ),
+            refresh_board=lambda **kwargs: refresh_model_market_board_in_memory(
+                repository, **kwargs
+            ),
+            build_batch=_build_model_market_board_refresh_batch,
+            save_batch=lambda batch: save_model_market_board_refresh_batch_in_memory(
+                repository, batch
+            ),
+            serialize_batch=_serialize_model_market_board_refresh_batch,
+        )
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    refresh_batch = result.get("refresh_batch") or {}
+    span.success(
+        candidate_board_count=int(result.get("candidate_board_count", 0)),
+        refreshed_board_count=int(result.get("refreshed_board_count", 0)),
+        refresh_batch_id=refresh_batch.get("id"),
+    )
+    return result
 
 
 def orchestrate_model_market_board_refresh_postgres(
@@ -1901,22 +2016,47 @@ def orchestrate_model_market_board_refresh_postgres(
     pending_only: bool = True,
     recent_limit: int = 10,
 ) -> dict[str, Any]:
-    return model_market_board_orchestration.orchestrate_model_market_board_refresh(
+    span = start_workflow_span(
+        workflow_name="model_market_board.refresh_orchestration",
+        storage_mode="postgres",
         target_task=target_task,
         season_label=season_label,
         source_name=source_name,
         freshness_status=freshness_status,
         pending_only=pending_only,
         recent_limit=recent_limit,
-        get_queue=lambda **kwargs: get_model_market_board_refresh_queue_postgres(
-            connection,
-            **kwargs,
-        ),
-        refresh_board=lambda **kwargs: refresh_model_market_board_postgres(connection, **kwargs),
-        build_batch=_build_model_market_board_refresh_batch,
-        save_batch=lambda batch: save_model_market_board_refresh_batch_postgres(connection, batch),
-        serialize_batch=_serialize_model_market_board_refresh_batch,
     )
+    try:
+        result = model_market_board_orchestration.orchestrate_model_market_board_refresh(
+            target_task=target_task,
+            season_label=season_label,
+            source_name=source_name,
+            freshness_status=freshness_status,
+            pending_only=pending_only,
+            recent_limit=recent_limit,
+            get_queue=lambda **kwargs: get_model_market_board_refresh_queue_postgres(
+                connection,
+                **kwargs,
+            ),
+            refresh_board=lambda **kwargs: refresh_model_market_board_postgres(
+                connection, **kwargs
+            ),
+            build_batch=_build_model_market_board_refresh_batch,
+            save_batch=lambda batch: save_model_market_board_refresh_batch_postgres(
+                connection, batch
+            ),
+            serialize_batch=_serialize_model_market_board_refresh_batch,
+        )
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    refresh_batch = result.get("refresh_batch") or {}
+    span.success(
+        candidate_board_count=int(result.get("candidate_board_count", 0)),
+        refreshed_board_count=int(result.get("refreshed_board_count", 0)),
+        refresh_batch_id=refresh_batch.get("id"),
+    )
+    return result
 
 
 def orchestrate_model_market_board_scoring_in_memory(
@@ -1937,30 +2077,56 @@ def orchestrate_model_market_board_scoring_in_memory(
     drop_null_targets: bool = True,
     recent_limit: int = 10,
 ) -> dict[str, Any]:
-    return model_market_board_orchestration.orchestrate_model_market_board_scoring(
+    span = start_workflow_span(
+        workflow_name="model_market_board.scoring_orchestration",
+        storage_mode="in_memory",
         feature_key=feature_key,
         target_task=target_task,
         season_label=season_label,
         source_name=source_name,
         freshness_status=freshness_status,
         pending_only=pending_only,
-        include_evidence=include_evidence,
-        evidence_dimensions=evidence_dimensions,
-        comparable_limit=comparable_limit,
-        min_pattern_sample_size=min_pattern_sample_size,
-        train_ratio=train_ratio,
-        validation_ratio=validation_ratio,
-        drop_null_targets=drop_null_targets,
         recent_limit=recent_limit,
-        get_queue=lambda **kwargs: get_model_market_board_scoring_queue_in_memory(
-            repository,
-            **kwargs,
-        ),
-        score_board=lambda **kwargs: score_model_market_board_in_memory(repository, **kwargs),
-        build_batch=_build_model_market_board_scoring_batch,
-        save_batch=lambda batch: save_model_market_board_scoring_batch_in_memory(repository, batch),
-        serialize_batch=_serialize_model_market_board_scoring_batch,
     )
+    try:
+        result = model_market_board_orchestration.orchestrate_model_market_board_scoring(
+            feature_key=feature_key,
+            target_task=target_task,
+            season_label=season_label,
+            source_name=source_name,
+            freshness_status=freshness_status,
+            pending_only=pending_only,
+            include_evidence=include_evidence,
+            evidence_dimensions=evidence_dimensions,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            drop_null_targets=drop_null_targets,
+            recent_limit=recent_limit,
+            get_queue=lambda **kwargs: get_model_market_board_scoring_queue_in_memory(
+                repository,
+                **kwargs,
+            ),
+            score_board=lambda **kwargs: score_model_market_board_in_memory(repository, **kwargs),
+            build_batch=_build_model_market_board_scoring_batch,
+            save_batch=lambda batch: save_model_market_board_scoring_batch_in_memory(
+                repository, batch
+            ),
+            serialize_batch=_serialize_model_market_board_scoring_batch,
+        )
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    orchestration_batch = result.get("orchestration_batch") or {}
+    span.success(
+        candidate_board_count=int(result.get("candidate_board_count", 0)),
+        scored_board_count=int(result.get("scored_board_count", 0)),
+        materialized_scoring_run_count=int(result.get("materialized_scoring_run_count", 0)),
+        materialized_opportunity_count=int(result.get("materialized_opportunity_count", 0)),
+        scoring_batch_id=orchestration_batch.get("id"),
+    )
+    return result
 
 
 def orchestrate_model_market_board_scoring_postgres(
@@ -1981,30 +2147,56 @@ def orchestrate_model_market_board_scoring_postgres(
     drop_null_targets: bool = True,
     recent_limit: int = 10,
 ) -> dict[str, Any]:
-    return model_market_board_orchestration.orchestrate_model_market_board_scoring(
+    span = start_workflow_span(
+        workflow_name="model_market_board.scoring_orchestration",
+        storage_mode="postgres",
         feature_key=feature_key,
         target_task=target_task,
         season_label=season_label,
         source_name=source_name,
         freshness_status=freshness_status,
         pending_only=pending_only,
-        include_evidence=include_evidence,
-        evidence_dimensions=evidence_dimensions,
-        comparable_limit=comparable_limit,
-        min_pattern_sample_size=min_pattern_sample_size,
-        train_ratio=train_ratio,
-        validation_ratio=validation_ratio,
-        drop_null_targets=drop_null_targets,
         recent_limit=recent_limit,
-        get_queue=lambda **kwargs: get_model_market_board_scoring_queue_postgres(
-            connection,
-            **kwargs,
-        ),
-        score_board=lambda **kwargs: score_model_market_board_postgres(connection, **kwargs),
-        build_batch=_build_model_market_board_scoring_batch,
-        save_batch=lambda batch: save_model_market_board_scoring_batch_postgres(connection, batch),
-        serialize_batch=_serialize_model_market_board_scoring_batch,
     )
+    try:
+        result = model_market_board_orchestration.orchestrate_model_market_board_scoring(
+            feature_key=feature_key,
+            target_task=target_task,
+            season_label=season_label,
+            source_name=source_name,
+            freshness_status=freshness_status,
+            pending_only=pending_only,
+            include_evidence=include_evidence,
+            evidence_dimensions=evidence_dimensions,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            drop_null_targets=drop_null_targets,
+            recent_limit=recent_limit,
+            get_queue=lambda **kwargs: get_model_market_board_scoring_queue_postgres(
+                connection,
+                **kwargs,
+            ),
+            score_board=lambda **kwargs: score_model_market_board_postgres(connection, **kwargs),
+            build_batch=_build_model_market_board_scoring_batch,
+            save_batch=lambda batch: save_model_market_board_scoring_batch_postgres(
+                connection, batch
+            ),
+            serialize_batch=_serialize_model_market_board_scoring_batch,
+        )
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    orchestration_batch = result.get("orchestration_batch") or {}
+    span.success(
+        candidate_board_count=int(result.get("candidate_board_count", 0)),
+        scored_board_count=int(result.get("scored_board_count", 0)),
+        materialized_scoring_run_count=int(result.get("materialized_scoring_run_count", 0)),
+        materialized_opportunity_count=int(result.get("materialized_opportunity_count", 0)),
+        scoring_batch_id=orchestration_batch.get("id"),
+    )
+    return result
 
 
 def orchestrate_model_market_board_cadence_in_memory(
@@ -2027,7 +2219,9 @@ def orchestrate_model_market_board_cadence_in_memory(
     drop_null_targets: bool = True,
     recent_limit: int = 10,
 ) -> dict[str, Any]:
-    return model_market_board_orchestration.orchestrate_model_market_board_cadence(
+    span = start_workflow_span(
+        workflow_name="model_market_board.cadence_orchestration",
+        storage_mode="in_memory",
         feature_key=feature_key,
         target_task=target_task,
         season_label=season_label,
@@ -2036,26 +2230,52 @@ def orchestrate_model_market_board_cadence_in_memory(
         refresh_pending_only=refresh_pending_only,
         scoring_freshness_status=scoring_freshness_status,
         scoring_pending_only=scoring_pending_only,
-        include_evidence=include_evidence,
-        evidence_dimensions=evidence_dimensions,
-        comparable_limit=comparable_limit,
-        min_pattern_sample_size=min_pattern_sample_size,
-        train_ratio=train_ratio,
-        validation_ratio=validation_ratio,
-        drop_null_targets=drop_null_targets,
         recent_limit=recent_limit,
-        refresh_orchestrator=lambda **kwargs: orchestrate_model_market_board_refresh_in_memory(
-            repository,
-            **kwargs,
-        ),
-        scoring_orchestrator=lambda **kwargs: orchestrate_model_market_board_scoring_in_memory(
-            repository,
-            **kwargs,
-        ),
-        build_batch=_build_model_market_board_cadence_batch,
-        save_batch=lambda batch: save_model_market_board_cadence_batch_in_memory(repository, batch),
-        serialize_batch=_serialize_model_market_board_cadence_batch,
     )
+    try:
+        result = model_market_board_orchestration.orchestrate_model_market_board_cadence(
+            feature_key=feature_key,
+            target_task=target_task,
+            season_label=season_label,
+            source_name=source_name,
+            refresh_freshness_status=refresh_freshness_status,
+            refresh_pending_only=refresh_pending_only,
+            scoring_freshness_status=scoring_freshness_status,
+            scoring_pending_only=scoring_pending_only,
+            include_evidence=include_evidence,
+            evidence_dimensions=evidence_dimensions,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            drop_null_targets=drop_null_targets,
+            recent_limit=recent_limit,
+            refresh_orchestrator=lambda **kwargs: orchestrate_model_market_board_refresh_in_memory(
+                repository,
+                **kwargs,
+            ),
+            scoring_orchestrator=lambda **kwargs: orchestrate_model_market_board_scoring_in_memory(
+                repository,
+                **kwargs,
+            ),
+            build_batch=_build_model_market_board_cadence_batch,
+            save_batch=lambda batch: save_model_market_board_cadence_batch_in_memory(
+                repository, batch
+            ),
+            serialize_batch=_serialize_model_market_board_cadence_batch,
+        )
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    cadence_batch = result.get("cadence_batch") or {}
+    span.success(
+        refreshed_board_count=int(result.get("refreshed_board_count", 0)),
+        scored_board_count=int(result.get("scored_board_count", 0)),
+        materialized_scoring_run_count=int(result.get("materialized_scoring_run_count", 0)),
+        materialized_opportunity_count=int(result.get("materialized_opportunity_count", 0)),
+        cadence_batch_id=cadence_batch.get("id"),
+    )
+    return result
 
 
 def orchestrate_model_market_board_cadence_postgres(
@@ -2078,7 +2298,9 @@ def orchestrate_model_market_board_cadence_postgres(
     drop_null_targets: bool = True,
     recent_limit: int = 10,
 ) -> dict[str, Any]:
-    return model_market_board_orchestration.orchestrate_model_market_board_cadence(
+    span = start_workflow_span(
+        workflow_name="model_market_board.cadence_orchestration",
+        storage_mode="postgres",
         feature_key=feature_key,
         target_task=target_task,
         season_label=season_label,
@@ -2087,26 +2309,52 @@ def orchestrate_model_market_board_cadence_postgres(
         refresh_pending_only=refresh_pending_only,
         scoring_freshness_status=scoring_freshness_status,
         scoring_pending_only=scoring_pending_only,
-        include_evidence=include_evidence,
-        evidence_dimensions=evidence_dimensions,
-        comparable_limit=comparable_limit,
-        min_pattern_sample_size=min_pattern_sample_size,
-        train_ratio=train_ratio,
-        validation_ratio=validation_ratio,
-        drop_null_targets=drop_null_targets,
         recent_limit=recent_limit,
-        refresh_orchestrator=lambda **kwargs: orchestrate_model_market_board_refresh_postgres(
-            connection,
-            **kwargs,
-        ),
-        scoring_orchestrator=lambda **kwargs: orchestrate_model_market_board_scoring_postgres(
-            connection,
-            **kwargs,
-        ),
-        build_batch=_build_model_market_board_cadence_batch,
-        save_batch=lambda batch: save_model_market_board_cadence_batch_postgres(connection, batch),
-        serialize_batch=_serialize_model_market_board_cadence_batch,
     )
+    try:
+        result = model_market_board_orchestration.orchestrate_model_market_board_cadence(
+            feature_key=feature_key,
+            target_task=target_task,
+            season_label=season_label,
+            source_name=source_name,
+            refresh_freshness_status=refresh_freshness_status,
+            refresh_pending_only=refresh_pending_only,
+            scoring_freshness_status=scoring_freshness_status,
+            scoring_pending_only=scoring_pending_only,
+            include_evidence=include_evidence,
+            evidence_dimensions=evidence_dimensions,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            drop_null_targets=drop_null_targets,
+            recent_limit=recent_limit,
+            refresh_orchestrator=lambda **kwargs: orchestrate_model_market_board_refresh_postgres(
+                connection,
+                **kwargs,
+            ),
+            scoring_orchestrator=lambda **kwargs: orchestrate_model_market_board_scoring_postgres(
+                connection,
+                **kwargs,
+            ),
+            build_batch=_build_model_market_board_cadence_batch,
+            save_batch=lambda batch: save_model_market_board_cadence_batch_postgres(
+                connection, batch
+            ),
+            serialize_batch=_serialize_model_market_board_cadence_batch,
+        )
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    cadence_batch = result.get("cadence_batch") or {}
+    span.success(
+        refreshed_board_count=int(result.get("refreshed_board_count", 0)),
+        scored_board_count=int(result.get("scored_board_count", 0)),
+        materialized_scoring_run_count=int(result.get("materialized_scoring_run_count", 0)),
+        materialized_opportunity_count=int(result.get("materialized_opportunity_count", 0)),
+        cadence_batch_id=cadence_batch.get("id"),
+    )
+    return result
 
 
 def get_model_market_board_refresh_batch_history_in_memory(
@@ -2516,46 +2764,83 @@ def run_model_backtest_in_memory(
     train_ratio: float = 0.7,
     validation_ratio: float = 0.15,
 ) -> dict[str, Any]:
-    feature_version = get_feature_version_in_memory(repository, feature_key=feature_key)
-    if feature_version is None:
-        return {
-            "feature_version": None,
-            "backtest_run": None,
-            "summary": model_backtest_workflows.empty_backtest_summary(
-                target_task=target_task,
-                selection_policy_name=selection_policy_name,
-                strategy_name=model_backtest_workflows.backtest_strategy_name(target_task),
-                minimum_train_games=minimum_train_games,
-                test_window_games=test_window_games,
-            ),
-        }
-    dataset_rows = _load_training_dataset_rows_in_memory(
-        repository,
-        feature_version_id=feature_version.id,
-        team_code=team_code,
-        season_label=season_label,
-    )
-    result = _run_walk_forward_backtest(
-        dataset_rows=dataset_rows,
-        feature_version=feature_version,
+    span = start_workflow_span(
+        workflow_name="model_backtest.run",
+        storage_mode="in_memory",
+        feature_key=feature_key,
         target_task=target_task,
         team_code=team_code,
         season_label=season_label,
         selection_policy_name=selection_policy_name,
         minimum_train_games=minimum_train_games,
         test_window_games=test_window_games,
-        train_ratio=train_ratio,
-        validation_ratio=validation_ratio,
     )
-    backtest_run = model_backtest_runs.save_model_backtest_run_in_memory(
-        repository,
-        result["record"],
+    try:
+        feature_version = get_feature_version_in_memory(repository, feature_key=feature_key)
+        if feature_version is None:
+            result = {
+                "feature_version": None,
+                "backtest_run": None,
+                "summary": model_backtest_workflows.empty_backtest_summary(
+                    target_task=target_task,
+                    selection_policy_name=selection_policy_name,
+                    strategy_name=model_backtest_workflows.backtest_strategy_name(target_task),
+                    minimum_train_games=minimum_train_games,
+                    test_window_games=test_window_games,
+                ),
+            }
+            span.success(
+                feature_version_id=None,
+                backtest_run_id=None,
+                dataset_row_count=0,
+                dataset_game_count=0,
+                fold_count=int(result["summary"]["fold_count"]),
+                candidate_bet_count=int(
+                    result["summary"]["strategy_results"]["candidate_threshold"]["bet_count"]
+                ),
+            )
+            return result
+        dataset_rows = _load_training_dataset_rows_in_memory(
+            repository,
+            feature_version_id=feature_version.id,
+            team_code=team_code,
+            season_label=season_label,
+        )
+        workflow_result = _run_walk_forward_backtest(
+            dataset_rows=dataset_rows,
+            feature_version=feature_version,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            selection_policy_name=selection_policy_name,
+            minimum_train_games=minimum_train_games,
+            test_window_games=test_window_games,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+        backtest_run = model_backtest_runs.save_model_backtest_run_in_memory(
+            repository,
+            workflow_result["record"],
+        )
+        result = {
+            "feature_version": asdict(feature_version),
+            "backtest_run": _serialize_model_backtest_run(backtest_run),
+            "summary": workflow_result["summary"],
+        }
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    span.success(
+        feature_version_id=feature_version.id,
+        backtest_run_id=backtest_run.id,
+        dataset_row_count=int(result["summary"]["dataset_row_count"]),
+        dataset_game_count=int(result["summary"]["dataset_game_count"]),
+        fold_count=int(result["summary"]["fold_count"]),
+        candidate_bet_count=int(
+            result["summary"]["strategy_results"]["candidate_threshold"]["bet_count"]
+        ),
     )
-    return {
-        "feature_version": asdict(feature_version),
-        "backtest_run": _serialize_model_backtest_run(backtest_run),
-        "summary": result["summary"],
-    }
+    return result
 
 
 def run_model_backtest_postgres(
@@ -2571,46 +2856,83 @@ def run_model_backtest_postgres(
     train_ratio: float = 0.7,
     validation_ratio: float = 0.15,
 ) -> dict[str, Any]:
-    feature_version = get_feature_version_postgres(connection, feature_key=feature_key)
-    if feature_version is None:
-        return {
-            "feature_version": None,
-            "backtest_run": None,
-            "summary": model_backtest_workflows.empty_backtest_summary(
-                target_task=target_task,
-                selection_policy_name=selection_policy_name,
-                strategy_name=model_backtest_workflows.backtest_strategy_name(target_task),
-                minimum_train_games=minimum_train_games,
-                test_window_games=test_window_games,
-            ),
-        }
-    dataset_rows = _load_training_dataset_rows_postgres(
-        connection,
-        feature_version_id=feature_version.id,
-        team_code=team_code,
-        season_label=season_label,
-    )
-    result = _run_walk_forward_backtest(
-        dataset_rows=dataset_rows,
-        feature_version=feature_version,
+    span = start_workflow_span(
+        workflow_name="model_backtest.run",
+        storage_mode="postgres",
+        feature_key=feature_key,
         target_task=target_task,
         team_code=team_code,
         season_label=season_label,
         selection_policy_name=selection_policy_name,
         minimum_train_games=minimum_train_games,
         test_window_games=test_window_games,
-        train_ratio=train_ratio,
-        validation_ratio=validation_ratio,
     )
-    backtest_run = model_backtest_runs.save_model_backtest_run_postgres(
-        connection,
-        result["record"],
+    try:
+        feature_version = get_feature_version_postgres(connection, feature_key=feature_key)
+        if feature_version is None:
+            result = {
+                "feature_version": None,
+                "backtest_run": None,
+                "summary": model_backtest_workflows.empty_backtest_summary(
+                    target_task=target_task,
+                    selection_policy_name=selection_policy_name,
+                    strategy_name=model_backtest_workflows.backtest_strategy_name(target_task),
+                    minimum_train_games=minimum_train_games,
+                    test_window_games=test_window_games,
+                ),
+            }
+            span.success(
+                feature_version_id=None,
+                backtest_run_id=None,
+                dataset_row_count=0,
+                dataset_game_count=0,
+                fold_count=int(result["summary"]["fold_count"]),
+                candidate_bet_count=int(
+                    result["summary"]["strategy_results"]["candidate_threshold"]["bet_count"]
+                ),
+            )
+            return result
+        dataset_rows = _load_training_dataset_rows_postgres(
+            connection,
+            feature_version_id=feature_version.id,
+            team_code=team_code,
+            season_label=season_label,
+        )
+        workflow_result = _run_walk_forward_backtest(
+            dataset_rows=dataset_rows,
+            feature_version=feature_version,
+            target_task=target_task,
+            team_code=team_code,
+            season_label=season_label,
+            selection_policy_name=selection_policy_name,
+            minimum_train_games=minimum_train_games,
+            test_window_games=test_window_games,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+        )
+        backtest_run = model_backtest_runs.save_model_backtest_run_postgres(
+            connection,
+            workflow_result["record"],
+        )
+        result = {
+            "feature_version": asdict(feature_version),
+            "backtest_run": _serialize_model_backtest_run(backtest_run),
+            "summary": workflow_result["summary"],
+        }
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    span.success(
+        feature_version_id=feature_version.id,
+        backtest_run_id=backtest_run.id,
+        dataset_row_count=int(result["summary"]["dataset_row_count"]),
+        dataset_game_count=int(result["summary"]["dataset_game_count"]),
+        fold_count=int(result["summary"]["fold_count"]),
+        candidate_bet_count=int(
+            result["summary"]["strategy_results"]["candidate_threshold"]["bet_count"]
+        ),
     )
-    return {
-        "feature_version": asdict(feature_version),
-        "backtest_run": _serialize_model_backtest_run(backtest_run),
-        "summary": result["summary"],
-    }
+    return result
 
 
 def list_model_backtest_runs_in_memory(
@@ -3259,8 +3581,6 @@ def _float_or_none(value: Any) -> float | None:
     return model_training_views._float_or_none(value)
 
 
-
-
 def _select_best_evaluation_snapshot(
     snapshots: list[ModelEvaluationSnapshotRecord],
     *,
@@ -3270,4 +3590,3 @@ def _select_best_evaluation_snapshot(
         snapshots,
         selection_policy_name=selection_policy_name,
     )
-

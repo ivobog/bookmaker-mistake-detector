@@ -28,13 +28,21 @@ def canonicalize_rows(rows: list[RawGameRow]) -> list[CanonicalGame]:
         away_rows = [row for row in matches if row.team_code == away_team]
         warnings: list[str] = []
 
-        home_row = home_rows[0] if home_rows else next(
-            (row for row in matches if row.team_code != away_team),
-            matches[0],
+        home_row = (
+            home_rows[0]
+            if home_rows
+            else next(
+                (row for row in matches if row.team_code != away_team),
+                matches[0],
+            )
         )
-        away_row = away_rows[0] if away_rows else next(
-            (row for row in matches if row.team_code != home_team),
-            matches[0],
+        away_row = (
+            away_rows[0]
+            if away_rows
+            else next(
+                (row for row in matches if row.team_code != home_team),
+                matches[0],
+            )
         )
 
         if home_rows and away_rows:

@@ -7,12 +7,12 @@ from bookmaker_detector_api.data_quality_taxonomy import canonical_severity_for_
 from bookmaker_detector_api.fetching import store_parser_snapshot
 from bookmaker_detector_api.ingestion.models import ParseStatus, RawGameRow
 from bookmaker_detector_api.ingestion.providers.base import HistoricalTeamPageProvider
+from bookmaker_detector_api.repositories import IngestionRepository
 from bookmaker_detector_api.repositories.ingestion_types import (
     DataQualityIssueRecord,
     PageRetrievalRecord,
     PersistedIngestionRun,
 )
-from bookmaker_detector_api.repositories import IngestionRepository
 from bookmaker_detector_api.services.canonical import canonicalize_rows
 from bookmaker_detector_api.services.metrics import calculate_game_metric
 
@@ -107,16 +107,8 @@ def ingest_historical_team_page(
     canonical_games_saved = len(persisted_canonical_games)
 
     warnings = sorted(
-        {
-            warning
-            for row in raw_rows
-            for warning in row.warnings
-        }
-        | {
-            warning
-            for game in canonical_games
-            for warning in game.warnings
-        }
+        {warning for row in raw_rows for warning in row.warnings}
+        | {warning for game in canonical_games for warning in game.warnings}
     )
 
     parser_snapshot_path = _store_parser_snapshot_if_requested(
@@ -204,9 +196,7 @@ def _parse_raw_rows(
                 team_code=team_code,
                 season_label=season_label,
                 source_url=source_url,
-                source_section=str(
-                    provider_row.metadata.get("source_section", "Regular Season")
-                ),
+                source_section=str(provider_row.metadata.get("source_section", "Regular Season")),
             )
         )
         for row_index, provider_row in enumerate(provider_rows, start=1)
@@ -241,8 +231,7 @@ def _attach_source_coordinates(
         replace(
             row,
             source_page_url=row.source_page_url or source_page_url,
-            source_page_season_label=row.source_page_season_label
-            or source_page_season_label,
+            source_page_season_label=row.source_page_season_label or source_page_season_label,
         )
         for row in raw_rows
     ]

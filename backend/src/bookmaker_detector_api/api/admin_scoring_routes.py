@@ -1,5 +1,4 @@
 from datetime import date
-
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Query
@@ -15,7 +14,6 @@ from bookmaker_detector_api.api.schemas import (
     AdminScoringRunsResponse,
 )
 from bookmaker_detector_api.db.postgres import postgres_connection
-from bookmaker_detector_api.services.repository_factory import build_in_memory_phase_three_modeling_store
 from bookmaker_detector_api.services.models import (
     get_model_future_game_preview_in_memory,
     get_model_future_game_preview_postgres,
@@ -33,6 +31,9 @@ from bookmaker_detector_api.services.models import (
     materialize_model_future_game_preview_postgres,
     materialize_model_future_slate_in_memory,
     materialize_model_future_slate_postgres,
+)
+from bookmaker_detector_api.services.repository_factory import (
+    build_in_memory_phase_three_modeling_store,
 )
 
 from .admin_model_support import (
@@ -310,9 +311,7 @@ def phase_three_model_future_game_preview_runs(
         repository_mode=repository_mode,
         filters=filters,
         scoring_run_count=len(scoring_runs),
-        scoring_runs=[
-            _serialize_scoring_run(scoring_run) for scoring_run in scoring_runs[:limit]
-        ],
+        scoring_runs=[_serialize_scoring_run(scoring_run) for scoring_run in scoring_runs[:limit]],
     )
 
 
@@ -537,6 +536,3 @@ def phase_three_model_future_slate_materialize(
         },
         **materialized,
     }
-
-
-

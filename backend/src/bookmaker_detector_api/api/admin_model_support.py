@@ -143,4 +143,3 @@ def _prepare_in_memory_future_slate_repository(
             validation_ratio=validation_ratio,
         )
     return repository
-

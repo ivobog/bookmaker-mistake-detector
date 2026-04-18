@@ -108,19 +108,20 @@ def train_tree_stump_model(
             candidate_count += 1
             left_prediction = round(float(mean(left_targets)), 4)
             right_prediction = round(float(mean(right_targets)), 4)
+
+            def stump_predictor(
+                row: dict[str, Any],
+                *,
+                fn: str = feature_name,
+                split: float = threshold,
+                left: float = left_prediction,
+                right: float = right_prediction,
+            ) -> float | None:
+                return predict_tree_stump(row, fn, split, left, right)
+
             selection_metrics = score_regression_model(
                 selection_rows,
-                predictor=lambda row,
-                fn=feature_name,
-                split=threshold,
-                left=left_prediction,
-                right=right_prediction: predict_tree_stump(
-                    row,
-                    fn,
-                    split,
-                    left,
-                    right,
-                ),
+                predictor=stump_predictor,
             )
             if is_better_regression_candidate(selection_metrics, best_model["selection_metrics"]):
                 best_model = {
@@ -215,8 +216,7 @@ def candidate_tree_thresholds(
     if len(unique_values) < 2:
         return []
     thresholds = [
-        round(float((left + right) / 2), 4)
-        for left, right in zip(unique_values, unique_values[1:])
+        round(float((left + right) / 2), 4) for left, right in zip(unique_values, unique_values[1:])
     ]
     median_threshold = round(float(median(unique_values)), 4)
     if median_threshold not in thresholds:
@@ -226,9 +226,7 @@ def candidate_tree_thresholds(
 
 def constant_target_mean(training_rows: list[dict[str, Any]]) -> float | None:
     target_values = [
-        float(row["target_value"])
-        for row in training_rows
-        if row.get("target_value") is not None
+        float(row["target_value"]) for row in training_rows if row.get("target_value") is not None
     ]
     if not target_values:
         return None
@@ -237,9 +235,7 @@ def constant_target_mean(training_rows: list[dict[str, Any]]) -> float | None:
 
 def summarize_target_values(training_rows: list[dict[str, Any]]) -> dict[str, Any]:
     target_values = [
-        float(row["target_value"])
-        for row in training_rows
-        if row.get("target_value") is not None
+        float(row["target_value"]) for row in training_rows if row.get("target_value") is not None
     ]
     if not target_values:
         return {

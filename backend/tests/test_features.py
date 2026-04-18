@@ -524,9 +524,7 @@ def test_profile_feature_dataset_rows_returns_coverage_and_label_balance() -> No
     assert profile["label_balance"]["went_over_actual"] == {"true": 2, "false": 1, "null": 0}
     assert profile["feature_coverage"]["games_played_prior"]["coverage_rate"] == 1.0
     assert profile["feature_coverage"]["days_rest"]["coverage_rate"] == 0.6667
-    assert (
-        profile["feature_coverage"]["rolling_3_avg_point_margin"]["non_null_count"] == 2
-    )
+    assert profile["feature_coverage"]["rolling_3_avg_point_margin"]["non_null_count"] == 2
 
 
 def test_build_feature_pattern_catalog_groups_bucketed_conditions() -> None:
@@ -1180,14 +1178,8 @@ def test_materialize_feature_analysis_artifacts_persists_patterns_and_evidence()
         limit=50,
     )
     assert catalog["artifact_count"] >= 2
-    assert any(
-        artifact["artifact_type"] == "pattern_summary"
-        for artifact in catalog["artifacts"]
-    )
-    assert any(
-        artifact["artifact_type"] == "evidence_bundle"
-        for artifact in catalog["artifacts"]
-    )
+    assert any(artifact["artifact_type"] == "pattern_summary" for artifact in catalog["artifacts"])
+    assert any(artifact["artifact_type"] == "evidence_bundle" for artifact in catalog["artifacts"])
 
 
 def test_feature_analysis_artifact_history_summarizes_evidence_statuses() -> None:
@@ -1516,8 +1508,7 @@ def test_build_feature_training_bundle_returns_split_target_summaries() -> None:
     assert training_bundle["bundle_summary"]["train"]["training_row_count"] == 1
     assert training_bundle["bundle_summary"]["train"]["target_summary"]["row_count"] == 1
     assert (
-        training_bundle["bundle_summary"]["train"]["training_manifest"]["feature_column_count"]
-        > 0
+        training_bundle["bundle_summary"]["train"]["training_manifest"]["feature_column_count"] > 0
     )
     assert len(training_bundle["split_previews"]["train"]) == 1
 

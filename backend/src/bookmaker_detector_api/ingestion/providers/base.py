@@ -42,14 +42,11 @@ class TeamPageFetchResult:
 class HistoricalTeamPageProvider(Protocol):
     provider_name: str
 
-    def discover_team_pages(self, *, index_url: str) -> list[DiscoveredTeamPage]:
-        ...
+    def discover_team_pages(self, *, index_url: str) -> list[DiscoveredTeamPage]: ...
 
-    def resolve_team_main_page_url(self, *, team_page: DiscoveredTeamPage) -> str:
-        ...
+    def resolve_team_main_page_url(self, *, team_page: DiscoveredTeamPage) -> str: ...
 
-    def fetch_page(self, *, url: str) -> FetchedPage:
-        ...
+    def fetch_page(self, *, url: str) -> FetchedPage: ...
 
     def fetch_team_main_page(
         self,
@@ -57,8 +54,7 @@ class HistoricalTeamPageProvider(Protocol):
         url: str,
         requested_season_labels: tuple[str, ...] | list[str] = (),
         browser_fallback: bool = False,
-    ) -> TeamPageFetchResult:
-        ...
+    ) -> TeamPageFetchResult: ...
 
     def extract_season_block(
         self,
@@ -66,11 +62,9 @@ class HistoricalTeamPageProvider(Protocol):
         page_content: str,
         season_label: str,
         team_main_page_url: str,
-    ) -> SeasonBlock | None:
-        ...
+    ) -> SeasonBlock | None: ...
 
-    def extract_regular_season_rows(self, *, season_block: SeasonBlock) -> list[ProviderRow]:
-        ...
+    def extract_regular_season_rows(self, *, season_block: SeasonBlock) -> list[ProviderRow]: ...
 
     def parse_row(
         self,
@@ -81,11 +75,9 @@ class HistoricalTeamPageProvider(Protocol):
         season_label: str,
         source_url: str,
         source_section: str,
-    ) -> RawGameRow:
-        ...
+    ) -> RawGameRow: ...
 
-    def normalize_row(self, *, raw_row: RawGameRow) -> RawGameRow:
-        ...
+    def normalize_row(self, *, raw_row: RawGameRow) -> RawGameRow: ...
 
     def parse_team_page(
         self,
@@ -94,8 +86,6 @@ class HistoricalTeamPageProvider(Protocol):
         team_code: str,
         season_label: str,
         source_url: str,
-    ) -> list[RawGameRow]:
-        ...
+    ) -> list[RawGameRow]: ...
 
-    def load_fixture(self, fixture_path: Path) -> str:
-        ...
+    def load_fixture(self, fixture_path: Path) -> str: ...

@@ -552,9 +552,7 @@ def _build_market_board_refresh_change_summary(
     normalized_generated_games = [
         _serialize_future_game_input_value(game) for game in generated_games
     ]
-    previous_by_key = {
-        _build_market_board_game_key(entry): entry for entry in previous_games
-    }
+    previous_by_key = {_build_market_board_game_key(entry): entry for entry in previous_games}
     generated_by_key = {
         _build_market_board_game_key(entry): entry for entry in normalized_generated_games
     }
@@ -1026,8 +1024,7 @@ def _summarize_model_market_board_source_run_history(
         },
         "daily_buckets": [daily_buckets[key] for key in sorted(daily_buckets.keys())],
         "recent_source_runs": [
-            _serialize_model_market_board_source_run(entry)
-            for entry in source_runs[:recent_limit]
+            _serialize_model_market_board_source_run(entry) for entry in source_runs[:recent_limit]
         ],
     }
 
@@ -1266,12 +1263,8 @@ def _build_model_market_board_scoring_batch(
         pending_only=pending_only,
         candidate_board_count=int(result.get("candidate_board_count", 0)),
         scored_board_count=int(result.get("scored_board_count", 0)),
-        materialized_scoring_run_count=int(
-            result.get("materialized_scoring_run_count", 0)
-        ),
-        materialized_opportunity_count=int(
-            result.get("materialized_opportunity_count", 0)
-        ),
+        materialized_scoring_run_count=int(result.get("materialized_scoring_run_count", 0)),
+        materialized_opportunity_count=int(result.get("materialized_opportunity_count", 0)),
         payload=payload,
     )
 
@@ -1362,12 +1355,8 @@ def _build_model_market_board_cadence_batch(
         scoring_freshness_status=scoring_freshness_status,
         refreshed_board_count=int(result.get("refreshed_board_count", 0)),
         scored_board_count=int(result.get("scored_board_count", 0)),
-        materialized_scoring_run_count=int(
-            result.get("materialized_scoring_run_count", 0)
-        ),
-        materialized_opportunity_count=int(
-            result.get("materialized_opportunity_count", 0)
-        ),
+        materialized_scoring_run_count=int(result.get("materialized_scoring_run_count", 0)),
+        materialized_opportunity_count=int(result.get("materialized_opportunity_count", 0)),
         payload=payload,
     )
 
@@ -1480,10 +1469,7 @@ def _build_future_slate_key_value(
     )
     first = ordered[0]
     last = ordered[-1]
-    return (
-        f"{target_task}:{first['game_date']}:{last['game_date']}:"
-        f"{len(serialized_inputs)}-games"
-    )
+    return f"{target_task}:{first['game_date']}:{last['game_date']}:{len(serialized_inputs)}-games"
 
 
 def _utc_today() -> date:

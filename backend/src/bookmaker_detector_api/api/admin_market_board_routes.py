@@ -5,7 +5,6 @@ from fastapi import APIRouter, Body, Query
 from bookmaker_detector_api.db.postgres import postgres_connection
 from bookmaker_detector_api.demo import seed_phase_two_feature_in_memory
 from bookmaker_detector_api.repositories import PhaseThreeModelingStore
-from bookmaker_detector_api.services.repository_factory import build_in_memory_phase_three_modeling_store
 from bookmaker_detector_api.services.models import (
     get_model_market_board_cadence_batch_history_in_memory,
     get_model_market_board_cadence_batch_history_postgres,
@@ -44,6 +43,9 @@ from bookmaker_detector_api.services.models import (
     score_model_market_board_in_memory,
     score_model_market_board_postgres,
     train_phase_three_models_in_memory,
+)
+from bookmaker_detector_api.services.repository_factory import (
+    build_in_memory_phase_three_modeling_store,
 )
 
 from .admin_model_support import (
@@ -1167,6 +1169,3 @@ def phase_three_model_market_board_score(
         },
         **result,
     }
-
-
-

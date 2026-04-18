@@ -7,7 +7,7 @@ from tempfile import mkdtemp
 
 from bookmaker_detector_api.config import settings
 from bookmaker_detector_api.ingestion.models import ParseStatus, RawGameRow
-from bookmaker_detector_api.repositories import InMemoryIngestionRepository, IngestionRepository
+from bookmaker_detector_api.repositories import IngestionRepository, InMemoryIngestionRepository
 from bookmaker_detector_api.services.fetch_ingestion_runner import run_fetch_and_ingest
 from bookmaker_detector_api.services.ingestion_pipeline import (
     HistoricalIngestionRequest,
@@ -220,9 +220,7 @@ def _seed_in_memory_demo_data(repository: IngestionRepository) -> None:
         return
 
     fixture_path = (
-        Path(__file__).resolve().parents[1]
-        / "fixtures"
-        / "covers_sample_team_page.html"
+        Path(__file__).resolve().parents[1] / "fixtures" / "covers_sample_team_page.html"
     ).resolve()
     artifact_root = Path(mkdtemp(prefix="admin-diagnostics-seed-", dir=str(Path.cwd())))
     original_payload_dir = settings.raw_payload_dir
@@ -359,9 +357,7 @@ def _seed_canonical_conflict_demo(repository: IngestionRepository) -> None:
         repository=repository,
     )
     missing_path = (
-        Path(__file__).resolve().parents[1]
-        / "fixtures"
-        / "missing_team_page.html"
+        Path(__file__).resolve().parents[1] / "fixtures" / "missing_team_page.html"
     ).resolve()
     run_fetch_and_ingest(
         repository_mode="in_memory",
@@ -585,16 +581,14 @@ def _build_run_delta(
         },
         "metric_deltas": {
             "raw_rows_saved": (
-                int(latest_run["raw_rows_saved"])
-                - int(previous_run["raw_rows_saved"])
+                int(latest_run["raw_rows_saved"]) - int(previous_run["raw_rows_saved"])
             ),
             "canonical_games_saved": int(latest_run["canonical_games_saved"])
             - int(previous_run["canonical_games_saved"]),
             "metrics_saved": int(latest_run["metrics_saved"]) - int(previous_run["metrics_saved"]),
             "quality_issues_saved": int(latest_run["quality_issues_saved"])
             - int(previous_run["quality_issues_saved"]),
-            "warning_count": int(latest_run["warning_count"])
-            - int(previous_run["warning_count"]),
+            "warning_count": int(latest_run["warning_count"]) - int(previous_run["warning_count"]),
         },
         "parse_status_count_deltas": _build_count_delta(
             latest_run["parse_status_counts"],
@@ -778,9 +772,7 @@ def _build_parser_provenance_daily_buckets(
                     continue
                 aggregate_counts[str(mode)] = aggregate_counts.get(str(mode), 0) + int(count)
     return {
-        bucket_date: {
-            category: counts for category, counts in category_counts.items() if counts
-        }
+        bucket_date: {category: counts for category, counts in category_counts.items() if counts}
         for bucket_date, category_counts in daily_buckets.items()
     }
 
@@ -828,8 +820,8 @@ def _shift_latest_in_memory_run(repository: IngestionRepository, *, days_ago: in
         repository.job_runs[-1]["completed_at"] = target_started_at + timedelta(seconds=5)
     if repository.job_run_reporting_snapshots:
         repository.job_run_reporting_snapshots[-1]["started_at"] = target_started_at
-        repository.job_run_reporting_snapshots[-1]["completed_at"] = (
-            target_started_at + timedelta(seconds=5)
+        repository.job_run_reporting_snapshots[-1]["completed_at"] = target_started_at + timedelta(
+            seconds=5
         )
     if repository.page_retrievals:
         repository.page_retrievals[-1]["retrieved_at"] = target_started_at + timedelta(seconds=1)
@@ -839,6 +831,6 @@ def _shift_latest_in_memory_run(repository: IngestionRepository, *, days_ago: in
         )
     if repository.job_run_quality_snapshots:
         repository.job_run_quality_snapshots[-1]["started_at"] = target_started_at
-        repository.job_run_quality_snapshots[-1]["completed_at"] = (
-            target_started_at + timedelta(seconds=5)
+        repository.job_run_quality_snapshots[-1]["completed_at"] = target_started_at + timedelta(
+            seconds=5
         )
