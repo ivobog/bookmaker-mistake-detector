@@ -1,17 +1,24 @@
-from fastapi import APIRouter, Query
+from __future__ import annotations
 
+from typing import Annotated
+
+from fastapi import APIRouter, Depends
+
+from bookmaker_detector_api.api.schemas import (
+    AnalystBacktestDetailResponse,
+    AnalystBacktestListFilters,
+    AnalystBacktestListResponse,
+    AnalystBacktestRun,
+)
 from bookmaker_detector_api.config import settings
 from bookmaker_detector_api.db.postgres import postgres_connection
-from bookmaker_detector_api.demo import (
-    seed_phase_two_feature_in_memory,
-)
 from bookmaker_detector_api.repositories import InMemoryIngestionRepository
+from bookmaker_detector_api.services.model_records import ModelBacktestRunRecord
 from bookmaker_detector_api.services.models import (
     get_model_backtest_detail_in_memory,
     get_model_backtest_detail_postgres,
     list_model_backtest_runs_in_memory,
     list_model_backtest_runs_postgres,
-    run_model_backtest_in_memory,
 )
 
 router = APIRouter(prefix="/analyst", tags=["analyst"])
@@ -21,99 +28,85 @@ def _use_postgres_analyst_mode() -> bool:
     return settings.api_env.lower() == "production"
 
 
-@router.get("/backtests")
-def phase_four_model_backtests(
-    feature_key: str = Query(default="baseline_team_features_v1"),
-    target_task: str = Query(default="spread_error_regression"),
-    team_code: str | None = Query(default=None),
-    season_label: str | None = Query(default=None),
-    selection_policy_name: str = Query(default="validation_mae_candidate_v1"),
-    minimum_train_games: int = Query(default=1, ge=1),
-    test_window_games: int = Query(default=1, ge=1),
-    train_ratio: float = Query(default=0.7, gt=0, lt=1),
-    validation_ratio: float = Query(default=0.15, ge=0, lt=1),
-) -> dict[str, object]:
+def _serialize_backtest_run(run: ModelBacktestRunRecord) -> AnalystBacktestRun:
+    return AnalystBacktestRun(
+        id=run.id,
+        feature_version_id=run.feature_version_id,
+        target_task=run.target_task,
+        team_code=run.team_code,
+        season_label=run.season_label,
+        status=run.status,
+        selection_policy_name=run.selection_policy_name,
+        strategy_name=run.strategy_name,
+        minimum_train_games=run.minimum_train_games,
+        test_window_games=run.test_window_games,
+        train_ratio=run.train_ratio,
+        validation_ratio=run.validation_ratio,
+        fold_count=run.fold_count,
+        payload=run.payload,
+        created_at=run.created_at.isoformat() if run.created_at else None,
+        completed_at=run.completed_at.isoformat() if run.completed_at else None,
+    )
+
+
+def _load_backtest_runs(filters: AnalystBacktestListFilters) -> tuple[str, list[ModelBacktestRunRecord]]:
     if _use_postgres_analyst_mode():
         with postgres_connection() as connection:
             runs = list_model_backtest_runs_postgres(
                 connection,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
+                target_task=filters.target_task,
+                team_code=filters.team_code,
+                season_label=filters.season_label,
             )
-        repository_mode = "postgres"
-    else:
-        repository = InMemoryIngestionRepository()
-        repository, _, _ = seed_phase_two_feature_in_memory()
-        run_model_backtest_in_memory(
-            repository,
-            feature_key=feature_key,
-            target_task=target_task,
-            team_code=team_code,
-            season_label=season_label,
-            selection_policy_name=selection_policy_name,
-            minimum_train_games=minimum_train_games,
-            test_window_games=test_window_games,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-        )
-        runs = list_model_backtest_runs_in_memory(
-            repository,
-            target_task=target_task,
-            team_code=team_code,
-            season_label=season_label,
-        )
-        repository_mode = "in_memory"
+        return "postgres", runs
 
-    return {
-        "repository_mode": repository_mode,
-        "backtest_run_count": len(runs),
-        "backtest_runs": [run.payload | {"id": run.id} for run in runs],
-    }
+    repository = InMemoryIngestionRepository()
+    runs = list_model_backtest_runs_in_memory(
+        repository,
+        target_task=filters.target_task,
+        team_code=filters.team_code,
+        season_label=filters.season_label,
+    )
+    return "in_memory", runs
 
 
-@router.get("/backtests/{backtest_run_id}")
-def phase_four_model_backtest_detail(
-    backtest_run_id: int,
-    feature_key: str = Query(default="baseline_team_features_v1"),
-    target_task: str = Query(default="spread_error_regression"),
-    team_code: str | None = Query(default=None),
-    season_label: str | None = Query(default=None),
-    selection_policy_name: str = Query(default="validation_mae_candidate_v1"),
-    minimum_train_games: int = Query(default=1, ge=1),
-    test_window_games: int = Query(default=1, ge=1),
-    train_ratio: float = Query(default=0.7, gt=0, lt=1),
-    validation_ratio: float = Query(default=0.15, ge=0, lt=1),
-) -> dict[str, object]:
+def _load_backtest_detail(backtest_run_id: int) -> tuple[str, dict[str, object] | None]:
     if _use_postgres_analyst_mode():
         with postgres_connection() as connection:
             backtest_run = get_model_backtest_detail_postgres(
                 connection,
                 backtest_run_id=backtest_run_id,
             )
-        repository_mode = "postgres"
-    else:
-        repository = InMemoryIngestionRepository()
-        repository, _, _ = seed_phase_two_feature_in_memory()
-        run_model_backtest_in_memory(
-            repository,
-            feature_key=feature_key,
-            target_task=target_task,
-            team_code=team_code,
-            season_label=season_label,
-            selection_policy_name=selection_policy_name,
-            minimum_train_games=minimum_train_games,
-            test_window_games=test_window_games,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-        )
-        backtest_run = get_model_backtest_detail_in_memory(
-            repository,
-            backtest_run_id=backtest_run_id,
-        )
-        repository_mode = "in_memory"
+        return "postgres", backtest_run
 
-    return {
-        "repository_mode": repository_mode,
-        "backtest_run": backtest_run,
-    }
+    repository = InMemoryIngestionRepository()
+    backtest_run = get_model_backtest_detail_in_memory(
+        repository,
+        backtest_run_id=backtest_run_id,
+    )
+    return "in_memory", backtest_run
+
+
+@router.get("/backtests", response_model=AnalystBacktestListResponse)
+def phase_four_model_backtests(
+    filters: Annotated[AnalystBacktestListFilters, Depends()],
+) -> AnalystBacktestListResponse:
+    repository_mode, runs = _load_backtest_runs(filters)
+    return AnalystBacktestListResponse(
+        repository_mode=repository_mode,
+        backtest_run_count=len(runs),
+        backtest_runs=[_serialize_backtest_run(run) for run in runs],
+    )
+
+
+@router.get("/backtests/{backtest_run_id}", response_model=AnalystBacktestDetailResponse)
+def phase_four_model_backtest_detail(
+    backtest_run_id: int,
+) -> AnalystBacktestDetailResponse:
+    repository_mode, backtest_run = _load_backtest_detail(backtest_run_id)
+    return AnalystBacktestDetailResponse(
+        repository_mode=repository_mode,
+        backtest_run=(
+            AnalystBacktestRun.model_validate(backtest_run) if backtest_run is not None else None
+        ),
+    )

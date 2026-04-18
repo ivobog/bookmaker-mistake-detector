@@ -47,42 +47,6 @@ def _prepare_in_memory_feature_repository() -> InMemoryIngestionRepository:
     return repository
 
 
-def _prepare_in_memory_feature_analysis_repository(
-    *,
-    feature_key: str,
-    target_task: str,
-    team_code: str | None,
-    season_label: str | None,
-    dimensions: tuple[str, ...],
-    min_sample_size: int,
-    canonical_game_id: int | None,
-    condition_values: tuple[str, ...] | None,
-    pattern_key: str | None,
-    comparable_limit: int,
-    train_ratio: float,
-    validation_ratio: float,
-    drop_null_targets: bool,
-) -> InMemoryIngestionRepository:
-    repository = _prepare_in_memory_feature_repository()
-    materialize_feature_analysis_artifacts_in_memory(
-        repository,
-        feature_key=feature_key,
-        target_task=target_task,
-        team_code=team_code,
-        season_label=season_label,
-        dimensions=dimensions,
-        min_sample_size=min_sample_size,
-        canonical_game_id=canonical_game_id,
-        condition_values=condition_values,
-        pattern_key=pattern_key,
-        comparable_limit=comparable_limit,
-        train_ratio=train_ratio,
-        validation_ratio=validation_ratio,
-        drop_null_targets=drop_null_targets,
-    )
-    return repository
-
-
 @router.get("/phase-2-feature-demo")
 def phase_two_feature_demo() -> dict[str, object]:
     repository_mode = "postgres" if _use_postgres_stable_read_mode() else "in_memory"
@@ -109,7 +73,7 @@ def feature_snapshots(
             )
         repository_mode = "postgres"
     else:
-        repository = _prepare_in_memory_feature_repository()
+        repository = InMemoryIngestionRepository()
         snapshot_result = get_feature_snapshot_catalog_in_memory(
             repository,
             feature_key=feature_key,
@@ -153,7 +117,7 @@ def feature_dataset(
             )
         repository_mode = "postgres"
     else:
-        repository = _prepare_in_memory_feature_repository()
+        repository = InMemoryIngestionRepository()
         dataset_result = get_feature_dataset_in_memory(
             repository,
             feature_key=feature_key,
@@ -193,7 +157,7 @@ def feature_dataset_profile(
             )
         repository_mode = "postgres"
     else:
-        repository = _prepare_in_memory_feature_repository()
+        repository = InMemoryIngestionRepository()
         profile_result = get_feature_dataset_profile_in_memory(
             repository,
             feature_key=feature_key,
@@ -340,21 +304,7 @@ def feature_analysis_artifacts(
             )
         repository_mode = "postgres"
     else:
-        repository = _prepare_in_memory_feature_analysis_repository(
-            feature_key=feature_key,
-            target_task=target_task,
-            team_code=team_code,
-            season_label=season_label,
-            dimensions=parsed_dimensions,
-            min_sample_size=min_sample_size,
-            canonical_game_id=canonical_game_id,
-            condition_values=parsed_condition_values,
-            pattern_key=pattern_key,
-            comparable_limit=comparable_limit,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-            drop_null_targets=drop_null_targets,
-        )
+        repository = InMemoryIngestionRepository()
         artifact_result = get_feature_analysis_artifact_catalog_in_memory(
             repository,
             feature_key=feature_key,
@@ -432,21 +382,7 @@ def feature_analysis_history(
             )
         repository_mode = "postgres"
     else:
-        repository = _prepare_in_memory_feature_analysis_repository(
-            feature_key=feature_key,
-            target_task=target_task,
-            team_code=team_code,
-            season_label=season_label,
-            dimensions=parsed_dimensions,
-            min_sample_size=min_sample_size,
-            canonical_game_id=canonical_game_id,
-            condition_values=parsed_condition_values,
-            pattern_key=pattern_key,
-            comparable_limit=comparable_limit,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-            drop_null_targets=drop_null_targets,
-        )
+        repository = InMemoryIngestionRepository()
         history_result = get_feature_analysis_artifact_history_in_memory(
             repository,
             feature_key=feature_key,
@@ -505,7 +441,7 @@ def feature_dataset_splits(
             )
         repository_mode = "postgres"
     else:
-        repository = _prepare_in_memory_feature_repository()
+        repository = InMemoryIngestionRepository()
         split_result = get_feature_dataset_splits_in_memory(
             repository,
             feature_key=feature_key,
@@ -555,7 +491,7 @@ def feature_dataset_training_view(
             )
         repository_mode = "postgres"
     else:
-        repository = _prepare_in_memory_feature_repository()
+        repository = InMemoryIngestionRepository()
         training_view = get_feature_training_view_in_memory(
             repository,
             feature_key=feature_key,
@@ -603,7 +539,7 @@ def feature_dataset_training_manifest(
             )
         repository_mode = "postgres"
     else:
-        repository = _prepare_in_memory_feature_repository()
+        repository = InMemoryIngestionRepository()
         training_manifest = get_feature_training_manifest_in_memory(
             repository,
             feature_key=feature_key,
@@ -653,7 +589,7 @@ def feature_dataset_training_bundle(
             )
         repository_mode = "postgres"
     else:
-        repository = _prepare_in_memory_feature_repository()
+        repository = InMemoryIngestionRepository()
         training_bundle = get_feature_training_bundle_in_memory(
             repository,
             feature_key=feature_key,
@@ -707,7 +643,7 @@ def feature_dataset_training_benchmark(
             )
         repository_mode = "postgres"
     else:
-        repository = _prepare_in_memory_feature_repository()
+        repository = InMemoryIngestionRepository()
         training_benchmark = get_feature_training_benchmark_in_memory(
             repository,
             feature_key=feature_key,
@@ -757,7 +693,7 @@ def feature_dataset_training_task_matrix(
             )
         repository_mode = "postgres"
     else:
-        repository = _prepare_in_memory_feature_repository()
+        repository = InMemoryIngestionRepository()
         training_task_matrix = get_feature_training_task_matrix_in_memory(
             repository,
             feature_key=feature_key,

@@ -1,10 +1,19 @@
-from fastapi import APIRouter, Query
+from __future__ import annotations
 
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Query
+
+from bookmaker_detector_api.api.schemas import (
+    AnalystComparableFilters,
+    AnalystComparableResponse,
+    AnalystEvidenceFilters,
+    AnalystEvidenceResponse,
+    AnalystPatternFilters,
+    AnalystPatternResponse,
+)
 from bookmaker_detector_api.config import settings
 from bookmaker_detector_api.db.postgres import postgres_connection
-from bookmaker_detector_api.demo import (
-    seed_phase_two_feature_in_memory,
-)
 from bookmaker_detector_api.repositories import InMemoryIngestionRepository
 from bookmaker_detector_api.services.features import (
     get_feature_comparable_cases_in_memory,
@@ -22,215 +31,174 @@ def _use_postgres_analyst_mode() -> bool:
     return settings.api_env.lower() == "production"
 
 
-@router.get("/patterns")
+def _parse_csv_values(value: str | None) -> list[str] | None:
+    if value is None:
+        return None
+    parsed = [item.strip() for item in value.split(",") if item.strip()]
+    return parsed or None
+
+
+@router.get("/patterns", response_model=AnalystPatternResponse)
 def feature_patterns(
-    feature_key: str = Query(default="baseline_team_features_v1"),
-    target_task: str = Query(default="spread_error_regression"),
-    team_code: str | None = Query(default=None),
-    season_label: str | None = Query(default=None),
+    filters: Annotated[AnalystPatternFilters, Depends()],
     dimensions: str = Query(default="venue,days_rest_bucket"),
-    min_sample_size: int = Query(default=2, ge=1, le=100),
-    limit: int = Query(default=50, ge=1, le=200),
-) -> dict[str, object]:
-    parsed_dimensions = tuple(
-        dimension.strip() for dimension in dimensions.split(",") if dimension.strip()
-    )
+) -> AnalystPatternResponse:
+    parsed_dimensions = _parse_csv_values(dimensions) or []
     if _use_postgres_analyst_mode():
         with postgres_connection() as connection:
             pattern_result = get_feature_pattern_catalog_postgres(
                 connection,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                dimensions=parsed_dimensions,
-                min_sample_size=min_sample_size,
-                limit=limit,
+                feature_key=filters.feature_key,
+                target_task=filters.target_task,
+                team_code=filters.team_code,
+                season_label=filters.season_label,
+                dimensions=tuple(parsed_dimensions),
+                min_sample_size=filters.min_sample_size,
+                limit=filters.limit,
             )
         repository_mode = "postgres"
     else:
         repository = InMemoryIngestionRepository()
-        repository, _, _ = seed_phase_two_feature_in_memory()
         pattern_result = get_feature_pattern_catalog_in_memory(
             repository,
-            feature_key=feature_key,
-            target_task=target_task,
-            team_code=team_code,
-            season_label=season_label,
-            dimensions=parsed_dimensions,
-            min_sample_size=min_sample_size,
-            limit=limit,
+            feature_key=filters.feature_key,
+            target_task=filters.target_task,
+            team_code=filters.team_code,
+            season_label=filters.season_label,
+            dimensions=tuple(parsed_dimensions),
+            min_sample_size=filters.min_sample_size,
+            limit=filters.limit,
         )
         repository_mode = "in_memory"
 
-    return {
-        "repository_mode": repository_mode,
-        "filters": {
-            "feature_key": feature_key,
-            "target_task": target_task,
-            "team_code": team_code,
-            "season_label": season_label,
-            "dimensions": list(parsed_dimensions),
-            "min_sample_size": min_sample_size,
-            "limit": limit,
-        },
-        **pattern_result,
-    }
+    response_filters = filters.model_copy(update={"dimensions": parsed_dimensions})
+    return AnalystPatternResponse(
+        repository_mode=repository_mode,
+        filters=response_filters,
+        feature_version=pattern_result.get("feature_version"),
+        row_count=int(pattern_result.get("row_count", 0)),
+        task=pattern_result.get("task"),
+        pattern_count=int(pattern_result.get("pattern_count", 0)),
+        patterns=pattern_result.get("patterns", []),
+    )
 
 
-@router.get("/comparables")
+@router.get("/comparables", response_model=AnalystComparableResponse)
 def feature_comparables(
-    feature_key: str = Query(default="baseline_team_features_v1"),
-    target_task: str = Query(default="spread_error_regression"),
-    team_code: str | None = Query(default=None),
-    season_label: str | None = Query(default=None),
+    filters: Annotated[AnalystComparableFilters, Depends()],
     dimensions: str = Query(default="venue,days_rest_bucket"),
-    canonical_game_id: int | None = Query(default=None, ge=1),
     condition_values: str | None = Query(default=None),
-    pattern_key: str | None = Query(default=None),
-    limit: int = Query(default=20, ge=1, le=100),
-) -> dict[str, object]:
-    parsed_dimensions = tuple(
-        dimension.strip() for dimension in dimensions.split(",") if dimension.strip()
-    )
-    parsed_condition_values = (
-        tuple(value.strip() for value in condition_values.split(","))
-        if condition_values is not None
-        else None
-    )
+) -> AnalystComparableResponse:
+    parsed_dimensions = _parse_csv_values(dimensions) or []
+    parsed_condition_values = _parse_csv_values(condition_values)
     if _use_postgres_analyst_mode():
         with postgres_connection() as connection:
             comparable_result = get_feature_comparable_cases_postgres(
                 connection,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                dimensions=parsed_dimensions,
-                canonical_game_id=canonical_game_id,
-                condition_values=parsed_condition_values,
-                pattern_key=pattern_key,
-                limit=limit,
+                feature_key=filters.feature_key,
+                target_task=filters.target_task,
+                team_code=filters.team_code,
+                season_label=filters.season_label,
+                dimensions=tuple(parsed_dimensions),
+                canonical_game_id=filters.canonical_game_id,
+                condition_values=tuple(parsed_condition_values) if parsed_condition_values else None,
+                pattern_key=filters.pattern_key,
+                limit=filters.limit,
             )
         repository_mode = "postgres"
     else:
         repository = InMemoryIngestionRepository()
-        repository, _, _ = seed_phase_two_feature_in_memory()
         comparable_result = get_feature_comparable_cases_in_memory(
             repository,
-            feature_key=feature_key,
-            target_task=target_task,
-            team_code=team_code,
-            season_label=season_label,
-            dimensions=parsed_dimensions,
-            canonical_game_id=canonical_game_id,
-            condition_values=parsed_condition_values,
-            pattern_key=pattern_key,
-            limit=limit,
+            feature_key=filters.feature_key,
+            target_task=filters.target_task,
+            team_code=filters.team_code,
+            season_label=filters.season_label,
+            dimensions=tuple(parsed_dimensions),
+            canonical_game_id=filters.canonical_game_id,
+            condition_values=tuple(parsed_condition_values) if parsed_condition_values else None,
+            pattern_key=filters.pattern_key,
+            limit=filters.limit,
         )
         repository_mode = "in_memory"
 
-    return {
-        "repository_mode": repository_mode,
-        "filters": {
-            "feature_key": feature_key,
-            "target_task": target_task,
-            "team_code": team_code,
-            "season_label": season_label,
-            "dimensions": list(parsed_dimensions),
-            "canonical_game_id": canonical_game_id,
-            "condition_values": list(parsed_condition_values)
-            if parsed_condition_values is not None
-            else None,
-            "pattern_key": pattern_key,
-            "limit": limit,
-        },
-        **comparable_result,
-    }
+    response_filters = filters.model_copy(
+        update={
+            "dimensions": parsed_dimensions,
+            "condition_values": parsed_condition_values,
+        }
+    )
+    return AnalystComparableResponse(
+        repository_mode=repository_mode,
+        filters=response_filters,
+        feature_version=comparable_result.get("feature_version"),
+        row_count=int(comparable_result.get("row_count", 0)),
+        task=comparable_result.get("task"),
+        anchor_case=comparable_result.get("anchor_case"),
+        comparable_count=int(comparable_result.get("comparable_count", 0)),
+        comparables=comparable_result.get("comparables", []),
+        pattern_key=comparable_result.get("pattern_key"),
+    )
 
 
-@router.get("/evidence")
+@router.get("/evidence", response_model=AnalystEvidenceResponse)
 def feature_evidence(
-    feature_key: str = Query(default="baseline_team_features_v1"),
-    target_task: str = Query(default="spread_error_regression"),
-    team_code: str | None = Query(default=None),
-    season_label: str | None = Query(default=None),
+    filters: Annotated[AnalystEvidenceFilters, Depends()],
     dimensions: str = Query(default="venue,days_rest_bucket"),
-    canonical_game_id: int | None = Query(default=None, ge=1),
     condition_values: str | None = Query(default=None),
-    pattern_key: str | None = Query(default=None),
-    comparable_limit: int = Query(default=10, ge=1, le=100),
-    min_pattern_sample_size: int = Query(default=1, ge=1, le=100),
-    train_ratio: float = Query(default=0.7, gt=0, lt=1),
-    validation_ratio: float = Query(default=0.15, ge=0, lt=1),
-    drop_null_targets: bool = Query(default=True),
-) -> dict[str, object]:
-    parsed_dimensions = tuple(
-        dimension.strip() for dimension in dimensions.split(",") if dimension.strip()
-    )
-    parsed_condition_values = (
-        tuple(value.strip() for value in condition_values.split(","))
-        if condition_values is not None
-        else None
-    )
+) -> AnalystEvidenceResponse:
+    parsed_dimensions = _parse_csv_values(dimensions) or []
+    parsed_condition_values = _parse_csv_values(condition_values)
     if _use_postgres_analyst_mode():
         with postgres_connection() as connection:
             evidence_result = get_feature_evidence_bundle_postgres(
                 connection,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                dimensions=parsed_dimensions,
-                canonical_game_id=canonical_game_id,
-                condition_values=parsed_condition_values,
-                pattern_key=pattern_key,
-                comparable_limit=comparable_limit,
-                min_pattern_sample_size=min_pattern_sample_size,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-                drop_null_targets=drop_null_targets,
+                feature_key=filters.feature_key,
+                target_task=filters.target_task,
+                team_code=filters.team_code,
+                season_label=filters.season_label,
+                dimensions=tuple(parsed_dimensions),
+                canonical_game_id=filters.canonical_game_id,
+                condition_values=tuple(parsed_condition_values) if parsed_condition_values else None,
+                pattern_key=filters.pattern_key,
+                comparable_limit=filters.comparable_limit,
+                min_pattern_sample_size=filters.min_pattern_sample_size,
+                train_ratio=filters.train_ratio,
+                validation_ratio=filters.validation_ratio,
+                drop_null_targets=filters.drop_null_targets,
             )
         repository_mode = "postgres"
     else:
         repository = InMemoryIngestionRepository()
-        repository, _, _ = seed_phase_two_feature_in_memory()
         evidence_result = get_feature_evidence_bundle_in_memory(
             repository,
-            feature_key=feature_key,
-            target_task=target_task,
-            team_code=team_code,
-            season_label=season_label,
-            dimensions=parsed_dimensions,
-            canonical_game_id=canonical_game_id,
-            condition_values=parsed_condition_values,
-            pattern_key=pattern_key,
-            comparable_limit=comparable_limit,
-            min_pattern_sample_size=min_pattern_sample_size,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-            drop_null_targets=drop_null_targets,
+            feature_key=filters.feature_key,
+            target_task=filters.target_task,
+            team_code=filters.team_code,
+            season_label=filters.season_label,
+            dimensions=tuple(parsed_dimensions),
+            canonical_game_id=filters.canonical_game_id,
+            condition_values=tuple(parsed_condition_values) if parsed_condition_values else None,
+            pattern_key=filters.pattern_key,
+            comparable_limit=filters.comparable_limit,
+            min_pattern_sample_size=filters.min_pattern_sample_size,
+            train_ratio=filters.train_ratio,
+            validation_ratio=filters.validation_ratio,
+            drop_null_targets=filters.drop_null_targets,
         )
         repository_mode = "in_memory"
 
-    return {
-        "repository_mode": repository_mode,
-        "filters": {
-            "feature_key": feature_key,
-            "target_task": target_task,
-            "team_code": team_code,
-            "season_label": season_label,
-            "dimensions": list(parsed_dimensions),
-            "canonical_game_id": canonical_game_id,
-            "condition_values": list(parsed_condition_values)
-            if parsed_condition_values is not None
-            else None,
-            "pattern_key": pattern_key,
-            "comparable_limit": comparable_limit,
-            "min_pattern_sample_size": min_pattern_sample_size,
-            "train_ratio": train_ratio,
-            "validation_ratio": validation_ratio,
-            "drop_null_targets": drop_null_targets,
-        },
-        **evidence_result,
-    }
+    response_filters = filters.model_copy(
+        update={
+            "dimensions": parsed_dimensions,
+            "condition_values": parsed_condition_values,
+        }
+    )
+    return AnalystEvidenceResponse(
+        repository_mode=repository_mode,
+        filters=response_filters,
+        feature_version=evidence_result.get("feature_version"),
+        row_count=int(evidence_result.get("row_count", 0)),
+        task=evidence_result.get("task"),
+        evidence=evidence_result.get("evidence", {}),
+    )

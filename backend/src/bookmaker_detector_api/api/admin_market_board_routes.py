@@ -77,37 +77,6 @@ def _prepare_in_memory_market_board_refresh_repository(
     return repository
 
 
-def _prepare_in_memory_market_board_materialized_repository(
-    *,
-    target_task: str | None,
-    season_label: str | None,
-    slate_label: str | None,
-    game_date: date,
-    home_team_code: str,
-    away_team_code: str,
-    home_spread_line: float | None,
-    total_line: float | None,
-) -> InMemoryIngestionRepository:
-    repository = InMemoryIngestionRepository()
-    if target_task is not None:
-        materialize_model_market_board_in_memory(
-            repository,
-            target_task=target_task,
-            slate_label=slate_label,
-            games=[
-                {
-                    "season_label": season_label or "2025-2026",
-                    "game_date": game_date,
-                    "home_team_code": home_team_code,
-                    "away_team_code": away_team_code,
-                    "home_spread_line": home_spread_line,
-                    "total_line": total_line,
-                }
-            ],
-        )
-    return repository
-
-
 def _prepare_in_memory_market_board_score_repository(
     *,
     board_id: int,
@@ -313,15 +282,7 @@ def phase_three_model_market_board_history(
             )
         repository_mode = "postgres"
     else:
-        repository = _prepare_in_memory_market_board_refresh_repository(
-            target_task=target_task,
-            source_name=source_name,
-            season_label=season_label,
-            game_date=game_date,
-            slate_label=slate_label,
-            game_count=game_count,
-            source_path=source_path,
-        )
+        repository = InMemoryIngestionRepository()
         history = get_model_market_board_refresh_history_in_memory(
             repository,
             target_task=target_task,
@@ -357,7 +318,6 @@ def phase_three_model_market_board_source_runs(
     source_path: str | None = Query(default=None),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
-    resolved_source_name = source_name or "demo_daily_lines_v1"
     if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
             history = get_model_market_board_source_run_history_postgres(
@@ -369,15 +329,7 @@ def phase_three_model_market_board_source_runs(
             )
         repository_mode = "postgres"
     else:
-        repository = _prepare_in_memory_market_board_refresh_repository(
-            target_task=target_task,
-            source_name=resolved_source_name,
-            season_label=season_label,
-            game_date=game_date,
-            slate_label=slate_label,
-            game_count=game_count,
-            source_path=source_path,
-        )
+        repository = InMemoryIngestionRepository()
         history = get_model_market_board_source_run_history_in_memory(
             repository,
             target_task=target_task,
@@ -415,7 +367,6 @@ def phase_three_model_market_board_refresh_queue(
     pending_only: bool = Query(default=False),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
-    resolved_source_name = source_name or "demo_daily_lines_v1"
     if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
             queue = get_model_market_board_refresh_queue_postgres(
@@ -429,14 +380,7 @@ def phase_three_model_market_board_refresh_queue(
             )
         repository_mode = "postgres"
     else:
-        repository = _prepare_in_memory_market_board_refresh_repository(
-            target_task=target_task,
-            source_name=resolved_source_name,
-            season_label=season_label,
-            game_date=game_date,
-            slate_label=slate_label,
-            game_count=game_count,
-        )
+        repository = InMemoryIngestionRepository()
         queue = get_model_market_board_refresh_queue_in_memory(
             repository,
             target_task=target_task,
@@ -477,7 +421,6 @@ def phase_three_model_market_board_queue(
     pending_only: bool = Query(default=False),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
-    resolved_source_name = source_name or "demo_daily_lines_v1"
     if _use_postgres_stable_read_mode():
         with postgres_connection() as connection:
             queue = get_model_market_board_scoring_queue_postgres(
@@ -491,14 +434,7 @@ def phase_three_model_market_board_queue(
             )
         repository_mode = "postgres"
     else:
-        repository = _prepare_in_memory_market_board_refresh_repository(
-            target_task=target_task,
-            source_name=resolved_source_name,
-            season_label=season_label,
-            game_date=game_date,
-            slate_label=slate_label,
-            game_count=game_count,
-        )
+        repository = InMemoryIngestionRepository()
         queue = get_model_market_board_scoring_queue_in_memory(
             repository,
             target_task=target_task,
@@ -802,21 +738,7 @@ def phase_three_model_market_board_refresh_orchestration_history(
             )
         repository_mode = "postgres"
     else:
-        repository = _prepare_in_memory_market_board_orchestration_repository(
-            target_task=target_task,
-            source_name=source_name,
-            season_label=season_label,
-            game_date=game_date,
-            slate_label=slate_label,
-            game_count=game_count,
-            feature_key="baseline_team_features_v1",
-            train_ratio=0.7,
-            validation_ratio=0.15,
-            refresh_freshness_status=freshness_status,
-            refresh_pending_only=pending_only,
-            recent_limit=recent_limit,
-            run_refresh_orchestration=True,
-        )
+        repository = InMemoryIngestionRepository()
         history = get_model_market_board_refresh_batch_history_in_memory(
             repository,
             target_task=target_task,
@@ -869,23 +791,7 @@ def phase_three_model_market_board_cadence_history(
             )
         repository_mode = "postgres"
     else:
-        repository = _prepare_in_memory_market_board_orchestration_repository(
-            target_task=target_task,
-            source_name=source_name,
-            season_label=season_label,
-            game_date=game_date,
-            slate_label=slate_label,
-            game_count=game_count,
-            feature_key=feature_key,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-            refresh_freshness_status=refresh_freshness_status,
-            refresh_pending_only=refresh_pending_only,
-            scoring_freshness_status=scoring_freshness_status,
-            scoring_pending_only=scoring_pending_only,
-            recent_limit=recent_limit,
-            run_cadence_orchestration=True,
-        )
+        repository = InMemoryIngestionRepository()
         history = get_model_market_board_cadence_batch_history_in_memory(
             repository,
             target_task=target_task,
@@ -941,21 +847,7 @@ def phase_three_model_market_board_orchestration_history(
             )
         repository_mode = "postgres"
     else:
-        repository = _prepare_in_memory_market_board_orchestration_repository(
-            target_task=target_task,
-            source_name=source_name,
-            season_label=season_label,
-            game_date=game_date,
-            slate_label=slate_label,
-            game_count=game_count,
-            feature_key=feature_key,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-            scoring_freshness_status=freshness_status,
-            scoring_pending_only=pending_only,
-            recent_limit=recent_limit,
-            run_scoring_orchestration=True,
-        )
+        repository = InMemoryIngestionRepository()
         history = get_model_market_board_scoring_batch_history_in_memory(
             repository,
             target_task=target_task,
@@ -1010,21 +902,7 @@ def phase_three_model_market_board_cadence(
             )
         repository_mode = "postgres"
     else:
-        repository = _prepare_in_memory_market_board_orchestration_repository(
-            target_task=target_task,
-            source_name=source_name,
-            season_label=season_label,
-            game_date=game_date,
-            slate_label=slate_label,
-            game_count=game_count,
-            feature_key=feature_key,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-            scoring_freshness_status=freshness_status,
-            scoring_pending_only=pending_only,
-            recent_limit=recent_limit,
-            run_scoring_orchestration=True,
-        )
+        repository = InMemoryIngestionRepository()
         dashboard = get_model_market_board_cadence_dashboard_in_memory(
             repository,
             target_task=target_task,
@@ -1109,16 +987,7 @@ def phase_three_model_market_boards(
             )
         repository_mode = "postgres"
     else:
-        repository = _prepare_in_memory_market_board_materialized_repository(
-            target_task=target_task,
-            season_label=season_label,
-            slate_label=slate_label,
-            game_date=game_date,
-            home_team_code=home_team_code,
-            away_team_code=away_team_code,
-            home_spread_line=home_spread_line,
-            total_line=total_line,
-        )
+        repository = InMemoryIngestionRepository()
         boards = list_model_market_boards_in_memory(
             repository,
             target_task=target_task,
@@ -1154,16 +1023,7 @@ def phase_three_model_market_board_detail(
             board = get_model_market_board_detail_postgres(connection, board_id=board_id)
         repository_mode = "postgres"
     else:
-        repository = _prepare_in_memory_market_board_materialized_repository(
-            target_task=target_task,
-            season_label=season_label,
-            slate_label=slate_label,
-            game_date=game_date,
-            home_team_code=home_team_code,
-            away_team_code=away_team_code,
-            home_spread_line=home_spread_line,
-            total_line=total_line,
-        )
+        repository = InMemoryIngestionRepository()
         board = get_model_market_board_detail_in_memory(repository, board_id=board_id)
         repository_mode = "in_memory"
 
@@ -1202,21 +1062,7 @@ def phase_three_model_market_board_operations(
             )
         repository_mode = "postgres"
     else:
-        repository = _prepare_in_memory_market_board_orchestration_repository(
-            target_task=target_task,
-            source_name=source_name,
-            season_label=season_label,
-            game_date=game_date,
-            slate_label=slate_label,
-            game_count=game_count,
-            feature_key=feature_key,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-            scoring_freshness_status=freshness_status,
-            scoring_pending_only=pending_only,
-            recent_limit=recent_limit,
-            run_scoring_orchestration=True,
-        )
+        repository = InMemoryIngestionRepository()
         operations = get_model_market_board_operations_in_memory(
             repository,
             board_id=board_id,

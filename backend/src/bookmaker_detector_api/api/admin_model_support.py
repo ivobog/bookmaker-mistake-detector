@@ -9,7 +9,6 @@ from bookmaker_detector_api.services.models import (
     materialize_model_future_game_preview_in_memory,
     materialize_model_future_slate_in_memory,
     promote_best_model_in_memory,
-    run_model_backtest_in_memory,
     train_phase_three_models_in_memory,
 )
 
@@ -30,34 +29,6 @@ class FutureSlateRequest(BaseModel):
 
 def _use_postgres_stable_read_mode() -> bool:
     return settings.api_env.lower() == "production"
-
-
-def _prepare_in_memory_backtest_history_repository(
-    *,
-    feature_key: str,
-    target_task: str,
-    team_code: str | None,
-    season_label: str | None,
-    selection_policy_name: str,
-    minimum_train_games: int,
-    test_window_games: int,
-    train_ratio: float,
-    validation_ratio: float,
-) -> InMemoryIngestionRepository:
-    repository, _, _ = seed_phase_two_feature_in_memory()
-    run_model_backtest_in_memory(
-        repository,
-        feature_key=feature_key,
-        target_task=target_task,
-        team_code=team_code,
-        season_label=season_label,
-        selection_policy_name=selection_policy_name,
-        minimum_train_games=minimum_train_games,
-        test_window_games=test_window_games,
-        train_ratio=train_ratio,
-        validation_ratio=validation_ratio,
-    )
-    return repository
 
 
 def _prepare_in_memory_phase_three_model_repository(

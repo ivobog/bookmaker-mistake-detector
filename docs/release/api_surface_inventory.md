@@ -1,172 +1,159 @@
 # API Surface Inventory
 
 ## Purpose
-This document is the first cleanup slice from the clean-release execution plan. It inventories every route currently defined in `backend/src/bookmaker_detector_api/api/admin_routes.py` and assigns each route to one of the clean-release target zones:
+This inventory captures the currently mounted API surface for the modularized router tree under [backend/src/bookmaker_detector_api/api/__init__.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\__init__.py).
 
-- `analyst`: stable analyst-facing product surface
-- `admin`: privileged operational or mutation surface
-- `dev-only`: move to scripts, fixtures, tests, or non-production route mounts
-- `delete`: remove instead of preserving as a route
+It replaces the older inventory that referenced the pre-split `admin_routes.py` mega-router.
 
-## Current-State Summary
-- Current source file: `backend/src/bookmaker_detector_api/api/admin_routes.py`
-- Current route count in that file: `81`
-- Current mounted API surfaces: `health` plus one large `/admin` router
-- Dominant cleanup smells:
-  - stable read endpoints accept `repository_mode`
-  - many read endpoints accept `seed_demo`
-  - many read endpoints also accept `auto_*` toggles that can trigger hidden mutations
-  - demo workflows are mixed into the same module as production-oriented APIs
+## Current mounted route groups
+- `health`
+- `analyst_backtests`
+- `analyst_opportunities`
+- `analyst_patterns`
+- `analyst_trends`
+- `admin_demo`
+- `admin_diagnostics`
+- `admin_features`
+- `admin_market_board`
+- `admin_models`
+- `admin_opportunities`
+- `admin_scoring`
 
-## Parameter Families To Remove From Stable Contracts
-- `repository_mode`
-  - keep only for dev-only tooling or test harnesses
-- `seed_demo`
-  - move to scripts, fixtures, or dev-only entry points
-- `auto_run_demo`
-- `auto_train_demo`
-- `auto_select_demo`
-- `auto_materialize_demo`
-- `auto_refresh_demo`
-- `auto_orchestrate_demo`
+## Route count summary
 
-These parameters are the main source of side-effect risk in otherwise read-shaped APIs.
+| Surface | Count | Notes |
+| --- | --- | --- |
+| Health | `1` | Root operational health check |
+| Analyst | `8` | Intended stable read surface, but several routes still trigger seeded/demo workflows outside production |
+| Admin operational + artifact reads | `49` | Includes diagnostics, model history, feature exports, and market-board operational views |
+| Admin explicit mutations | `16` | Training, selection, materialization, orchestration, maintenance |
+| Demo/dev-only | `8` | Phase/demo scaffolding and provider catalog |
+| Total | `82` | Current route count under `/api/v1` |
 
-## Inventory
+## Classification rules
+- `health`: always-on readiness or liveness checks
+- `analyst`: read-oriented operator-facing workflow routes
+- `admin-read`: operational, audit, diagnostics, and artifact retrieval routes
+- `admin-mutation`: explicit state-changing routes
+- `dev-only`: phase/demo scaffolding that should not be part of the stable operator surface
 
-### Demo and Bootstrap Routes
-| Route | Handler | Zone | Target module | Recommended action |
+## Health
+
+| Method | Path | Zone | Source file |
+| --- | --- | --- | --- |
+| `GET` | `/api/v1/health` | `health` | [backend/src/bookmaker_detector_api/api/routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\routes.py) |
+
+## Analyst
+
+| Method | Path | Zone | Source file | Current caution |
 | --- | --- | --- | --- | --- |
-| `GET /api/v1/admin/providers` | `list_supported_providers` | `admin` | `admin_ingestion` | Keep as an admin capability catalog, but remove any implication that fixture-backed providers are production-default. |
-| `GET /api/v1/admin/phase-1-demo` | `phase_one_demo` | `dev-only` | `dev_routes` or scripts | Move out of stable runtime. This is phase/demo scaffolding. |
-| `GET /api/v1/admin/phase-1-persistence-demo` | `phase_one_persistence_demo` | `dev-only` | `dev_routes` or scripts | Move out of stable runtime. |
-| `GET /api/v1/admin/phase-1-worker-demo` | `phase_one_worker_demo` | `dev-only` | `dev_routes` or scripts | Move out of stable runtime. |
-| `GET /api/v1/admin/phase-1-fetch-demo` | `phase_one_fetch_demo` | `dev-only` | `dev_routes` or scripts | Move out of stable runtime. |
-| `GET /api/v1/admin/phase-1-fetch-failure-demo` | `phase_one_fetch_failure_demo` | `dev-only` | `dev_routes` or scripts | Move out of stable runtime. |
-| `GET /api/v1/admin/phase-1-fetch-reporting-demo` | `phase_one_fetch_reporting_demo` | `dev-only` | `dev_routes` or scripts | Move out of stable runtime. |
-| `GET /api/v1/admin/phase-2-feature-demo` | `phase_two_feature_demo` | `dev-only` | `dev_routes` or scripts | Move out of stable runtime. |
+| `GET` | `/api/v1/analyst/backtests` | `analyst` | [backend/src/bookmaker_detector_api/api/analyst_backtests.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\analyst_backtests.py) | Seeds in-memory data and runs a backtest outside production |
+| `GET` | `/api/v1/analyst/backtests/{backtest_run_id}` | `analyst` | [backend/src/bookmaker_detector_api/api/analyst_backtests.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\analyst_backtests.py) | Seeds in-memory data and runs a backtest outside production |
+| `GET` | `/api/v1/analyst/opportunities` | `analyst` | [backend/src/bookmaker_detector_api/api/analyst_opportunities.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\analyst_opportunities.py) | Can train, select, and materialize in-memory data outside production |
+| `GET` | `/api/v1/analyst/opportunities/{opportunity_id}` | `analyst` | [backend/src/bookmaker_detector_api/api/analyst_opportunities.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\analyst_opportunities.py) | Can train, select, and materialize in-memory data outside production |
+| `GET` | `/api/v1/analyst/patterns` | `analyst` | [backend/src/bookmaker_detector_api/api/analyst_patterns.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\analyst_patterns.py) | Review for seeded in-memory preparation before phase 1 |
+| `GET` | `/api/v1/analyst/comparables` | `analyst` | [backend/src/bookmaker_detector_api/api/analyst_patterns.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\analyst_patterns.py) | Review for seeded in-memory preparation before phase 1 |
+| `GET` | `/api/v1/analyst/evidence` | `analyst` | [backend/src/bookmaker_detector_api/api/analyst_patterns.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\analyst_patterns.py) | Review for seeded in-memory preparation before phase 1 |
+| `GET` | `/api/v1/analyst/trends/summary` | `analyst` | [backend/src/bookmaker_detector_api/api/analyst_trends.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\analyst_trends.py) | Review for seeded in-memory preparation before phase 1 |
 
-### Model Training, Evaluation, and Backtests
-| Route | Handler | Zone | Target module | Recommended action |
+## Admin Read
+
+### Demo and provider catalog
+| Method | Path | Zone | Source file | Recommended direction |
 | --- | --- | --- | --- | --- |
-| `POST /api/v1/admin/models/train` | `phase_three_model_train` | `admin` | `admin_models` | Keep as explicit mutation. Remove `repository_mode` and `seed_demo` from the production contract. |
-| `POST /api/v1/admin/models/backtests/run` | `phase_four_model_backtest_run` | `admin` | `admin_backtests` | Keep as explicit backtest execution. |
-| `GET /api/v1/admin/models/backtests` | `phase_four_model_backtests` | `analyst` | `analyst_backtests` | Move stable summary listing here. Keep admin history separately. Remove `auto_run_demo`. |
-| `GET /api/v1/admin/models/backtests/history` | `phase_four_model_backtest_history` | `admin` | `admin_backtests` | Keep as operational run history. |
-| `GET /api/v1/admin/models/backtests/{backtest_run_id}` | `phase_four_model_backtest_detail` | `analyst` | `analyst_backtests` | Keep as analyst detail if the contract is stable and read-only. |
-| `GET /api/v1/admin/models/registry` | `phase_three_model_registry` | `admin` | `admin_models` | Keep as model registry admin view. Remove auto-training behavior from reads. |
-| `GET /api/v1/admin/models/runs` | `phase_three_model_runs` | `admin` | `admin_models` | Keep as admin run listing. |
-| `GET /api/v1/admin/models/runs/{run_id}` | `phase_three_model_run_detail` | `admin` | `admin_models` | Keep as admin run detail. |
-| `GET /api/v1/admin/models/summary` | `phase_three_model_summary` | `admin` | `admin_models` | Keep as admin summary view. |
-| `GET /api/v1/admin/models/history` | `phase_three_model_history` | `admin` | `admin_models` | Keep as admin history view. |
-| `GET /api/v1/admin/models/evaluations` | `phase_three_model_evaluations` | `admin` | `admin_models` | Keep as evaluation snapshot listing. |
-| `GET /api/v1/admin/models/evaluations/history` | `phase_three_model_evaluation_history` | `admin` | `admin_models` | Keep as operational history. |
-| `GET /api/v1/admin/models/evaluations/{snapshot_id}` | `phase_three_model_evaluation_detail` | `admin` | `admin_models` | Keep as evaluation detail. |
-| `POST /api/v1/admin/models/select` | `phase_three_model_select` | `admin` | `admin_models` | Keep as explicit active-model selection mutation. |
-| `GET /api/v1/admin/models/selections` | `phase_three_model_selections` | `admin` | `admin_models` | Keep as selection listing. |
-| `GET /api/v1/admin/models/selections/history` | `phase_three_model_selection_history` | `admin` | `admin_models` | Keep as admin history. |
-| `GET /api/v1/admin/models/selections/{selection_id}` | `phase_three_model_selection_detail` | `admin` | `admin_models` | Keep as selection detail. |
-| `GET /api/v1/admin/models/score-preview` | `phase_three_model_score_preview` | `admin` | `admin_models` | Keep as internal scoring preview, not analyst surface. Remove hidden auto-training and auto-selection. |
+| `GET` | `/api/v1/admin/providers` | `dev-only` | [backend/src/bookmaker_detector_api/api/admin_demo_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_demo_routes.py) | Keep only if clearly labeled as development/provider catalog |
+| `GET` | `/api/v1/admin/phase-1-demo` | `dev-only` | [backend/src/bookmaker_detector_api/api/admin_demo_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_demo_routes.py) | Move to dev-only mounts or scripts |
+| `GET` | `/api/v1/admin/phase-1-persistence-demo` | `dev-only` | [backend/src/bookmaker_detector_api/api/admin_demo_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_demo_routes.py) | Move to dev-only mounts or scripts |
+| `GET` | `/api/v1/admin/phase-1-worker-demo` | `dev-only` | [backend/src/bookmaker_detector_api/api/admin_demo_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_demo_routes.py) | Move to dev-only mounts or scripts |
+| `GET` | `/api/v1/admin/phase-1-fetch-demo` | `dev-only` | [backend/src/bookmaker_detector_api/api/admin_demo_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_demo_routes.py) | Move to dev-only mounts or scripts |
+| `GET` | `/api/v1/admin/phase-1-fetch-failure-demo` | `dev-only` | [backend/src/bookmaker_detector_api/api/admin_demo_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_demo_routes.py) | Move to dev-only mounts or scripts |
+| `GET` | `/api/v1/admin/phase-1-fetch-reporting-demo` | `dev-only` | [backend/src/bookmaker_detector_api/api/admin_demo_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_demo_routes.py) | Move to dev-only mounts or scripts |
 
-### Future Scenario and Slate Modeling
-| Route | Handler | Zone | Target module | Recommended action |
-| --- | --- | --- | --- | --- |
-| `GET /api/v1/admin/models/future-game-preview` | `phase_three_model_future_game_preview` | `admin` | `admin_models` | Keep as internal preview tooling; do not expose as stable analyst contract yet. |
-| `POST /api/v1/admin/models/future-game-preview/materialize` | `phase_three_model_future_game_preview_materialize` | `admin` | `admin_models` | Keep as explicit mutation. |
-| `GET /api/v1/admin/models/future-game-preview/runs` | `phase_three_model_future_game_preview_runs` | `admin` | `admin_models` | Keep as admin run listing. |
-| `GET /api/v1/admin/models/future-game-preview/runs/{scoring_run_id}` | `phase_three_model_future_game_preview_run_detail` | `admin` | `admin_models` | Keep as admin run detail. |
-| `GET /api/v1/admin/models/future-game-preview/history` | `phase_three_model_future_game_preview_history` | `admin` | `admin_models` | Keep as admin history. |
-| `POST /api/v1/admin/models/future-slate/preview` | `phase_three_model_future_slate_preview` | `admin` | `admin_models` | Keep as internal scenario-preview tooling. |
-| `POST /api/v1/admin/models/future-slate/materialize` | `phase_three_model_future_slate_materialize` | `admin` | `admin_models` | Keep as explicit mutation. |
-| `POST /api/v1/admin/models/future-game-preview/opportunities/materialize` | `phase_three_model_future_opportunity_materialize` | `admin` | `admin_models` | Keep as explicit mutation. |
+### Diagnostics
+| Method | Path | Zone | Source file |
+| --- | --- | --- | --- |
+| `GET` | `/api/v1/admin/jobs/recent` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_diagnostics_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_diagnostics_routes.py) |
+| `GET` | `/api/v1/admin/ingestion/issues` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_diagnostics_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_diagnostics_routes.py) |
+| `GET` | `/api/v1/admin/data-quality/issues` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_diagnostics_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_diagnostics_routes.py) |
+| `GET` | `/api/v1/admin/ingestion/stats` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_diagnostics_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_diagnostics_routes.py) |
+| `GET` | `/api/v1/admin/validation-runs/compare` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_diagnostics_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_diagnostics_routes.py) |
+| `GET` | `/api/v1/admin/ingestion/trends` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_diagnostics_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_diagnostics_routes.py) |
+| `GET` | `/api/v1/admin/retrieval/trends` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_diagnostics_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_diagnostics_routes.py) |
+| `GET` | `/api/v1/admin/ingestion/quality-trends` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_diagnostics_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_diagnostics_routes.py) |
 
-### Market Board Operations
-| Route | Handler | Zone | Target module | Recommended action |
-| --- | --- | --- | --- | --- |
-| `GET /api/v1/admin/models/market-board/sources` | `phase_three_model_market_board_sources` | `admin` | `admin_models` | Keep as admin source catalog. |
-| `POST /api/v1/admin/models/market-board/refresh` | `phase_three_model_market_board_refresh` | `admin` | `admin_models` | Keep as explicit refresh mutation. |
-| `GET /api/v1/admin/models/market-board/history` | `phase_three_model_market_board_history` | `admin` | `admin_models` | Keep as admin refresh history. |
-| `GET /api/v1/admin/models/market-board/source-runs` | `phase_three_model_market_board_source_runs` | `admin` | `admin_models` | Keep as admin source-run history. |
-| `GET /api/v1/admin/models/market-board/refresh-queue` | `phase_three_model_market_board_refresh_queue` | `admin` | `admin_models` | Keep as admin queue view. |
-| `GET /api/v1/admin/models/market-board/queue` | `phase_three_model_market_board_queue` | `admin` | `admin_models` | Keep as admin scoring queue view. |
-| `POST /api/v1/admin/models/market-board/orchestrate-refresh` | `phase_three_model_market_board_orchestrate_refresh` | `admin` | `admin_models` | Keep as explicit orchestration mutation. |
-| `POST /api/v1/admin/models/market-board/orchestrate-score` | `phase_three_model_market_board_orchestrate_score` | `admin` | `admin_models` | Keep as explicit orchestration mutation. |
-| `POST /api/v1/admin/models/market-board/orchestrate-cadence` | `phase_three_model_market_board_orchestrate_cadence` | `admin` | `admin_models` | Keep as explicit orchestration mutation. |
-| `GET /api/v1/admin/models/market-board/refresh-orchestration-history` | `phase_three_model_market_board_refresh_orchestration_history` | `admin` | `admin_models` | Keep as admin orchestration history. |
-| `GET /api/v1/admin/models/market-board/cadence-history` | `phase_three_model_market_board_cadence_history` | `admin` | `admin_models` | Keep as cadence history. |
-| `GET /api/v1/admin/models/market-board/orchestration-history` | `phase_three_model_market_board_orchestration_history` | `admin` | `admin_models` | Keep as orchestration history. |
-| `GET /api/v1/admin/models/market-board/cadence` | `phase_three_model_market_board_cadence` | `admin` | `admin_models` | Keep as admin cadence dashboard. |
-| `POST /api/v1/admin/models/market-board/materialize` | `phase_three_model_market_board_materialize` | `admin` | `admin_models` | Keep as explicit board creation mutation. |
-| `GET /api/v1/admin/models/market-board` | `phase_three_model_market_boards` | `admin` | `admin_models` | Keep as board listing. |
-| `GET /api/v1/admin/models/market-board/{board_id}` | `phase_three_model_market_board_detail` | `admin` | `admin_models` | Keep as board detail. |
-| `GET /api/v1/admin/models/market-board/{board_id}/operations` | `phase_three_model_market_board_operations` | `admin` | `admin_models` | Keep as admin operations summary. |
-| `POST /api/v1/admin/models/market-board/{board_id}/score` | `phase_three_model_market_board_score` | `admin` | `admin_models` | Keep as explicit score mutation. |
+### Feature artifacts and datasets
+| Method | Path | Zone | Source file |
+| --- | --- | --- | --- |
+| `GET` | `/api/v1/admin/phase-2-feature-demo` | `dev-only` | [backend/src/bookmaker_detector_api/api/admin_feature_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_feature_routes.py) |
+| `GET` | `/api/v1/admin/features/snapshots` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_feature_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_feature_routes.py) |
+| `GET` | `/api/v1/admin/features/dataset` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_feature_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_feature_routes.py) |
+| `GET` | `/api/v1/admin/features/dataset/profile` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_feature_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_feature_routes.py) |
+| `GET` | `/api/v1/admin/features/analysis/artifacts` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_feature_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_feature_routes.py) |
+| `GET` | `/api/v1/admin/features/analysis/history` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_feature_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_feature_routes.py) |
+| `GET` | `/api/v1/admin/features/dataset/splits` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_feature_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_feature_routes.py) |
+| `GET` | `/api/v1/admin/features/dataset/training-view` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_feature_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_feature_routes.py) |
+| `GET` | `/api/v1/admin/features/dataset/training-manifest` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_feature_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_feature_routes.py) |
+| `GET` | `/api/v1/admin/features/dataset/training-bundle` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_feature_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_feature_routes.py) |
+| `GET` | `/api/v1/admin/features/dataset/training-benchmark` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_feature_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_feature_routes.py) |
+| `GET` | `/api/v1/admin/features/dataset/training-task-matrix` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_feature_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_feature_routes.py) |
 
-### Opportunity Surface
-| Route | Handler | Zone | Target module | Recommended action |
-| --- | --- | --- | --- | --- |
-| `POST /api/v1/admin/models/opportunities/materialize` | `phase_three_model_opportunity_materialize` | `admin` | `admin_models` | Keep as explicit opportunity materialization mutation. |
-| `GET /api/v1/admin/models/opportunities` | `phase_three_model_opportunities` | `analyst` | `analyst_opportunities` | Promote to stable analyst list API after removing `seed_demo`, `auto_train_demo`, `auto_select_demo`, and `auto_materialize_demo`. |
-| `GET /api/v1/admin/models/opportunities/history` | `phase_three_model_opportunity_history` | `admin` | `admin_models` | Keep as admin history and audit view. |
-| `GET /api/v1/admin/models/opportunities/{opportunity_id}` | `phase_three_model_opportunity_detail` | `analyst` | `analyst_opportunities` | Promote to stable analyst detail API after cleanup. |
+### Model, opportunity, scoring, and market-board reads
+| Method | Path | Zone | Source file |
+| --- | --- | --- | --- |
+| `GET` | `/api/v1/admin/models/backtests/history` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_model_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_model_routes.py) |
+| `GET` | `/api/v1/admin/models/registry` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_model_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_model_routes.py) |
+| `GET` | `/api/v1/admin/models/runs` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_model_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_model_routes.py) |
+| `GET` | `/api/v1/admin/models/runs/{run_id}` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_model_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_model_routes.py) |
+| `GET` | `/api/v1/admin/models/summary` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_model_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_model_routes.py) |
+| `GET` | `/api/v1/admin/models/history` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_model_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_model_routes.py) |
+| `GET` | `/api/v1/admin/models/evaluations` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_model_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_model_routes.py) |
+| `GET` | `/api/v1/admin/models/evaluations/history` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_model_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_model_routes.py) |
+| `GET` | `/api/v1/admin/models/evaluations/{snapshot_id}` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_model_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_model_routes.py) |
+| `GET` | `/api/v1/admin/models/selections` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_model_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_model_routes.py) |
+| `GET` | `/api/v1/admin/models/selections/history` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_model_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_model_routes.py) |
+| `GET` | `/api/v1/admin/models/selections/{selection_id}` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_model_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_model_routes.py) |
+| `GET` | `/api/v1/admin/models/opportunities/history` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_opportunity_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_opportunity_routes.py) |
+| `GET` | `/api/v1/admin/models/score-preview` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_scoring_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_scoring_routes.py) |
+| `GET` | `/api/v1/admin/models/future-game-preview` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_scoring_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_scoring_routes.py) |
+| `GET` | `/api/v1/admin/models/future-game-preview/runs` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_scoring_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_scoring_routes.py) |
+| `GET` | `/api/v1/admin/models/future-game-preview/runs/{scoring_run_id}` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_scoring_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_scoring_routes.py) |
+| `GET` | `/api/v1/admin/models/future-game-preview/history` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_scoring_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_scoring_routes.py) |
+| `GET` | `/api/v1/admin/models/market-board/sources` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_market_board_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_market_board_routes.py) |
+| `GET` | `/api/v1/admin/models/market-board/history` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_market_board_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_market_board_routes.py) |
+| `GET` | `/api/v1/admin/models/market-board/source-runs` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_market_board_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_market_board_routes.py) |
+| `GET` | `/api/v1/admin/models/market-board/refresh-queue` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_market_board_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_market_board_routes.py) |
+| `GET` | `/api/v1/admin/models/market-board/queue` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_market_board_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_market_board_routes.py) |
+| `GET` | `/api/v1/admin/models/market-board/refresh-orchestration-history` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_market_board_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_market_board_routes.py) |
+| `GET` | `/api/v1/admin/models/market-board/cadence-history` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_market_board_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_market_board_routes.py) |
+| `GET` | `/api/v1/admin/models/market-board/orchestration-history` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_market_board_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_market_board_routes.py) |
+| `GET` | `/api/v1/admin/models/market-board/cadence` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_market_board_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_market_board_routes.py) |
+| `GET` | `/api/v1/admin/models/market-board` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_market_board_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_market_board_routes.py) |
+| `GET` | `/api/v1/admin/models/market-board/{board_id}` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_market_board_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_market_board_routes.py) |
+| `GET` | `/api/v1/admin/models/market-board/{board_id}/operations` | `admin-read` | [backend/src/bookmaker_detector_api/api/admin_market_board_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_market_board_routes.py) |
 
-### Feature, Pattern, and Evidence Surface
-| Route | Handler | Zone | Target module | Recommended action |
-| --- | --- | --- | --- | --- |
-| `GET /api/v1/admin/features/snapshots` | `feature_snapshots` | `admin` | `admin_features` | Keep as artifact/admin visibility, not stable analyst surface. |
-| `GET /api/v1/admin/features/summary` | `feature_summary` | `analyst` | `analyst_trends` | Promote as stable team trend summary once it is detached from demo seeding. |
-| `GET /api/v1/admin/features/dataset` | `feature_dataset` | `admin` | `admin_features` | Keep as internal analytical export/admin view. |
-| `GET /api/v1/admin/features/dataset/profile` | `feature_dataset_profile` | `admin` | `admin_features` | Keep as internal diagnostic/admin view. |
-| `GET /api/v1/admin/features/patterns` | `feature_patterns` | `analyst` | `analyst_patterns` | Promote as stable analyst pattern exploration. |
-| `GET /api/v1/admin/features/comparables` | `feature_comparables` | `analyst` | `analyst_patterns` | Promote as analyst comparable-case retrieval. |
-| `GET /api/v1/admin/features/evidence` | `feature_evidence` | `analyst` | `analyst_patterns` | Promote as analyst evidence/comparable detail. |
-| `POST /api/v1/admin/features/analysis/materialize` | `materialize_feature_analysis` | `admin` | `admin_features` | Keep as explicit artifact materialization mutation. |
-| `GET /api/v1/admin/features/analysis/artifacts` | `feature_analysis_artifacts` | `admin` | `admin_features` | Keep as admin artifact listing. |
-| `GET /api/v1/admin/features/analysis/history` | `feature_analysis_history` | `admin` | `admin_features` | Keep as admin artifact history. |
-| `GET /api/v1/admin/features/dataset/splits` | `feature_dataset_splits` | `admin` | `admin_features` | Keep as internal data-science/admin view. |
-| `GET /api/v1/admin/features/dataset/training-view` | `feature_dataset_training_view` | `admin` | `admin_features` | Keep as internal training/admin view. |
-| `GET /api/v1/admin/features/dataset/training-manifest` | `feature_dataset_training_manifest` | `admin` | `admin_features` | Keep as admin training metadata. |
-| `GET /api/v1/admin/features/dataset/training-bundle` | `feature_dataset_training_bundle` | `admin` | `admin_features` | Keep as internal training/admin view. |
-| `GET /api/v1/admin/features/dataset/training-benchmark` | `feature_dataset_training_benchmark` | `admin` | `admin_features` | Keep as internal benchmark/admin view. |
-| `GET /api/v1/admin/features/dataset/training-task-matrix` | `feature_dataset_training_task_matrix` | `admin` | `admin_features` | Keep as internal task-readiness/admin view. |
+## Admin Mutation
 
-### Ingestion, Quality, and Maintenance
-| Route | Handler | Zone | Target module | Recommended action |
-| --- | --- | --- | --- | --- |
-| `GET /api/v1/admin/jobs/recent` | `recent_job_runs` | `admin` | `admin_ingestion` | Keep as admin operational view. |
-| `GET /api/v1/admin/ingestion/issues` | `recent_ingestion_issues` | `admin` | `admin_ingestion` | Keep as admin issue listing. |
-| `GET /api/v1/admin/data-quality/issues` | `recent_data_quality_issues` | `admin` | `admin_ingestion` | Keep as admin issue listing. |
-| `GET /api/v1/admin/ingestion/stats` | `ingestion_stats` | `admin` | `admin_ingestion` | Keep as admin stats surface. |
-| `GET /api/v1/admin/validation-runs/compare` | `compare_validation_runs` | `admin` | `admin_maintenance` | Keep as admin validation comparison. |
-| `GET /api/v1/admin/ingestion/trends` | `ingestion_trends` | `admin` | `admin_ingestion` | Keep as admin trend surface. |
-| `GET /api/v1/admin/retrieval/trends` | `retrieval_trends` | `admin` | `admin_ingestion` | Keep as admin retrieval trend surface. |
-| `GET /api/v1/admin/ingestion/quality-trends` | `ingestion_quality_trends` | `admin` | `admin_ingestion` | Keep as admin quality-trend surface. |
-| `POST /api/v1/admin/data-quality/normalize-taxonomy` | `normalize_data_quality_issue_taxonomy` | `admin` | `admin_maintenance` | Keep as explicit maintenance mutation. |
+| Method | Path | Zone | Source file |
+| --- | --- | --- | --- |
+| `POST` | `/api/v1/admin/data-quality/normalize-taxonomy` | `admin-mutation` | [backend/src/bookmaker_detector_api/api/admin_diagnostics_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_diagnostics_routes.py) |
+| `POST` | `/api/v1/admin/features/analysis/materialize` | `admin-mutation` | [backend/src/bookmaker_detector_api/api/admin_feature_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_feature_routes.py) |
+| `POST` | `/api/v1/admin/models/train` | `admin-mutation` | [backend/src/bookmaker_detector_api/api/admin_model_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_model_routes.py) |
+| `POST` | `/api/v1/admin/models/backtests/run` | `admin-mutation` | [backend/src/bookmaker_detector_api/api/admin_model_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_model_routes.py) |
+| `POST` | `/api/v1/admin/models/select` | `admin-mutation` | [backend/src/bookmaker_detector_api/api/admin_model_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_model_routes.py) |
+| `POST` | `/api/v1/admin/models/future-game-preview/opportunities/materialize` | `admin-mutation` | [backend/src/bookmaker_detector_api/api/admin_opportunity_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_opportunity_routes.py) |
+| `POST` | `/api/v1/admin/models/opportunities/materialize` | `admin-mutation` | [backend/src/bookmaker_detector_api/api/admin_opportunity_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_opportunity_routes.py) |
+| `POST` | `/api/v1/admin/models/future-game-preview/materialize` | `admin-mutation` | [backend/src/bookmaker_detector_api/api/admin_scoring_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_scoring_routes.py) |
+| `POST` | `/api/v1/admin/models/future-slate/preview` | `admin-mutation` | [backend/src/bookmaker_detector_api/api/admin_scoring_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_scoring_routes.py) |
+| `POST` | `/api/v1/admin/models/future-slate/materialize` | `admin-mutation` | [backend/src/bookmaker_detector_api/api/admin_scoring_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_scoring_routes.py) |
+| `POST` | `/api/v1/admin/models/market-board/refresh` | `admin-mutation` | [backend/src/bookmaker_detector_api/api/admin_market_board_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_market_board_routes.py) |
+| `POST` | `/api/v1/admin/models/market-board/orchestrate-refresh` | `admin-mutation` | [backend/src/bookmaker_detector_api/api/admin_market_board_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_market_board_routes.py) |
+| `POST` | `/api/v1/admin/models/market-board/orchestrate-score` | `admin-mutation` | [backend/src/bookmaker_detector_api/api/admin_market_board_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_market_board_routes.py) |
+| `POST` | `/api/v1/admin/models/market-board/orchestrate-cadence` | `admin-mutation` | [backend/src/bookmaker_detector_api/api/admin_market_board_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_market_board_routes.py) |
+| `POST` | `/api/v1/admin/models/market-board/materialize` | `admin-mutation` | [backend/src/bookmaker_detector_api/api/admin_market_board_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_market_board_routes.py) |
+| `POST` | `/api/v1/admin/models/market-board/{board_id}/score` | `admin-mutation` | [backend/src/bookmaker_detector_api/api/admin_market_board_routes.py](C:\Users\Ivica\Downloads\bookmakers-mistake-detector\backend\src\bookmaker_detector_api\api\admin_market_board_routes.py) |
 
-## Recommended First Refactor Cut
-The lowest-risk first router split is:
-
-1. Create `analyst_opportunities.py`
-2. Move:
-   - `GET /models/opportunities`
-   - `GET /models/opportunities/{opportunity_id}`
-3. Create `analyst_backtests.py`
-4. Move:
-   - `GET /models/backtests`
-   - `GET /models/backtests/{backtest_run_id}`
-5. Create `analyst_patterns.py`
-6. Move:
-   - `GET /features/patterns`
-   - `GET /features/comparables`
-   - `GET /features/evidence`
-7. Create `analyst_trends.py`
-8. Move:
-   - `GET /features/summary`
-
-These are the clearest analyst-facing reads in the current file.
-
-## Follow-On Cleanup Rules
-- No analyst route should accept `seed_demo`, `repository_mode`, or any `auto_*` parameter.
-- No analyst GET route should perform training, selection, refresh, scoring, or materialization.
-- Admin mutation routes should remain explicit `POST` operations.
-- Demo and phase-specific routes should not ship inside the production router tree.
+## Immediate findings for the refactor
+- Analyst routes are mounted under their own namespace, but some still perform seed/train/materialize work when `settings.api_env != "production"`.
+- Admin diagnostics and feature routes still use in-memory seeded fallback behavior in non-production, which means many `GET` responses are not truly side-effect-free in development.
+- Demo routes are already isolated into `admin_demo_routes.py`, which is a good boundary for future dev-only mounting.
+- The stable route topology is far better than the older mega-router state, but the contract-hardening and side-effect cleanup work described in the SDD is still required.
