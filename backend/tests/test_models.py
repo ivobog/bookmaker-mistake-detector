@@ -127,6 +127,34 @@ def test_train_phase_three_models_in_memory_persists_baseline_runs() -> None:
     }
 
 
+def test_training_and_promotion_in_memory_emit_structured_workflow_logs(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    repository, _, _ = seed_phase_two_feature_in_memory()
+
+    with caplog.at_level(logging.INFO, logger=WORKFLOW_LOGGER_NAME):
+        training_result = train_phase_three_models_in_memory(
+            repository,
+            target_task="spread_error_regression",
+            train_ratio=0.5,
+            validation_ratio=0.25,
+        )
+        promotion_result = promote_best_model_in_memory(
+            repository,
+            target_task="spread_error_regression",
+        )
+
+    events = _workflow_events(caplog)
+    succeeded = [entry for entry in events if entry["event"] == "workflow_succeeded"]
+    assert [entry["workflow_name"] for entry in succeeded] == [
+        "model_training.train",
+        "model_training.promote",
+    ]
+    assert succeeded[0]["persisted_run_count"] == training_result["persisted_run_count"]
+    assert succeeded[1]["selection_count"] == promotion_result["selection_count"]
+    assert succeeded[1]["active_selection_id"] == promotion_result["active_selection"]["id"]
+
+
 def test_run_model_backtest_in_memory_persists_walk_forward_summary() -> None:
     repository, _, _ = seed_phase_two_feature_in_memory()
 
@@ -452,14 +480,14 @@ def test_materialize_model_opportunities_in_memory_emits_structured_workflow_log
         )
 
     events = _workflow_events(caplog)
-    assert [entry["event"] for entry in events] == [
-        "workflow_started",
-        "workflow_succeeded",
+    succeeded = [entry for entry in events if entry["event"] == "workflow_succeeded"]
+    assert [entry["workflow_name"] for entry in succeeded] == [
+        "model_scoring.preview",
+        "model_opportunities.materialize",
     ]
-    assert events[0]["workflow_name"] == "model_opportunities.materialize"
-    assert events[1]["opportunity_count"] == materialized["opportunity_count"]
-    assert events[1]["materialized_count"] == materialized["materialized_count"]
-    assert events[1]["scoring_preview_count"] == materialized["scored_prediction_count"]
+    assert succeeded[1]["opportunity_count"] == materialized["opportunity_count"]
+    assert succeeded[1]["materialized_count"] == materialized["materialized_count"]
+    assert succeeded[1]["scoring_preview_count"] == materialized["scored_prediction_count"]
 
 
 def test_get_model_future_game_preview_in_memory_scores_both_perspectives() -> None:
@@ -536,6 +564,64 @@ def test_materialize_model_future_game_preview_in_memory_persists_scoring_run() 
     )
     assert len(stored) == 1
     assert stored[0].prediction_count == 2
+
+
+def test_scoring_preview_and_future_game_materialization_emit_structured_workflow_logs(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    repository, _, _ = seed_phase_two_feature_in_memory()
+    train_phase_three_models_in_memory(
+        repository,
+        target_task="spread_error_regression",
+        train_ratio=0.5,
+        validation_ratio=0.25,
+    )
+    promote_best_model_in_memory(
+        repository,
+        target_task="spread_error_regression",
+    )
+
+    with caplog.at_level(logging.INFO, logger=WORKFLOW_LOGGER_NAME):
+        preview = get_model_scoring_preview_in_memory(
+            repository,
+            target_task="spread_error_regression",
+            team_code="LAL",
+            season_label="2024-2025",
+            canonical_game_id=3,
+            limit=5,
+            include_evidence=True,
+            train_ratio=0.5,
+            validation_ratio=0.25,
+        )
+        materialized = materialize_model_future_game_preview_in_memory(
+            repository,
+            target_task="spread_error_regression",
+            season_label="2025-2026",
+            game_date=date(2026, 4, 20),
+            home_team_code="LAL",
+            away_team_code="BOS",
+            home_spread_line=-3.5,
+            total_line=228.5,
+            include_evidence=True,
+            train_ratio=0.5,
+            validation_ratio=0.25,
+        )
+
+    events = _workflow_events(caplog)
+    succeeded = [entry for entry in events if entry["event"] == "workflow_succeeded"]
+    workflow_names = [entry["workflow_name"] for entry in succeeded]
+    assert "model_scoring.preview" in workflow_names
+    assert "model_scoring.future_game_materialize" in workflow_names
+    preview_success = next(
+        entry for entry in succeeded if entry["workflow_name"] == "model_scoring.preview"
+    )
+    materialize_success = next(
+        entry
+        for entry in succeeded
+        if entry["workflow_name"] == "model_scoring.future_game_materialize"
+    )
+    assert preview_success["scored_prediction_count"] == preview["scored_prediction_count"]
+    assert materialize_success["scoring_run_id"] == materialized["scoring_run"]["id"]
 
 
 def test_get_model_scoring_run_detail_and_history_in_memory_return_persisted_preview() -> None:
@@ -729,6 +815,81 @@ def test_materialize_model_future_slate_in_memory_persists_batch_runs_and_opport
     )
     assert len(stored_runs) == 2
     assert len(stored_opportunities) >= 2
+
+
+def test_future_slate_preview_and_materialization_emit_structured_workflow_logs(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    repository, _, _ = seed_phase_two_feature_in_memory()
+    train_phase_three_models_in_memory(
+        repository,
+        target_task="spread_error_regression",
+        train_ratio=0.5,
+        validation_ratio=0.25,
+    )
+    promote_best_model_in_memory(
+        repository,
+        target_task="spread_error_regression",
+    )
+    games = [
+        {
+            "season_label": "2025-2026",
+            "game_date": date(2026, 4, 20),
+            "home_team_code": "LAL",
+            "away_team_code": "BOS",
+            "home_spread_line": -3.5,
+            "total_line": 228.5,
+        },
+        {
+            "season_label": "2025-2026",
+            "game_date": date(2026, 4, 21),
+            "home_team_code": "NYK",
+            "away_team_code": "MIA",
+            "home_spread_line": -1.5,
+            "total_line": 219.5,
+        },
+    ]
+
+    with caplog.at_level(logging.INFO, logger=WORKFLOW_LOGGER_NAME):
+        preview = get_model_future_slate_preview_in_memory(
+            repository,
+            target_task="spread_error_regression",
+            slate_label="demo-slate",
+            games=games,
+            include_evidence=True,
+            train_ratio=0.5,
+            validation_ratio=0.25,
+        )
+        materialized = materialize_model_future_slate_in_memory(
+            repository,
+            target_task="spread_error_regression",
+            slate_label="demo-slate",
+            games=games,
+            include_evidence=True,
+            train_ratio=0.5,
+            validation_ratio=0.25,
+        )
+
+    events = _workflow_events(caplog)
+    succeeded = [entry for entry in events if entry["event"] == "workflow_succeeded"]
+    workflow_names = [entry["workflow_name"] for entry in succeeded]
+    assert "model_scoring.future_slate_preview" in workflow_names
+    assert "model_scoring.future_slate_materialize" in workflow_names
+    preview_success = next(
+        entry
+        for entry in succeeded
+        if entry["workflow_name"] == "model_scoring.future_slate_preview"
+    )
+    materialize_success = next(
+        entry
+        for entry in succeeded
+        if entry["workflow_name"] == "model_scoring.future_slate_materialize"
+    )
+    assert preview_success["game_preview_count"] == preview["game_preview_count"]
+    assert (
+        materialize_success["materialized_scoring_run_count"]
+        == materialized["materialized_scoring_run_count"]
+    )
 
 
 def test_materialize_model_market_board_in_memory_persists_board() -> None:

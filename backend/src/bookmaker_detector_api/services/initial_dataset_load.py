@@ -15,6 +15,7 @@ from bookmaker_detector_api.services.ingestion_pipeline import (
     HistoricalIngestionRequest,
     ingest_historical_team_page,
 )
+from bookmaker_detector_api.services.workflow_logging import start_workflow_span
 from bookmaker_detector_api.team_normalization import (
     slugify_team_name,
     team_identity_keys,
@@ -63,57 +64,83 @@ def run_initial_production_dataset_load(
     browser_fallback: bool = False,
 ) -> dict[str, object]:
     provider = CoversHistoricalTeamPageProvider()
+    span = start_workflow_span(
+        workflow_name="ingestion.initial_dataset_load",
+        provider_name=provider.provider_name,
+        base_url=base_url,
+        requested_by=requested_by,
+        run_label=run_label,
+        continue_on_error=continue_on_error,
+        persist_payload=persist_payload,
+        browser_fallback=browser_fallback,
+        team_codes=team_codes,
+        season_labels=season_labels,
+    )
 
-    with postgres_connection() as connection:
-        targets = build_initial_dataset_load_targets(
-            connection,
-            provider=provider,
-            base_url=base_url,
-            team_codes=team_codes,
-            season_labels=season_labels,
-        )
-        repository = _build_bootstrap_repository(connection)
-
-        results: list[dict[str, object]] = []
-        stopped_early = False
-
-        for target in targets:
-            target_results, target_stopped_early = _run_target_load(
-                repository=repository,
+    try:
+        with postgres_connection() as connection:
+            targets = build_initial_dataset_load_targets(
+                connection,
                 provider=provider,
-                target=target,
-                requested_by=requested_by,
-                run_label=run_label,
-                continue_on_error=continue_on_error,
-                persist_payload=persist_payload,
-                browser_fallback=browser_fallback,
+                base_url=base_url,
+                team_codes=team_codes,
+                season_labels=season_labels,
             )
-            results.extend(target_results)
-            if target_stopped_early:
-                stopped_early = True
-                break
+            repository = _build_bootstrap_repository(connection)
 
-    failed_count = sum(1 for result in results if result["status"] == "FAILED")
-    completed_count = sum(1 for result in results if result["status"] == "COMPLETED")
+            results: list[dict[str, object]] = []
+            stopped_early = False
 
-    return {
-        "status": "FAILED" if failed_count else "COMPLETED",
-        "provider_name": provider.provider_name,
-        "base_url": base_url,
-        "requested_by": requested_by,
-        "run_label": run_label,
-        "continue_on_error": continue_on_error,
-        "persist_payload": persist_payload,
-        "browser_fallback": browser_fallback,
-        "team_page_target_count": len(targets),
-        "target_count": sum(len(target.season_labels) for target in targets),
-        "processed_target_count": len(results),
-        "completed_target_count": completed_count,
-        "failed_target_count": failed_count,
-        "stopped_early": stopped_early,
-        "targets": [asdict(target) for target in targets],
-        "results": results,
-    }
+            for target in targets:
+                target_results, target_stopped_early = _run_target_load(
+                    repository=repository,
+                    provider=provider,
+                    target=target,
+                    requested_by=requested_by,
+                    run_label=run_label,
+                    continue_on_error=continue_on_error,
+                    persist_payload=persist_payload,
+                    browser_fallback=browser_fallback,
+                )
+                results.extend(target_results)
+                if target_stopped_early:
+                    stopped_early = True
+                    break
+
+        failed_count = sum(1 for result in results if result["status"] == "FAILED")
+        completed_count = sum(1 for result in results if result["status"] == "COMPLETED")
+
+        response = {
+            "status": "FAILED" if failed_count else "COMPLETED",
+            "provider_name": provider.provider_name,
+            "base_url": base_url,
+            "requested_by": requested_by,
+            "run_label": run_label,
+            "continue_on_error": continue_on_error,
+            "persist_payload": persist_payload,
+            "browser_fallback": browser_fallback,
+            "team_page_target_count": len(targets),
+            "target_count": sum(len(target.season_labels) for target in targets),
+            "processed_target_count": len(results),
+            "completed_target_count": completed_count,
+            "failed_target_count": failed_count,
+            "stopped_early": stopped_early,
+            "targets": [asdict(target) for target in targets],
+            "results": results,
+        }
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    span.success(
+        status=response["status"],
+        team_page_target_count=response["team_page_target_count"],
+        target_count=response["target_count"],
+        processed_target_count=response["processed_target_count"],
+        completed_target_count=response["completed_target_count"],
+        failed_target_count=response["failed_target_count"],
+        stopped_early=response["stopped_early"],
+    )
+    return response
 
 
 def build_initial_dataset_load_targets(

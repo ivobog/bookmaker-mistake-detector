@@ -178,42 +178,63 @@ def train_phase_three_models_in_memory(
     train_ratio: float = 0.7,
     validation_ratio: float = 0.15,
 ) -> dict[str, Any]:
-    feature_version = get_feature_version_in_memory(repository, feature_key=feature_key)
-    if feature_version is None:
-        return {
-            "feature_version": None,
-            "dataset_row_count": 0,
-            "model_runs": [],
-            "best_model": None,
-        }
-    dataset_rows = _load_training_dataset_rows_in_memory(
-        repository,
-        feature_version_id=feature_version.id,
-        team_code=team_code,
-        season_label=season_label,
-    )
-    return _train_phase_three_models(
-        dataset_rows=dataset_rows,
-        feature_version=feature_version,
-        team_code=team_code,
-        season_label=season_label,
+    span = start_workflow_span(
+        workflow_name="model_training.train",
+        storage_mode="in_memory",
+        feature_key=feature_key,
         target_task=target_task,
+        team_code=team_code,
+        season_label=season_label,
         train_ratio=train_ratio,
         validation_ratio=validation_ratio,
-        ensure_registry=lambda model_family: ensure_model_registry_in_memory(
-            repository,
-            target_task=target_task,
-            model_family=model_family,
-            team_code=team_code,
-        ),
-        save_run=lambda run: save_model_training_run_in_memory(repository, run),
-        list_runs=lambda: list_model_training_runs_in_memory(
-            repository,
-            target_task=target_task,
-            team_code=team_code,
-            season_label=season_label,
-        ),
     )
+    try:
+        feature_version = get_feature_version_in_memory(repository, feature_key=feature_key)
+        if feature_version is None:
+            result = {
+                "feature_version": None,
+                "dataset_row_count": 0,
+                "model_runs": [],
+                "best_model": None,
+            }
+        else:
+            dataset_rows = _load_training_dataset_rows_in_memory(
+                repository,
+                feature_version_id=feature_version.id,
+                team_code=team_code,
+                season_label=season_label,
+            )
+            result = _train_phase_three_models(
+                dataset_rows=dataset_rows,
+                feature_version=feature_version,
+                team_code=team_code,
+                season_label=season_label,
+                target_task=target_task,
+                train_ratio=train_ratio,
+                validation_ratio=validation_ratio,
+                ensure_registry=lambda model_family: ensure_model_registry_in_memory(
+                    repository,
+                    target_task=target_task,
+                    model_family=model_family,
+                    team_code=team_code,
+                ),
+                save_run=lambda run: save_model_training_run_in_memory(repository, run),
+                list_runs=lambda: list_model_training_runs_in_memory(
+                    repository,
+                    target_task=target_task,
+                    team_code=team_code,
+                    season_label=season_label,
+                ),
+            )
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    span.success(
+        dataset_row_count=int(result.get("dataset_row_count", 0)),
+        persisted_run_count=int(result.get("persisted_run_count", 0)),
+        best_model_id=(result.get("best_model") or {}).get("id"),
+    )
+    return result
 
 
 def train_phase_three_models_postgres(
@@ -226,42 +247,63 @@ def train_phase_three_models_postgres(
     train_ratio: float = 0.7,
     validation_ratio: float = 0.15,
 ) -> dict[str, Any]:
-    feature_version = get_feature_version_postgres(connection, feature_key=feature_key)
-    if feature_version is None:
-        return {
-            "feature_version": None,
-            "dataset_row_count": 0,
-            "model_runs": [],
-            "best_model": None,
-        }
-    dataset_rows = _load_training_dataset_rows_postgres(
-        connection,
-        feature_version_id=feature_version.id,
-        team_code=team_code,
-        season_label=season_label,
-    )
-    return _train_phase_three_models(
-        dataset_rows=dataset_rows,
-        feature_version=feature_version,
-        team_code=team_code,
-        season_label=season_label,
+    span = start_workflow_span(
+        workflow_name="model_training.train",
+        storage_mode="postgres",
+        feature_key=feature_key,
         target_task=target_task,
+        team_code=team_code,
+        season_label=season_label,
         train_ratio=train_ratio,
         validation_ratio=validation_ratio,
-        ensure_registry=lambda model_family: ensure_model_registry_postgres(
-            connection,
-            target_task=target_task,
-            model_family=model_family,
-            team_code=team_code,
-        ),
-        save_run=lambda run: save_model_training_run_postgres(connection, run),
-        list_runs=lambda: list_model_training_runs_postgres(
-            connection,
-            target_task=target_task,
-            team_code=team_code,
-            season_label=season_label,
-        ),
     )
+    try:
+        feature_version = get_feature_version_postgres(connection, feature_key=feature_key)
+        if feature_version is None:
+            result = {
+                "feature_version": None,
+                "dataset_row_count": 0,
+                "model_runs": [],
+                "best_model": None,
+            }
+        else:
+            dataset_rows = _load_training_dataset_rows_postgres(
+                connection,
+                feature_version_id=feature_version.id,
+                team_code=team_code,
+                season_label=season_label,
+            )
+            result = _train_phase_three_models(
+                dataset_rows=dataset_rows,
+                feature_version=feature_version,
+                team_code=team_code,
+                season_label=season_label,
+                target_task=target_task,
+                train_ratio=train_ratio,
+                validation_ratio=validation_ratio,
+                ensure_registry=lambda model_family: ensure_model_registry_postgres(
+                    connection,
+                    target_task=target_task,
+                    model_family=model_family,
+                    team_code=team_code,
+                ),
+                save_run=lambda run: save_model_training_run_postgres(connection, run),
+                list_runs=lambda: list_model_training_runs_postgres(
+                    connection,
+                    target_task=target_task,
+                    team_code=team_code,
+                    season_label=season_label,
+                ),
+            )
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    span.success(
+        dataset_row_count=int(result.get("dataset_row_count", 0)),
+        persisted_run_count=int(result.get("persisted_run_count", 0)),
+        best_model_id=(result.get("best_model") or {}).get("id"),
+    )
+    return result
 
 
 def list_model_registry_in_memory(
@@ -581,11 +623,27 @@ def promote_best_model_in_memory(
     target_task: str,
     selection_policy_name: str = "validation_mae_candidate_v1",
 ) -> dict[str, Any]:
-    return model_training_lifecycle.promote_best_model_in_memory(
-        repository,
+    span = start_workflow_span(
+        workflow_name="model_training.promote",
+        storage_mode="in_memory",
         target_task=target_task,
         selection_policy_name=selection_policy_name,
     )
+    try:
+        result = model_training_lifecycle.promote_best_model_in_memory(
+            repository,
+            target_task=target_task,
+            selection_policy_name=selection_policy_name,
+        )
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    span.success(
+        selection_count=int(result.get("selection_count", 0)),
+        active_selection_id=(result.get("active_selection") or {}).get("id"),
+        selected_snapshot_id=(result.get("selected_snapshot") or {}).get("id"),
+    )
+    return result
 
 
 def promote_best_model_postgres(
@@ -594,11 +652,27 @@ def promote_best_model_postgres(
     target_task: str,
     selection_policy_name: str = "validation_mae_candidate_v1",
 ) -> dict[str, Any]:
-    return model_training_lifecycle.promote_best_model_postgres(
-        connection,
+    span = start_workflow_span(
+        workflow_name="model_training.promote",
+        storage_mode="postgres",
         target_task=target_task,
         selection_policy_name=selection_policy_name,
     )
+    try:
+        result = model_training_lifecycle.promote_best_model_postgres(
+            connection,
+            target_task=target_task,
+            selection_policy_name=selection_policy_name,
+        )
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    span.success(
+        selection_count=int(result.get("selection_count", 0)),
+        active_selection_id=(result.get("active_selection") or {}).get("id"),
+        selected_snapshot_id=(result.get("selected_snapshot") or {}).get("id"),
+    )
+    return result
 
 
 def get_model_scoring_preview_in_memory(
@@ -618,61 +692,84 @@ def get_model_scoring_preview_in_memory(
     validation_ratio: float = 0.15,
     drop_null_targets: bool = True,
 ) -> dict[str, Any]:
-    feature_version = get_feature_version_in_memory(repository, feature_key=feature_key)
-    if feature_version is None:
-        return {
-            "feature_version": None,
-            "active_selection": None,
-            "active_evaluation_snapshot": None,
-            "row_count": 0,
-            "scored_prediction_count": 0,
-            "prediction_summary": {},
-            "predictions": [],
-        }
-    active_selection = model_scoring_previews.resolve_active_model_selection(
-        selections=list_model_selection_snapshots_in_memory(
-            repository,
-            target_task=target_task,
-            active_only=True,
-        ),
-    )
-    active_snapshot = model_scoring_previews.resolve_evaluation_snapshot_by_id(
-        snapshots=list_model_evaluation_snapshots_in_memory(
-            repository,
-            target_task=target_task,
-        ),
-        snapshot_id=(
-            active_selection.model_evaluation_snapshot_id if active_selection is not None else None
-        ),
-    )
-    dataset_rows = _load_training_dataset_rows_in_memory(
-        repository,
-        feature_version_id=feature_version.id,
+    span = start_workflow_span(
+        workflow_name="model_scoring.preview",
+        storage_mode="in_memory",
+        feature_key=feature_key,
+        target_task=target_task,
         team_code=team_code,
         season_label=season_label,
-    )
-    scoring_result = model_scoring_previews.build_model_scoring_preview(
-        dataset_rows=dataset_rows,
-        target_task=target_task,
-        active_selection=active_selection,
-        active_snapshot=active_snapshot,
         canonical_game_id=canonical_game_id,
         limit=limit,
-        include_evidence=include_evidence,
-        evidence_dimensions=evidence_dimensions,
-        comparable_limit=comparable_limit,
-        min_pattern_sample_size=min_pattern_sample_size,
-        train_ratio=train_ratio,
-        validation_ratio=validation_ratio,
-        drop_null_targets=drop_null_targets,
-        predict_linear=_predict_linear,
-        predict_tree_stump=_predict_tree_stump,
-        get_row_feature_value=_get_row_feature_value,
     )
-    return {
-        "feature_version": asdict(feature_version),
-        **scoring_result,
-    }
+    try:
+        feature_version = get_feature_version_in_memory(repository, feature_key=feature_key)
+        if feature_version is None:
+            result = {
+                "feature_version": None,
+                "active_selection": None,
+                "active_evaluation_snapshot": None,
+                "row_count": 0,
+                "scored_prediction_count": 0,
+                "prediction_summary": {},
+                "predictions": [],
+            }
+        else:
+            active_selection = model_scoring_previews.resolve_active_model_selection(
+                selections=list_model_selection_snapshots_in_memory(
+                    repository,
+                    target_task=target_task,
+                    active_only=True,
+                ),
+            )
+            active_snapshot = model_scoring_previews.resolve_evaluation_snapshot_by_id(
+                snapshots=list_model_evaluation_snapshots_in_memory(
+                    repository,
+                    target_task=target_task,
+                ),
+                snapshot_id=(
+                    active_selection.model_evaluation_snapshot_id
+                    if active_selection is not None
+                    else None
+                ),
+            )
+            dataset_rows = _load_training_dataset_rows_in_memory(
+                repository,
+                feature_version_id=feature_version.id,
+                team_code=team_code,
+                season_label=season_label,
+            )
+            scoring_result = model_scoring_previews.build_model_scoring_preview(
+                dataset_rows=dataset_rows,
+                target_task=target_task,
+                active_selection=active_selection,
+                active_snapshot=active_snapshot,
+                canonical_game_id=canonical_game_id,
+                limit=limit,
+                include_evidence=include_evidence,
+                evidence_dimensions=evidence_dimensions,
+                comparable_limit=comparable_limit,
+                min_pattern_sample_size=min_pattern_sample_size,
+                train_ratio=train_ratio,
+                validation_ratio=validation_ratio,
+                drop_null_targets=drop_null_targets,
+                predict_linear=_predict_linear,
+                predict_tree_stump=_predict_tree_stump,
+                get_row_feature_value=_get_row_feature_value,
+            )
+            result = {
+                "feature_version": asdict(feature_version),
+                **scoring_result,
+            }
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    span.success(
+        row_count=int(result.get("row_count", 0)),
+        scored_prediction_count=int(result.get("scored_prediction_count", 0)),
+        active_selection_id=(result.get("active_selection") or {}).get("id"),
+    )
+    return result
 
 
 def get_model_scoring_preview_postgres(
@@ -692,61 +789,84 @@ def get_model_scoring_preview_postgres(
     validation_ratio: float = 0.15,
     drop_null_targets: bool = True,
 ) -> dict[str, Any]:
-    feature_version = get_feature_version_postgres(connection, feature_key=feature_key)
-    if feature_version is None:
-        return {
-            "feature_version": None,
-            "active_selection": None,
-            "active_evaluation_snapshot": None,
-            "row_count": 0,
-            "scored_prediction_count": 0,
-            "prediction_summary": {},
-            "predictions": [],
-        }
-    active_selection = model_scoring_previews.resolve_active_model_selection(
-        selections=list_model_selection_snapshots_postgres(
-            connection,
-            target_task=target_task,
-            active_only=True,
-        ),
-    )
-    active_snapshot = model_scoring_previews.resolve_evaluation_snapshot_by_id(
-        snapshots=list_model_evaluation_snapshots_postgres(
-            connection,
-            target_task=target_task,
-        ),
-        snapshot_id=(
-            active_selection.model_evaluation_snapshot_id if active_selection is not None else None
-        ),
-    )
-    dataset_rows = _load_training_dataset_rows_postgres(
-        connection,
-        feature_version_id=feature_version.id,
+    span = start_workflow_span(
+        workflow_name="model_scoring.preview",
+        storage_mode="postgres",
+        feature_key=feature_key,
+        target_task=target_task,
         team_code=team_code,
         season_label=season_label,
-    )
-    scoring_result = model_scoring_previews.build_model_scoring_preview(
-        dataset_rows=dataset_rows,
-        target_task=target_task,
-        active_selection=active_selection,
-        active_snapshot=active_snapshot,
         canonical_game_id=canonical_game_id,
         limit=limit,
-        include_evidence=include_evidence,
-        evidence_dimensions=evidence_dimensions,
-        comparable_limit=comparable_limit,
-        min_pattern_sample_size=min_pattern_sample_size,
-        train_ratio=train_ratio,
-        validation_ratio=validation_ratio,
-        drop_null_targets=drop_null_targets,
-        predict_linear=_predict_linear,
-        predict_tree_stump=_predict_tree_stump,
-        get_row_feature_value=_get_row_feature_value,
     )
-    return {
-        "feature_version": asdict(feature_version),
-        **scoring_result,
-    }
+    try:
+        feature_version = get_feature_version_postgres(connection, feature_key=feature_key)
+        if feature_version is None:
+            result = {
+                "feature_version": None,
+                "active_selection": None,
+                "active_evaluation_snapshot": None,
+                "row_count": 0,
+                "scored_prediction_count": 0,
+                "prediction_summary": {},
+                "predictions": [],
+            }
+        else:
+            active_selection = model_scoring_previews.resolve_active_model_selection(
+                selections=list_model_selection_snapshots_postgres(
+                    connection,
+                    target_task=target_task,
+                    active_only=True,
+                ),
+            )
+            active_snapshot = model_scoring_previews.resolve_evaluation_snapshot_by_id(
+                snapshots=list_model_evaluation_snapshots_postgres(
+                    connection,
+                    target_task=target_task,
+                ),
+                snapshot_id=(
+                    active_selection.model_evaluation_snapshot_id
+                    if active_selection is not None
+                    else None
+                ),
+            )
+            dataset_rows = _load_training_dataset_rows_postgres(
+                connection,
+                feature_version_id=feature_version.id,
+                team_code=team_code,
+                season_label=season_label,
+            )
+            scoring_result = model_scoring_previews.build_model_scoring_preview(
+                dataset_rows=dataset_rows,
+                target_task=target_task,
+                active_selection=active_selection,
+                active_snapshot=active_snapshot,
+                canonical_game_id=canonical_game_id,
+                limit=limit,
+                include_evidence=include_evidence,
+                evidence_dimensions=evidence_dimensions,
+                comparable_limit=comparable_limit,
+                min_pattern_sample_size=min_pattern_sample_size,
+                train_ratio=train_ratio,
+                validation_ratio=validation_ratio,
+                drop_null_targets=drop_null_targets,
+                predict_linear=_predict_linear,
+                predict_tree_stump=_predict_tree_stump,
+                get_row_feature_value=_get_row_feature_value,
+            )
+            result = {
+                "feature_version": asdict(feature_version),
+                **scoring_result,
+            }
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    span.success(
+        row_count=int(result.get("row_count", 0)),
+        scored_prediction_count=int(result.get("scored_prediction_count", 0)),
+        active_selection_id=(result.get("active_selection") or {}).get("id"),
+    )
+    return result
 
 
 def get_model_future_game_preview_in_memory(
@@ -768,74 +888,97 @@ def get_model_future_game_preview_in_memory(
     validation_ratio: float = 0.15,
     drop_null_targets: bool = True,
 ) -> dict[str, Any]:
-    feature_version = get_feature_version_in_memory(repository, feature_key=feature_key)
-    if feature_version is None:
-        return {
-            "feature_version": None,
-            "active_selection": None,
-            "active_evaluation_snapshot": None,
-            "scenario": None,
-            "scored_prediction_count": 0,
-            "prediction_summary": {},
-            "predictions": [],
-            "opportunity_preview": [],
-        }
-    active_selection = model_scoring_previews.resolve_active_model_selection(
-        selections=list_model_selection_snapshots_in_memory(
-            repository,
-            target_task=target_task,
-            active_only=True,
-        ),
-    )
-    active_snapshot = model_scoring_previews.resolve_evaluation_snapshot_by_id(
-        snapshots=list_model_evaluation_snapshots_in_memory(
-            repository,
-            target_task=target_task,
-        ),
-        snapshot_id=(
-            active_selection.model_evaluation_snapshot_id if active_selection is not None else None
-        ),
-    )
-    canonical_games = list_canonical_game_metric_records_in_memory(repository)
-    historical_dataset_rows = _load_training_dataset_rows_in_memory(
-        repository,
-        feature_version_id=feature_version.id,
-        team_code=None,
-        season_label=None,
-    )
-    scenario_rows = build_future_feature_dataset_rows(
-        canonical_games,
-        feature_version_id=feature_version.id,
+    span = start_workflow_span(
+        workflow_name="model_scoring.future_game_preview",
+        storage_mode="in_memory",
+        feature_key=feature_key,
+        target_task=target_task,
         season_label=season_label,
         game_date=game_date,
         home_team_code=home_team_code,
         away_team_code=away_team_code,
-        home_spread_line=home_spread_line,
-        total_line=total_line,
     )
-    return {
-        "feature_version": asdict(feature_version),
-        **model_scoring_previews.build_model_future_game_preview(
-            target_task=target_task,
-            active_selection=active_selection,
-            active_snapshot=active_snapshot,
-            historical_dataset_rows=historical_dataset_rows,
-            scenario_rows=scenario_rows,
-            include_evidence=include_evidence,
-            evidence_dimensions=evidence_dimensions,
-            comparable_limit=comparable_limit,
-            min_pattern_sample_size=min_pattern_sample_size,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-            drop_null_targets=drop_null_targets,
-            predict_linear=_predict_linear,
-            predict_tree_stump=_predict_tree_stump,
-            get_row_feature_value=_get_row_feature_value,
-            evaluate_opportunity_status=model_opportunities.evaluate_opportunity_status,
-            nested_get=model_opportunities.nested_get,
-            opportunity_policy=OPPORTUNITY_POLICY_CONFIGS.get(target_task),
-        ),
-    }
+    try:
+        feature_version = get_feature_version_in_memory(repository, feature_key=feature_key)
+        if feature_version is None:
+            result = {
+                "feature_version": None,
+                "active_selection": None,
+                "active_evaluation_snapshot": None,
+                "scenario": None,
+                "scored_prediction_count": 0,
+                "prediction_summary": {},
+                "predictions": [],
+                "opportunity_preview": [],
+            }
+        else:
+            active_selection = model_scoring_previews.resolve_active_model_selection(
+                selections=list_model_selection_snapshots_in_memory(
+                    repository,
+                    target_task=target_task,
+                    active_only=True,
+                ),
+            )
+            active_snapshot = model_scoring_previews.resolve_evaluation_snapshot_by_id(
+                snapshots=list_model_evaluation_snapshots_in_memory(
+                    repository,
+                    target_task=target_task,
+                ),
+                snapshot_id=(
+                    active_selection.model_evaluation_snapshot_id
+                    if active_selection is not None
+                    else None
+                ),
+            )
+            canonical_games = list_canonical_game_metric_records_in_memory(repository)
+            historical_dataset_rows = _load_training_dataset_rows_in_memory(
+                repository,
+                feature_version_id=feature_version.id,
+                team_code=None,
+                season_label=None,
+            )
+            scenario_rows = build_future_feature_dataset_rows(
+                canonical_games,
+                feature_version_id=feature_version.id,
+                season_label=season_label,
+                game_date=game_date,
+                home_team_code=home_team_code,
+                away_team_code=away_team_code,
+                home_spread_line=home_spread_line,
+                total_line=total_line,
+            )
+            result = {
+                "feature_version": asdict(feature_version),
+                **model_scoring_previews.build_model_future_game_preview(
+                    target_task=target_task,
+                    active_selection=active_selection,
+                    active_snapshot=active_snapshot,
+                    historical_dataset_rows=historical_dataset_rows,
+                    scenario_rows=scenario_rows,
+                    include_evidence=include_evidence,
+                    evidence_dimensions=evidence_dimensions,
+                    comparable_limit=comparable_limit,
+                    min_pattern_sample_size=min_pattern_sample_size,
+                    train_ratio=train_ratio,
+                    validation_ratio=validation_ratio,
+                    drop_null_targets=drop_null_targets,
+                    predict_linear=_predict_linear,
+                    predict_tree_stump=_predict_tree_stump,
+                    get_row_feature_value=_get_row_feature_value,
+                    evaluate_opportunity_status=model_opportunities.evaluate_opportunity_status,
+                    nested_get=model_opportunities.nested_get,
+                    opportunity_policy=OPPORTUNITY_POLICY_CONFIGS.get(target_task),
+                ),
+            }
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    span.success(
+        scored_prediction_count=int(result.get("scored_prediction_count", 0)),
+        scenario_key=(result.get("scenario") or {}).get("scenario_key"),
+        opportunity_preview_count=len(result.get("opportunity_preview", [])),
+    )
+    return result
 
 
 def get_model_future_game_preview_postgres(
@@ -857,74 +1000,97 @@ def get_model_future_game_preview_postgres(
     validation_ratio: float = 0.15,
     drop_null_targets: bool = True,
 ) -> dict[str, Any]:
-    feature_version = get_feature_version_postgres(connection, feature_key=feature_key)
-    if feature_version is None:
-        return {
-            "feature_version": None,
-            "active_selection": None,
-            "active_evaluation_snapshot": None,
-            "scenario": None,
-            "scored_prediction_count": 0,
-            "prediction_summary": {},
-            "predictions": [],
-            "opportunity_preview": [],
-        }
-    active_selection = model_scoring_previews.resolve_active_model_selection(
-        selections=list_model_selection_snapshots_postgres(
-            connection,
-            target_task=target_task,
-            active_only=True,
-        ),
-    )
-    active_snapshot = model_scoring_previews.resolve_evaluation_snapshot_by_id(
-        snapshots=list_model_evaluation_snapshots_postgres(
-            connection,
-            target_task=target_task,
-        ),
-        snapshot_id=(
-            active_selection.model_evaluation_snapshot_id if active_selection is not None else None
-        ),
-    )
-    canonical_games = list_canonical_game_metric_records_postgres(connection)
-    historical_dataset_rows = _load_training_dataset_rows_postgres(
-        connection,
-        feature_version_id=feature_version.id,
-        team_code=None,
-        season_label=None,
-    )
-    scenario_rows = build_future_feature_dataset_rows(
-        canonical_games,
-        feature_version_id=feature_version.id,
+    span = start_workflow_span(
+        workflow_name="model_scoring.future_game_preview",
+        storage_mode="postgres",
+        feature_key=feature_key,
+        target_task=target_task,
         season_label=season_label,
         game_date=game_date,
         home_team_code=home_team_code,
         away_team_code=away_team_code,
-        home_spread_line=home_spread_line,
-        total_line=total_line,
     )
-    return {
-        "feature_version": asdict(feature_version),
-        **model_scoring_previews.build_model_future_game_preview(
-            target_task=target_task,
-            active_selection=active_selection,
-            active_snapshot=active_snapshot,
-            historical_dataset_rows=historical_dataset_rows,
-            scenario_rows=scenario_rows,
-            include_evidence=include_evidence,
-            evidence_dimensions=evidence_dimensions,
-            comparable_limit=comparable_limit,
-            min_pattern_sample_size=min_pattern_sample_size,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-            drop_null_targets=drop_null_targets,
-            predict_linear=_predict_linear,
-            predict_tree_stump=_predict_tree_stump,
-            get_row_feature_value=_get_row_feature_value,
-            evaluate_opportunity_status=model_opportunities.evaluate_opportunity_status,
-            nested_get=model_opportunities.nested_get,
-            opportunity_policy=OPPORTUNITY_POLICY_CONFIGS.get(target_task),
-        ),
-    }
+    try:
+        feature_version = get_feature_version_postgres(connection, feature_key=feature_key)
+        if feature_version is None:
+            result = {
+                "feature_version": None,
+                "active_selection": None,
+                "active_evaluation_snapshot": None,
+                "scenario": None,
+                "scored_prediction_count": 0,
+                "prediction_summary": {},
+                "predictions": [],
+                "opportunity_preview": [],
+            }
+        else:
+            active_selection = model_scoring_previews.resolve_active_model_selection(
+                selections=list_model_selection_snapshots_postgres(
+                    connection,
+                    target_task=target_task,
+                    active_only=True,
+                ),
+            )
+            active_snapshot = model_scoring_previews.resolve_evaluation_snapshot_by_id(
+                snapshots=list_model_evaluation_snapshots_postgres(
+                    connection,
+                    target_task=target_task,
+                ),
+                snapshot_id=(
+                    active_selection.model_evaluation_snapshot_id
+                    if active_selection is not None
+                    else None
+                ),
+            )
+            canonical_games = list_canonical_game_metric_records_postgres(connection)
+            historical_dataset_rows = _load_training_dataset_rows_postgres(
+                connection,
+                feature_version_id=feature_version.id,
+                team_code=None,
+                season_label=None,
+            )
+            scenario_rows = build_future_feature_dataset_rows(
+                canonical_games,
+                feature_version_id=feature_version.id,
+                season_label=season_label,
+                game_date=game_date,
+                home_team_code=home_team_code,
+                away_team_code=away_team_code,
+                home_spread_line=home_spread_line,
+                total_line=total_line,
+            )
+            result = {
+                "feature_version": asdict(feature_version),
+                **model_scoring_previews.build_model_future_game_preview(
+                    target_task=target_task,
+                    active_selection=active_selection,
+                    active_snapshot=active_snapshot,
+                    historical_dataset_rows=historical_dataset_rows,
+                    scenario_rows=scenario_rows,
+                    include_evidence=include_evidence,
+                    evidence_dimensions=evidence_dimensions,
+                    comparable_limit=comparable_limit,
+                    min_pattern_sample_size=min_pattern_sample_size,
+                    train_ratio=train_ratio,
+                    validation_ratio=validation_ratio,
+                    drop_null_targets=drop_null_targets,
+                    predict_linear=_predict_linear,
+                    predict_tree_stump=_predict_tree_stump,
+                    get_row_feature_value=_get_row_feature_value,
+                    evaluate_opportunity_status=model_opportunities.evaluate_opportunity_status,
+                    nested_get=model_opportunities.nested_get,
+                    opportunity_policy=OPPORTUNITY_POLICY_CONFIGS.get(target_task),
+                ),
+            }
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    span.success(
+        scored_prediction_count=int(result.get("scored_prediction_count", 0)),
+        scenario_key=(result.get("scenario") or {}).get("scenario_key"),
+        opportunity_preview_count=len(result.get("opportunity_preview", [])),
+    )
+    return result
 
 
 def materialize_model_future_game_preview_in_memory(
@@ -947,36 +1113,59 @@ def materialize_model_future_game_preview_in_memory(
     validation_ratio: float = 0.15,
     drop_null_targets: bool = True,
 ) -> dict[str, Any]:
-    preview = get_model_future_game_preview_in_memory(
-        repository,
+    span = start_workflow_span(
+        workflow_name="model_scoring.future_game_materialize",
+        storage_mode="in_memory",
         feature_key=feature_key,
         target_task=target_task,
         season_label=season_label,
         game_date=game_date,
         home_team_code=home_team_code,
         away_team_code=away_team_code,
-        home_spread_line=home_spread_line,
-        total_line=total_line,
-        include_evidence=include_evidence,
-        evidence_dimensions=evidence_dimensions,
-        comparable_limit=comparable_limit,
-        min_pattern_sample_size=min_pattern_sample_size,
-        train_ratio=train_ratio,
-        validation_ratio=validation_ratio,
-        drop_null_targets=drop_null_targets,
-    )
-    return model_future_scenarios.materialize_future_game_preview(
-        preview=preview,
-        target_task=target_task,
-        default_policy_name=OPPORTUNITY_POLICY_CONFIGS.get(target_task, {}).get("policy_name"),
         model_market_board_id=model_market_board_id,
-        build_scoring_run=model_scoring_runs.build_model_scoring_run,
-        save_scoring_run=lambda scoring_run: model_scoring_runs.save_model_scoring_run_in_memory(
-            repository,
-            scoring_run,
-        ),
-        serialize_scoring_run=_serialize_model_scoring_run,
     )
+    try:
+        preview = get_model_future_game_preview_in_memory(
+            repository,
+            feature_key=feature_key,
+            target_task=target_task,
+            season_label=season_label,
+            game_date=game_date,
+            home_team_code=home_team_code,
+            away_team_code=away_team_code,
+            home_spread_line=home_spread_line,
+            total_line=total_line,
+            include_evidence=include_evidence,
+            evidence_dimensions=evidence_dimensions,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            drop_null_targets=drop_null_targets,
+        )
+        result = model_future_scenarios.materialize_future_game_preview(
+            preview=preview,
+            target_task=target_task,
+            default_policy_name=OPPORTUNITY_POLICY_CONFIGS.get(target_task, {}).get("policy_name"),
+            model_market_board_id=model_market_board_id,
+            build_scoring_run=model_scoring_runs.build_model_scoring_run,
+            save_scoring_run=lambda scoring_run: (
+                model_scoring_runs.save_model_scoring_run_in_memory(
+                    repository,
+                    scoring_run,
+                )
+            ),
+            serialize_scoring_run=_serialize_model_scoring_run,
+        )
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    span.success(
+        scored_prediction_count=int(result.get("scored_prediction_count", 0)),
+        materialized_count=int(result.get("materialized_count", 0)),
+        scoring_run_id=(result.get("scoring_run") or {}).get("id"),
+    )
+    return result
 
 
 def materialize_model_future_game_preview_postgres(
@@ -999,36 +1188,59 @@ def materialize_model_future_game_preview_postgres(
     validation_ratio: float = 0.15,
     drop_null_targets: bool = True,
 ) -> dict[str, Any]:
-    preview = get_model_future_game_preview_postgres(
-        connection,
+    span = start_workflow_span(
+        workflow_name="model_scoring.future_game_materialize",
+        storage_mode="postgres",
         feature_key=feature_key,
         target_task=target_task,
         season_label=season_label,
         game_date=game_date,
         home_team_code=home_team_code,
         away_team_code=away_team_code,
-        home_spread_line=home_spread_line,
-        total_line=total_line,
-        include_evidence=include_evidence,
-        evidence_dimensions=evidence_dimensions,
-        comparable_limit=comparable_limit,
-        min_pattern_sample_size=min_pattern_sample_size,
-        train_ratio=train_ratio,
-        validation_ratio=validation_ratio,
-        drop_null_targets=drop_null_targets,
-    )
-    return model_future_scenarios.materialize_future_game_preview(
-        preview=preview,
-        target_task=target_task,
-        default_policy_name=OPPORTUNITY_POLICY_CONFIGS.get(target_task, {}).get("policy_name"),
         model_market_board_id=model_market_board_id,
-        build_scoring_run=model_scoring_runs.build_model_scoring_run,
-        save_scoring_run=lambda scoring_run: model_scoring_runs.save_model_scoring_run_postgres(
-            connection,
-            scoring_run,
-        ),
-        serialize_scoring_run=_serialize_model_scoring_run,
     )
+    try:
+        preview = get_model_future_game_preview_postgres(
+            connection,
+            feature_key=feature_key,
+            target_task=target_task,
+            season_label=season_label,
+            game_date=game_date,
+            home_team_code=home_team_code,
+            away_team_code=away_team_code,
+            home_spread_line=home_spread_line,
+            total_line=total_line,
+            include_evidence=include_evidence,
+            evidence_dimensions=evidence_dimensions,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            drop_null_targets=drop_null_targets,
+        )
+        result = model_future_scenarios.materialize_future_game_preview(
+            preview=preview,
+            target_task=target_task,
+            default_policy_name=OPPORTUNITY_POLICY_CONFIGS.get(target_task, {}).get("policy_name"),
+            model_market_board_id=model_market_board_id,
+            build_scoring_run=model_scoring_runs.build_model_scoring_run,
+            save_scoring_run=lambda scoring_run: (
+                model_scoring_runs.save_model_scoring_run_postgres(
+                    connection,
+                    scoring_run,
+                )
+            ),
+            serialize_scoring_run=_serialize_model_scoring_run,
+        )
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    span.success(
+        scored_prediction_count=int(result.get("scored_prediction_count", 0)),
+        materialized_count=int(result.get("materialized_count", 0)),
+        scoring_run_id=(result.get("scoring_run") or {}).get("id"),
+    )
+    return result
 
 
 def list_model_scoring_runs_in_memory(
@@ -1382,33 +1594,51 @@ def get_model_future_slate_preview_in_memory(
     validation_ratio: float = 0.15,
     drop_null_targets: bool = True,
 ) -> dict[str, Any]:
-    return model_future_scenarios.get_future_slate_preview(
-        games=games,
+    span = start_workflow_span(
+        workflow_name="model_scoring.future_slate_preview",
+        storage_mode="in_memory",
+        feature_key=feature_key,
         target_task=target_task,
         slate_label=slate_label,
-        preview_loader=lambda game: get_model_future_game_preview_in_memory(
-            repository,
-            feature_key=feature_key,
-            target_task=target_task,
-            season_label=str(game["season_label"]),
-            game_date=model_future_scenarios.coerce_date(game["game_date"]),
-            home_team_code=str(game["home_team_code"]),
-            away_team_code=str(game["away_team_code"]),
-            home_spread_line=_float_or_none(game.get("home_spread_line")),
-            total_line=_float_or_none(game.get("total_line")),
-            include_evidence=include_evidence,
-            evidence_dimensions=evidence_dimensions,
-            comparable_limit=comparable_limit,
-            min_pattern_sample_size=min_pattern_sample_size,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-            drop_null_targets=drop_null_targets,
-        ),
-        serialize_input=lambda game: model_future_scenarios.serialize_future_game_input(
-            game,
-            float_or_none=_float_or_none,
-        ),
+        game_count=len(games),
     )
+    try:
+        result = model_future_scenarios.get_future_slate_preview(
+            games=games,
+            target_task=target_task,
+            slate_label=slate_label,
+            preview_loader=lambda game: get_model_future_game_preview_in_memory(
+                repository,
+                feature_key=feature_key,
+                target_task=target_task,
+                season_label=str(game["season_label"]),
+                game_date=model_future_scenarios.coerce_date(game["game_date"]),
+                home_team_code=str(game["home_team_code"]),
+                away_team_code=str(game["away_team_code"]),
+                home_spread_line=_float_or_none(game.get("home_spread_line")),
+                total_line=_float_or_none(game.get("total_line")),
+                include_evidence=include_evidence,
+                evidence_dimensions=evidence_dimensions,
+                comparable_limit=comparable_limit,
+                min_pattern_sample_size=min_pattern_sample_size,
+                train_ratio=train_ratio,
+                validation_ratio=validation_ratio,
+                drop_null_targets=drop_null_targets,
+            ),
+            serialize_input=lambda game: model_future_scenarios.serialize_future_game_input(
+                game,
+                float_or_none=_float_or_none,
+            ),
+        )
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    span.success(
+        game_preview_count=int(result.get("game_preview_count", 0)),
+        scored_prediction_count=int(result.get("scored_prediction_count", 0)),
+        slate_key=(result.get("slate") or {}).get("slate_key"),
+    )
+    return result
 
 
 def get_model_future_slate_preview_postgres(
@@ -1426,33 +1656,51 @@ def get_model_future_slate_preview_postgres(
     validation_ratio: float = 0.15,
     drop_null_targets: bool = True,
 ) -> dict[str, Any]:
-    return model_future_scenarios.get_future_slate_preview(
-        games=games,
+    span = start_workflow_span(
+        workflow_name="model_scoring.future_slate_preview",
+        storage_mode="postgres",
+        feature_key=feature_key,
         target_task=target_task,
         slate_label=slate_label,
-        preview_loader=lambda game: get_model_future_game_preview_postgres(
-            connection,
-            feature_key=feature_key,
-            target_task=target_task,
-            season_label=str(game["season_label"]),
-            game_date=model_future_scenarios.coerce_date(game["game_date"]),
-            home_team_code=str(game["home_team_code"]),
-            away_team_code=str(game["away_team_code"]),
-            home_spread_line=_float_or_none(game.get("home_spread_line")),
-            total_line=_float_or_none(game.get("total_line")),
-            include_evidence=include_evidence,
-            evidence_dimensions=evidence_dimensions,
-            comparable_limit=comparable_limit,
-            min_pattern_sample_size=min_pattern_sample_size,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-            drop_null_targets=drop_null_targets,
-        ),
-        serialize_input=lambda game: model_future_scenarios.serialize_future_game_input(
-            game,
-            float_or_none=_float_or_none,
-        ),
+        game_count=len(games),
     )
+    try:
+        result = model_future_scenarios.get_future_slate_preview(
+            games=games,
+            target_task=target_task,
+            slate_label=slate_label,
+            preview_loader=lambda game: get_model_future_game_preview_postgres(
+                connection,
+                feature_key=feature_key,
+                target_task=target_task,
+                season_label=str(game["season_label"]),
+                game_date=model_future_scenarios.coerce_date(game["game_date"]),
+                home_team_code=str(game["home_team_code"]),
+                away_team_code=str(game["away_team_code"]),
+                home_spread_line=_float_or_none(game.get("home_spread_line")),
+                total_line=_float_or_none(game.get("total_line")),
+                include_evidence=include_evidence,
+                evidence_dimensions=evidence_dimensions,
+                comparable_limit=comparable_limit,
+                min_pattern_sample_size=min_pattern_sample_size,
+                train_ratio=train_ratio,
+                validation_ratio=validation_ratio,
+                drop_null_targets=drop_null_targets,
+            ),
+            serialize_input=lambda game: model_future_scenarios.serialize_future_game_input(
+                game,
+                float_or_none=_float_or_none,
+            ),
+        )
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    span.success(
+        game_preview_count=int(result.get("game_preview_count", 0)),
+        scored_prediction_count=int(result.get("scored_prediction_count", 0)),
+        slate_key=(result.get("slate") or {}).get("slate_key"),
+    )
+    return result
 
 
 def materialize_model_future_slate_in_memory(
@@ -1471,43 +1719,62 @@ def materialize_model_future_slate_in_memory(
     validation_ratio: float = 0.15,
     drop_null_targets: bool = True,
 ) -> dict[str, Any]:
-    return model_future_scenarios.materialize_future_slate(
-        games=games,
+    span = start_workflow_span(
+        workflow_name="model_scoring.future_slate_materialize",
+        storage_mode="in_memory",
+        feature_key=feature_key,
         target_task=target_task,
         slate_label=slate_label,
-        materialize_preview_loader=lambda game: materialize_model_future_game_preview_in_memory(
-            repository,
-            model_market_board_id=model_market_board_id,
-            feature_key=feature_key,
-            target_task=target_task,
-            season_label=str(game["season_label"]),
-            game_date=model_future_scenarios.coerce_date(game["game_date"]),
-            home_team_code=str(game["home_team_code"]),
-            away_team_code=str(game["away_team_code"]),
-            home_spread_line=_float_or_none(game.get("home_spread_line")),
-            total_line=_float_or_none(game.get("total_line")),
-            include_evidence=include_evidence,
-            evidence_dimensions=evidence_dimensions,
-            comparable_limit=comparable_limit,
-            min_pattern_sample_size=min_pattern_sample_size,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-            drop_null_targets=drop_null_targets,
-        ),
-        build_opportunities=lambda **kwargs: model_opportunities.build_model_opportunities(
-            **kwargs,
-            policy=OPPORTUNITY_POLICY_CONFIGS.get(target_task),
-        ),
-        save_opportunities=lambda opportunities: save_model_opportunities_in_memory(
-            repository,
-            opportunities,
-        ),
-        serialize_opportunity=_serialize_model_opportunity,
-        serialize_input=lambda game: model_future_scenarios.serialize_future_game_input(
-            game,
-            float_or_none=_float_or_none,
-        ),
+        game_count=len(games),
+        model_market_board_id=model_market_board_id,
     )
+    try:
+        result = model_future_scenarios.materialize_future_slate(
+            games=games,
+            target_task=target_task,
+            slate_label=slate_label,
+            materialize_preview_loader=lambda game: materialize_model_future_game_preview_in_memory(
+                repository,
+                model_market_board_id=model_market_board_id,
+                feature_key=feature_key,
+                target_task=target_task,
+                season_label=str(game["season_label"]),
+                game_date=model_future_scenarios.coerce_date(game["game_date"]),
+                home_team_code=str(game["home_team_code"]),
+                away_team_code=str(game["away_team_code"]),
+                home_spread_line=_float_or_none(game.get("home_spread_line")),
+                total_line=_float_or_none(game.get("total_line")),
+                include_evidence=include_evidence,
+                evidence_dimensions=evidence_dimensions,
+                comparable_limit=comparable_limit,
+                min_pattern_sample_size=min_pattern_sample_size,
+                train_ratio=train_ratio,
+                validation_ratio=validation_ratio,
+                drop_null_targets=drop_null_targets,
+            ),
+            build_opportunities=lambda **kwargs: model_opportunities.build_model_opportunities(
+                **kwargs,
+                policy=OPPORTUNITY_POLICY_CONFIGS.get(target_task),
+            ),
+            save_opportunities=lambda opportunities: save_model_opportunities_in_memory(
+                repository,
+                opportunities,
+            ),
+            serialize_opportunity=_serialize_model_opportunity,
+            serialize_input=lambda game: model_future_scenarios.serialize_future_game_input(
+                game,
+                float_or_none=_float_or_none,
+            ),
+        )
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    span.success(
+        materialized_scoring_run_count=int(result.get("materialized_scoring_run_count", 0)),
+        materialized_opportunity_count=int(result.get("materialized_opportunity_count", 0)),
+        slate_key=(result.get("slate") or {}).get("slate_key"),
+    )
+    return result
 
 
 def materialize_model_future_slate_postgres(
@@ -1526,43 +1793,62 @@ def materialize_model_future_slate_postgres(
     validation_ratio: float = 0.15,
     drop_null_targets: bool = True,
 ) -> dict[str, Any]:
-    return model_future_scenarios.materialize_future_slate(
-        games=games,
+    span = start_workflow_span(
+        workflow_name="model_scoring.future_slate_materialize",
+        storage_mode="postgres",
+        feature_key=feature_key,
         target_task=target_task,
         slate_label=slate_label,
-        materialize_preview_loader=lambda game: materialize_model_future_game_preview_postgres(
-            connection,
-            model_market_board_id=model_market_board_id,
-            feature_key=feature_key,
-            target_task=target_task,
-            season_label=str(game["season_label"]),
-            game_date=model_future_scenarios.coerce_date(game["game_date"]),
-            home_team_code=str(game["home_team_code"]),
-            away_team_code=str(game["away_team_code"]),
-            home_spread_line=_float_or_none(game.get("home_spread_line")),
-            total_line=_float_or_none(game.get("total_line")),
-            include_evidence=include_evidence,
-            evidence_dimensions=evidence_dimensions,
-            comparable_limit=comparable_limit,
-            min_pattern_sample_size=min_pattern_sample_size,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-            drop_null_targets=drop_null_targets,
-        ),
-        build_opportunities=lambda **kwargs: model_opportunities.build_model_opportunities(
-            **kwargs,
-            policy=OPPORTUNITY_POLICY_CONFIGS.get(target_task),
-        ),
-        save_opportunities=lambda opportunities: save_model_opportunities_postgres(
-            connection,
-            opportunities,
-        ),
-        serialize_opportunity=_serialize_model_opportunity,
-        serialize_input=lambda game: model_future_scenarios.serialize_future_game_input(
-            game,
-            float_or_none=_float_or_none,
-        ),
+        game_count=len(games),
+        model_market_board_id=model_market_board_id,
     )
+    try:
+        result = model_future_scenarios.materialize_future_slate(
+            games=games,
+            target_task=target_task,
+            slate_label=slate_label,
+            materialize_preview_loader=lambda game: materialize_model_future_game_preview_postgres(
+                connection,
+                model_market_board_id=model_market_board_id,
+                feature_key=feature_key,
+                target_task=target_task,
+                season_label=str(game["season_label"]),
+                game_date=model_future_scenarios.coerce_date(game["game_date"]),
+                home_team_code=str(game["home_team_code"]),
+                away_team_code=str(game["away_team_code"]),
+                home_spread_line=_float_or_none(game.get("home_spread_line")),
+                total_line=_float_or_none(game.get("total_line")),
+                include_evidence=include_evidence,
+                evidence_dimensions=evidence_dimensions,
+                comparable_limit=comparable_limit,
+                min_pattern_sample_size=min_pattern_sample_size,
+                train_ratio=train_ratio,
+                validation_ratio=validation_ratio,
+                drop_null_targets=drop_null_targets,
+            ),
+            build_opportunities=lambda **kwargs: model_opportunities.build_model_opportunities(
+                **kwargs,
+                policy=OPPORTUNITY_POLICY_CONFIGS.get(target_task),
+            ),
+            save_opportunities=lambda opportunities: save_model_opportunities_postgres(
+                connection,
+                opportunities,
+            ),
+            serialize_opportunity=_serialize_model_opportunity,
+            serialize_input=lambda game: model_future_scenarios.serialize_future_game_input(
+                game,
+                float_or_none=_float_or_none,
+            ),
+        )
+    except Exception as exc:
+        span.failure(exc)
+        raise
+    span.success(
+        materialized_scoring_run_count=int(result.get("materialized_scoring_run_count", 0)),
+        materialized_opportunity_count=int(result.get("materialized_opportunity_count", 0)),
+        slate_key=(result.get("slate") or {}).get("slate_key"),
+    )
+    return result
 
 
 def materialize_model_market_board_in_memory(

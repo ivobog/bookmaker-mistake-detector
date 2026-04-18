@@ -1,6 +1,9 @@
+import json
+import logging
 from datetime import date, datetime, timezone
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from bookmaker_detector_api import demo as demo_module
@@ -29,8 +32,17 @@ from bookmaker_detector_api.services.model_records import (
     ModelSelectionSnapshotRecord,
     ModelTrainingRunRecord,
 )
+from bookmaker_detector_api.services.workflow_logging import WORKFLOW_LOGGER_NAME
 
 client = TestClient(app)
+
+
+def _workflow_events(caplog: pytest.LogCaptureFixture) -> list[dict[str, object]]:
+    return [
+        json.loads(record.getMessage())
+        for record in caplog.records
+        if record.name == WORKFLOW_LOGGER_NAME
+    ]
 
 
 def test_admin_provider_listing() -> None:
@@ -176,6 +188,30 @@ def test_phase_three_model_train_endpoint_returns_ranked_baseline_runs() -> None
     assert payload["best_model"]["artifact"]["model_family"] == "linear_feature"
     assert "selection_metrics" in payload["model_runs"][0]["artifact"]
     assert "split_target_summary" in payload["model_runs"][0]["artifact"]
+
+
+def test_phase_three_model_train_endpoint_propagates_request_trace_context_to_workflow_logs(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.INFO, logger=WORKFLOW_LOGGER_NAME):
+        response = client.post(
+            "/api/v1/admin/models/train"
+            "?target_task=spread_error_regression&train_ratio=0.5&validation_ratio=0.25",
+            headers={"X-Request-ID": "phase5-trace-001"},
+        )
+
+    assert response.status_code == 200
+    assert response.headers["X-Request-ID"] == "phase5-trace-001"
+    events = _workflow_events(caplog)
+    training_success = next(
+        entry
+        for entry in events
+        if entry["event"] == "workflow_succeeded"
+        and entry["workflow_name"] == "model_training.train"
+    )
+    assert training_success["request_trace_id"] == "phase5-trace-001"
+    assert training_success["request_method"] == "POST"
+    assert training_success["request_path"] == "/api/v1/admin/models/train"
 
 
 def test_phase_three_model_registry_endpoint_returns_empty_without_hidden_seeding() -> None:

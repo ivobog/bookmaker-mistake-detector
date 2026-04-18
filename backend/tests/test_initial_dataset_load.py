@@ -1,3 +1,5 @@
+import json
+import logging
 from contextlib import contextmanager
 
 from bookmaker_detector_api.config import settings
@@ -6,12 +8,21 @@ from bookmaker_detector_api.ingestion.providers import (
 )
 from bookmaker_detector_api.repositories import InMemoryIngestionRepository
 from bookmaker_detector_api.services import initial_dataset_load as loader
+from bookmaker_detector_api.services.workflow_logging import WORKFLOW_LOGGER_NAME
 from tests.support.covers_fixtures import (
     DEFAULT_INDEX_URL,
     DEFAULT_TEAM_PAGE_URL,
     build_fixture_backed_covers_provider,
     load_covers_fixture,
 )
+
+
+def _workflow_events(caplog) -> list[dict[str, object]]:
+    return [
+        json.loads(record.getMessage())
+        for record in caplog.records
+        if record.name == WORKFLOW_LOGGER_NAME
+    ]
 
 
 def test_build_initial_dataset_load_targets_matches_discovered_team_pages(monkeypatch) -> None:
@@ -229,6 +240,95 @@ def test_run_initial_production_dataset_load_fetches_each_team_page_once(monkeyp
         for entry in result["results"]
     )
     assert all(entry["parser_snapshot_path"] == "parser-output.json" for entry in result["results"])
+
+
+def test_run_initial_production_dataset_load_emits_structured_workflow_logs(
+    monkeypatch, caplog
+) -> None:
+    @contextmanager
+    def fake_postgres_connection():
+        yield object()
+
+    monkeypatch.setattr(loader, "postgres_connection", fake_postgres_connection)
+    monkeypatch.setattr(
+        loader,
+        "build_initial_dataset_load_targets",
+        lambda connection, *, provider, base_url, team_codes, season_labels: [
+            loader.DatasetLoadTarget(
+                team_code="LAL",
+                team_name="Los Angeles Lakers",
+                team_slug="los-angeles-lakers",
+                team_main_page_url="https://example.com/lal",
+                season_labels=("2021-2022",),
+            )
+        ],
+    )
+
+    class FakeProvider:
+        provider_name = "covers"
+
+        def fetch_team_main_page(self, *, url, requested_season_labels, browser_fallback):
+            return TeamPageFetchResult(
+                fetched_page=type(
+                    "FetchedPage",
+                    (),
+                    {
+                        "content": "<html></html>",
+                        "status": "SUCCESS",
+                        "http_status": 200,
+                    },
+                )(),
+                diagnostics=(),
+            )
+
+    class FakeRepository:
+        def __init__(self, connection) -> None:
+            self.connection = connection
+
+        def create_job_run(self, *, job_name, requested_by, payload):
+            return 0
+
+        def create_page_retrieval(self, *, job_id, record):
+            return 0
+
+        def complete_job_run(self, *, job_id, summary, status):
+            return None
+
+    monkeypatch.setattr(loader, "CoversHistoricalTeamPageProvider", FakeProvider)
+    monkeypatch.setattr(loader, "PostgresIngestionRepository", FakeRepository)
+    monkeypatch.setattr(loader, "store_raw_payload", lambda **kwargs: "payload.html")
+    monkeypatch.setattr(
+        loader,
+        "ingest_historical_team_page",
+        lambda **kwargs: type(
+            "PersistedIngestionRun",
+            (),
+            {
+                "job_id": 1,
+                "page_retrieval_id": 1,
+                "raw_rows_saved": 3,
+                "canonical_games_saved": 3,
+                "metrics_saved": 3,
+                "parser_snapshot_path": "parser-output.json",
+                "diagnostics": [],
+            },
+        )(),
+    )
+
+    with caplog.at_level(logging.INFO, logger=WORKFLOW_LOGGER_NAME):
+        result = loader.run_initial_production_dataset_load(
+            season_labels=["2021-2022"],
+            continue_on_error=False,
+        )
+
+    events = _workflow_events(caplog)
+    assert [entry["event"] for entry in events] == [
+        "workflow_started",
+        "workflow_succeeded",
+    ]
+    assert events[0]["workflow_name"] == "ingestion.initial_dataset_load"
+    assert events[1]["processed_target_count"] == result["processed_target_count"]
+    assert events[1]["completed_target_count"] == result["completed_target_count"]
 
 
 def test_run_initial_production_dataset_load_uses_browser_fallback_only_when_needed(

@@ -18,18 +18,54 @@ Use it together with:
 
 ## Workflow Logging
 - High-value operator workflows now emit structured JSON log lines through the `bookmaker_detector_api.workflow` logger.
-- Current first-wave coverage includes:
+- Current coverage includes:
+  - model training and promotion
+  - scoring preview, future-game preview/materialization, and future-slate preview/materialization
   - backtest execution
   - opportunity materialization
-  - market-board refresh
-  - market-board refresh/scoring/cadence orchestration
+  - market-board refresh and refresh/scoring/cadence orchestration
+  - fetch ingestion, fixture ingestion, and initial dataset bootstrap
 - Each workflow log line includes:
   - `workflow_name`
   - `workflow_run_id`
   - `event`
+  - `request_trace_id` for API-driven flows
+  - `request_method`
+  - `request_path`
   - key filter/context fields
   - `duration_ms` on success/failure
-- When a release-candidate pass fails, capture the matching `workflow_run_id` from these logs before retrying the workflow.
+- When a release-candidate pass fails, capture both the response `X-Request-ID` and the matching `workflow_run_id` before retrying the workflow.
+
+## Workflow Evidence Map
+Use this map during manual smoke and release-candidate triage.
+
+| Workflow area | Typical route / trigger | Response evidence to capture | Expected workflow family |
+| --- | --- | --- | --- |
+| Model training | `POST /api/v1/admin/models/train` | `X-Request-ID`, HTTP status, target task | `model_training.train` |
+| Model promotion | `POST /api/v1/admin/models/select` | `X-Request-ID`, HTTP status, selection policy | `model_training.promote` |
+| Score preview | `GET /api/v1/admin/models/score-preview` | `X-Request-ID`, HTTP status, filters | `model_scoring.preview` |
+| Future game preview | `GET /api/v1/admin/models/future-game-preview` | `X-Request-ID`, HTTP status, scenario filters | `model_scoring.future_game_preview` |
+| Future game materialization | `POST /api/v1/admin/models/future-game-preview/materialize` | `X-Request-ID`, HTTP status, scenario filters | `model_scoring.future_game_materialize` |
+| Future slate preview | `POST /api/v1/admin/models/future-slate/preview` | `X-Request-ID`, HTTP status, slate label | `model_scoring.future_slate_preview` |
+| Future slate materialization | `POST /api/v1/admin/models/future-slate/materialize` | `X-Request-ID`, HTTP status, slate label | `model_scoring.future_slate_materialize` |
+| Opportunity materialization | `POST /api/v1/admin/models/opportunities/materialize` | `X-Request-ID`, HTTP status, target task | `model_opportunities.materialize` |
+| Backtest run | `POST /api/v1/admin/models/backtests/run` | `X-Request-ID`, HTTP status, target task | `model_backtest.run` |
+| Market-board refresh | `POST /api/v1/admin/models/market-board/refresh` | `X-Request-ID`, HTTP status, source name | `model_market_board.refresh` |
+| Market-board refresh orchestration | `POST /api/v1/admin/models/market-board/orchestrate-refresh` | `X-Request-ID`, HTTP status, source name | `model_market_board.refresh_orchestration` |
+| Market-board scoring orchestration | `POST /api/v1/admin/models/market-board/orchestrate-score` | `X-Request-ID`, HTTP status, source name | `model_market_board.scoring_orchestration` |
+| Market-board cadence | `POST /api/v1/admin/models/market-board/orchestrate-cadence` | `X-Request-ID`, HTTP status, source name | `model_market_board.cadence_orchestration` |
+| Fetch ingestion maintenance | `run_fetch_and_ingest(...)` or Phase 1 fetch demo | `X-Request-ID` when route-driven, job/page IDs | `ingestion.fetch_and_ingest` |
+| Fixture ingestion maintenance | `run_fixture_ingestion(...)` | job/page IDs | `ingestion.fixture_ingestion` |
+| Initial dataset bootstrap | `run_initial_production_dataset_load(...)` | team/target counts, final status | `ingestion.initial_dataset_load` |
+
+## Failure Capture
+When a smoke or release step fails:
+1. Record the route or command that was executed.
+2. Record the response HTTP status if applicable.
+3. Record the response `X-Request-ID` header if applicable.
+4. Record the expected workflow family from the map above.
+5. Capture the matching `workflow_run_id` plus the `workflow_failed` or slow `workflow_succeeded` log event.
+6. Only retry after that evidence is written into the smoke checklist or known-issues file.
 
 ## Schema Contract
 - PostgreSQL schema ownership lives in `infra/postgres/init/`.
@@ -115,6 +151,7 @@ After the regression script passes:
 
 As you complete the smoke pass:
 - record pass/fail in `docs/manual_smoke_checklist.md`
+- record `X-Request-ID`, workflow family, and `workflow_run_id` for any failed or unexpectedly slow step
 - move blockers into `docs/known_issues.md`
 - update the release decision section in `docs/release_acceptance_checklist.md`
 

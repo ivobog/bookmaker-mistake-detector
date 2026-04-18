@@ -14,8 +14,16 @@
 - `not-run`
 
 ## Workflow Log Capture
-- For any failed or slow golden-path workflow, capture the matching `workflow_run_id` from the `bookmaker_detector_api.workflow` logger before retrying.
-- Current structured-log coverage includes backtests, opportunity materialization, and market-board refresh/orchestration flows.
+- For any failed or slow golden-path workflow, capture both the response `X-Request-ID` header and the matching `workflow_run_id` from the `bookmaker_detector_api.workflow` logger before retrying.
+- Current structured-log coverage includes model training/promotion, scoring previews and future-slate materialization, backtests, opportunity materialization, market-board refresh/orchestration, and ingestion/bootstrap maintenance flows.
+
+## Failure Evidence Template
+When a step fails or is unexpectedly slow, append these notes in the step row:
+- `route_or_command=<value>`
+- `x_request_id=<value or n/a>`
+- `workflow_family=<expected workflow family>`
+- `workflow_run_id=<value or n/a>`
+- `log_event=workflow_failed|slow_success`
 
 ## 1. Environment Bring-up
 | Step | Result | Notes |
@@ -28,8 +36,8 @@
 ## 2. Historical Ingestion
 | Step | Result | Notes |
 | --- | --- | --- |
-| Phase 1 demo route responds | `pass` | `GET /api/v1/admin/phase-1-demo` returned HTTP 200. |
-| Phase 1 fetch demo responds | `not-run` | Not exercised in this slice. |
+| Phase 1 demo route responds | `pass` | `GET /api/v1/admin/phase-1-demo` returned HTTP 200. Expected workflow family: `none` for the pure demo route. |
+| Phase 1 fetch demo responds | `not-run` | Not exercised in this slice. Expected workflow family: `ingestion.fetch_and_ingest`. |
 | failed-fetch demo records diagnostics cleanly | `not-run` | Not exercised in this slice. |
 | ingestion stats endpoint returns expected payload shape | `not-run` | Not exercised in this slice. |
 | data-quality issue view returns issues and filters correctly | `not-run` | Not exercised in this slice. |
@@ -46,26 +54,26 @@
 ## 4. Predictive Workflow
 | Step | Result | Notes |
 | --- | --- | --- |
-| model training route completes | `pass` | `POST /api/v1/admin/models/train?...` returned HTTP 200. |
-| model selection route promotes an active model | `pass` | `POST /api/v1/admin/models/select?...` returned HTTP 200. |
-| score preview returns scored cases | `not-run` | Not exercised in this slice. |
-| opportunity materialization returns persisted opportunities | `pass` | `POST /api/v1/admin/models/opportunities/materialize?...` returned HTTP 200. |
+| model training route completes | `pass` | `POST /api/v1/admin/models/train?...` returned HTTP 200. Expected workflow family: `model_training.train`. |
+| model selection route promotes an active model | `pass` | `POST /api/v1/admin/models/select?...` returned HTTP 200. Expected workflow family: `model_training.promote`. |
+| score preview returns scored cases | `not-run` | Not exercised in this slice. Expected workflow family: `model_scoring.preview`. |
+| opportunity materialization returns persisted opportunities | `pass` | `POST /api/v1/admin/models/opportunities/materialize?...` returned HTTP 200. Expected workflow family: `model_opportunities.materialize`. |
 | opportunity history returns surfaced artifacts | `not-run` | Not exercised in this slice. |
 
 ## 5. Market Board and Cadence
 | Step | Result | Notes |
 | --- | --- | --- |
 | market-board source catalog loads | `pass` | `GET /api/v1/admin/models/market-board/sources` returned HTTP 200. |
-| file-backed or demo refresh completes | `pass` | `POST /api/v1/admin/models/market-board/refresh?...source_name=demo_daily_lines_v1` returned HTTP 200. |
+| file-backed or demo refresh completes | `pass` | `POST /api/v1/admin/models/market-board/refresh?...source_name=demo_daily_lines_v1` returned HTTP 200. Expected workflow family: `model_market_board.refresh`. |
 | refresh history records change summary and source run | `not-run` | Not exercised in this slice. |
 | scoring queue shows a board lifecycle | `not-run` | Not exercised in this slice. |
-| cadence/orchestration run completes end to end | `pass` | `POST /api/v1/admin/models/market-board/orchestrate-cadence?...` returned HTTP 200. |
+| cadence/orchestration run completes end to end | `pass` | `POST /api/v1/admin/models/market-board/orchestrate-cadence?...` returned HTTP 200. Expected workflow family: `model_market_board.cadence_orchestration`. |
 | board operations page returns combined state | `not-run` | Not exercised in this slice. |
 
 ## 6. Backtesting
 | Step | Result | Notes |
 | --- | --- | --- |
-| backtest run route completes | `pass` | `POST /api/v1/admin/models/backtests/run?...` returned HTTP 200. |
+| backtest run route completes | `pass` | `POST /api/v1/admin/models/backtests/run?...` returned HTTP 200. Expected workflow family: `model_backtest.run`. |
 | backtest history returns recent runs | `not-run` | Not exercised in this slice. |
 | fold summaries are present in run detail | `not-run` | Not exercised in this slice. |
 | strategy metrics and ROI fields are visible | `not-run` | Not exercised in this slice. |

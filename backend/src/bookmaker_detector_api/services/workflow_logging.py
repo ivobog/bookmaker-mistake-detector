@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from contextvars import ContextVar, Token
 from dataclasses import asdict, is_dataclass
 from datetime import date, datetime
 from time import perf_counter
@@ -9,10 +10,29 @@ from typing import Any
 from uuid import uuid4
 
 WORKFLOW_LOGGER_NAME = "bookmaker_detector_api.workflow"
+REQUEST_CONTEXT: ContextVar[dict[str, Any] | None] = ContextVar(
+    "bookmaker_detector_api_request_context",
+    default=None,
+)
+
+
+def set_request_workflow_context(**context: Any) -> Token:
+    return REQUEST_CONTEXT.set(context)
+
+
+def reset_request_workflow_context(token: Token) -> None:
+    REQUEST_CONTEXT.reset(token)
 
 
 def start_workflow_span(*, workflow_name: str, **context: Any) -> "WorkflowSpan":
-    return WorkflowSpan(workflow_name=workflow_name, context=context)
+    request_context = REQUEST_CONTEXT.get() or {}
+    return WorkflowSpan(
+        workflow_name=workflow_name,
+        context={
+            **request_context,
+            **context,
+        },
+    )
 
 
 class WorkflowSpan:

@@ -1,4 +1,5 @@
 import json
+import logging
 from pathlib import Path
 
 from bookmaker_detector_api.config import settings
@@ -6,11 +7,20 @@ from bookmaker_detector_api.fetching import fetch_page
 from bookmaker_detector_api.repositories import InMemoryIngestionRepository
 from bookmaker_detector_api.services import fetch_ingestion_runner
 from bookmaker_detector_api.services.fetch_ingestion_runner import run_fetch_and_ingest
+from bookmaker_detector_api.services.workflow_logging import WORKFLOW_LOGGER_NAME
 from tests.support.covers_fixtures import (
     DEFAULT_TEAM_PAGE_URL,
     build_fixture_backed_covers_provider,
     load_covers_fixture,
 )
+
+
+def _workflow_events(caplog) -> list[dict[str, object]]:
+    return [
+        json.loads(record.getMessage())
+        for record in caplog.records
+        if record.name == WORKFLOW_LOGGER_NAME
+    ]
 
 
 def test_fetch_page_reads_fixture_file_uri() -> None:
@@ -126,6 +136,43 @@ def test_fetch_and_ingest_stores_live_shape_payload_snapshot(monkeypatch, tmp_pa
     assert result["result"]["metrics_saved"] == 1
 
 
+def test_fetch_and_ingest_emits_structured_workflow_logs(caplog, tmp_path) -> None:
+    fixture_path = (
+        Path(__file__).resolve().parents[1]
+        / "src"
+        / "bookmaker_detector_api"
+        / "fixtures"
+        / "covers_sample_team_page.html"
+    )
+    original_payload_dir = settings.raw_payload_dir
+    original_parser_snapshot_dir = settings.parser_snapshot_dir
+    settings.raw_payload_dir = str(tmp_path)
+    settings.parser_snapshot_dir = str(tmp_path / "parser-output")
+
+    try:
+        with caplog.at_level(logging.INFO, logger=WORKFLOW_LOGGER_NAME):
+            result = run_fetch_and_ingest(
+                repository_mode="in_memory",
+                team_code="LAL",
+                season_label="2024-2025",
+                source_url=fixture_path.resolve().as_uri(),
+                requested_by="test-suite",
+                persist_payload=True,
+            )
+    finally:
+        settings.raw_payload_dir = original_payload_dir
+        settings.parser_snapshot_dir = original_parser_snapshot_dir
+
+    events = _workflow_events(caplog)
+    assert [entry["event"] for entry in events] == [
+        "workflow_started",
+        "workflow_succeeded",
+    ]
+    assert events[0]["workflow_name"] == "ingestion.fetch_and_ingest"
+    assert events[1]["job_id"] == result["result"]["job_id"]
+    assert events[1]["raw_rows_saved"] == result["result"]["raw_rows_saved"]
+
+
 def test_fetch_and_ingest_records_failed_fetch_in_memory() -> None:
     missing_fixture_url = (
         (
@@ -155,6 +202,39 @@ def test_fetch_and_ingest_records_failed_fetch_in_memory() -> None:
     assert result["job_runs"][0]["status"] == "FAILED"
     assert result["page_retrievals"][0]["record"]["status"] == "FAILED"
     assert result["page_retrievals"][0]["record"]["error_message"] == result["error_message"]
+
+
+def test_fetch_and_ingest_logs_failure_workflow_event(caplog) -> None:
+    missing_fixture_url = (
+        (
+            Path(__file__).resolve().parents[1]
+            / "src"
+            / "bookmaker_detector_api"
+            / "fixtures"
+            / "missing_team_page.html"
+        )
+        .resolve()
+        .as_uri()
+    )
+
+    with caplog.at_level(logging.INFO, logger=WORKFLOW_LOGGER_NAME):
+        result = run_fetch_and_ingest(
+            repository_mode="in_memory",
+            team_code="LAL",
+            season_label="2024-2025",
+            source_url=missing_fixture_url,
+            requested_by="test-suite",
+            persist_payload=True,
+        )
+
+    events = _workflow_events(caplog)
+    assert [entry["event"] for entry in events] == [
+        "workflow_started",
+        "workflow_failed",
+    ]
+    assert events[1]["workflow_name"] == "ingestion.fetch_and_ingest"
+    assert events[1]["job_id"] == result["job_id"]
+    assert events[1]["page_retrieval_id"] == result["page_retrieval_id"]
 
 
 def test_fetch_and_ingest_uses_ingestion_source_url_for_persistence() -> None:

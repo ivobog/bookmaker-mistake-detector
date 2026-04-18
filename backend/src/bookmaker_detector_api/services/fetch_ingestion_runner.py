@@ -12,6 +12,7 @@ from bookmaker_detector_api.services.ingestion_pipeline import (
     ingest_historical_team_page,
 )
 from bookmaker_detector_api.services.repository_factory import build_ingestion_repository
+from bookmaker_detector_api.services.workflow_logging import start_workflow_span
 
 
 def run_fetch_and_ingest(
@@ -28,6 +29,16 @@ def run_fetch_and_ingest(
 ) -> dict[str, object]:
     provider = CoversHistoricalTeamPageProvider()
     effective_source_url = ingestion_source_url or source_url
+    span = start_workflow_span(
+        workflow_name="ingestion.fetch_and_ingest",
+        repository_mode=repository_mode,
+        provider_name=provider.provider_name,
+        team_code=team_code,
+        season_label=season_label,
+        source_url=effective_source_url,
+        run_label=run_label,
+        persist_payload=persist_payload,
+    )
     repository_context = None
     if repository_override is not None:
         repository = repository_override
@@ -81,6 +92,14 @@ def run_fetch_and_ingest(
         if isinstance(repository, InMemoryIngestionRepository):
             response["job_runs"] = repository.job_runs
             response["page_retrievals"] = _serialize_page_retrievals(repository.page_retrievals)
+        span.success(
+            status=response["status"],
+            job_id=response["result"]["job_id"],
+            page_retrieval_id=response["result"]["page_retrieval_id"],
+            raw_rows_saved=response["result"]["raw_rows_saved"],
+            canonical_games_saved=response["result"]["canonical_games_saved"],
+            metrics_saved=response["result"]["metrics_saved"],
+        )
         return response
     except Exception as exc:
         failure = _record_fetch_failure(
@@ -96,6 +115,12 @@ def run_fetch_and_ingest(
         if isinstance(repository, InMemoryIngestionRepository):
             failure["job_runs"] = repository.job_runs
             failure["page_retrievals"] = _serialize_page_retrievals(repository.page_retrievals)
+        span.failure(
+            exc,
+            status=failure["status"],
+            job_id=failure["job_id"],
+            page_retrieval_id=failure["page_retrieval_id"],
+        )
         return failure
     finally:
         if repository_context is not None:
