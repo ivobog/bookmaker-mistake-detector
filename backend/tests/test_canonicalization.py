@@ -135,6 +135,38 @@ def test_canonicalization_normalizes_team_alias_codes() -> None:
     assert game.away_team_code == "NYK"
 
 
+def test_canonicalization_normalizes_historical_pho_alias_code() -> None:
+    rows = [
+        RawGameRow(
+            provider_name="covers",
+            team_code="MIL",
+            season_label="2024-2025",
+            source_url="https://example.com/mil",
+            source_section="Regular Season",
+            source_row_index=1,
+            game_date=date(2025, 3, 24),
+            opponent_code="PHO",
+            is_away=False,
+            result_flag="L",
+            team_score=106,
+            opponent_score=108,
+            ats_result="L",
+            ats_line=2.5,
+            ou_result="U",
+            total_line=223.5,
+            parse_status=ParseStatus.VALID,
+        )
+    ]
+
+    canonical_games = canonicalize_rows(rows)
+
+    assert len(canonical_games) == 1
+    game = canonical_games[0]
+    assert game.reconciliation_status == ReconciliationStatus.PARTIAL_SINGLE_ROW
+    assert game.home_team_code == "MIL"
+    assert game.away_team_code == "PHX"
+
+
 def test_canonicalization_marks_score_conflict() -> None:
     rows = [
         RawGameRow(

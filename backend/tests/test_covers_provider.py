@@ -293,6 +293,43 @@ def test_covers_provider_normalizes_live_two_letter_team_abbreviations() -> None
     assert rows[0].parser_provenance["opponent_resolution"]["mode"] == "alias_name"
 
 
+def test_covers_provider_normalizes_historical_pho_abbreviation() -> None:
+    provider = CoversHistoricalTeamPageProvider()
+    html = """
+<!doctype html>
+<html>
+  <body>
+    <section data-section="Regular Season">
+      <table>
+        <tbody>
+          <tr>
+            <td>2025-03-24</td>
+            <td>PHO</td>
+            <td>L</td>
+            <td>106-108</td>
+            <td>L 2.5</td>
+            <td>U 223.5</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </body>
+</html>
+"""
+
+    rows = provider.parse_team_page(
+        html=html,
+        team_code="MIL",
+        season_label="2024-2025",
+        source_url="https://example.com/covers/mil/2024-2025",
+    )
+
+    assert len(rows) == 1
+    assert rows[0].opponent_code == "PHX"
+    assert rows[0].parse_status == ParseStatus.VALID
+    assert rows[0].parser_provenance["opponent_resolution"]["mode"] == "alias_name"
+
+
 def test_covers_provider_uses_static_fetch_when_requested_seasons_are_present(
     monkeypatch,
 ) -> None:

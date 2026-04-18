@@ -26,7 +26,7 @@ NBA_TEAM_ALIASES = {
     "OKC": ("OKC", "Oklahoma City", "Oklahoma City Thunder", "Thunder"),
     "ORL": ("ORL", "Orlando", "Orlando Magic", "Magic"),
     "PHI": ("PHI", "Philadelphia", "Philadelphia 76ers", "76ers", "Sixers"),
-    "PHX": ("PHX", "Phoenix", "Phoenix Suns", "Suns"),
+    "PHX": ("PHX", "PHO", "Phoenix", "Phoenix Suns", "Suns"),
     "POR": ("POR", "Portland", "Portland Trail Blazers", "Trail Blazers"),
     "SAC": ("SAC", "Sacramento", "Sacramento Kings", "Kings"),
     "SAS": ("SAS", "SA", "San Antonio", "San Antonio Spurs", "Spurs"),
