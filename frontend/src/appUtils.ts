@@ -81,6 +81,42 @@ export function parseRouteFromHash(hash: string): AppRoute {
   if (!normalized || normalized === "backtests") {
     return { name: "backtests" };
   }
+  if (normalized === "models") {
+    return { name: "models" };
+  }
+  if (normalized === "models/registry") {
+    return { name: "model-registry" };
+  }
+  if (normalized === "models/runs") {
+    return { name: "model-runs" };
+  }
+  const modelRunDetailMatch = /^models\/runs\/(\d+)$/.exec(normalized);
+  if (modelRunDetailMatch) {
+    return {
+      name: "model-run-detail",
+      runId: Number(modelRunDetailMatch[1])
+    };
+  }
+  if (normalized === "models/evaluations") {
+    return { name: "model-evaluations" };
+  }
+  const modelEvaluationDetailMatch = /^models\/evaluations\/(\d+)$/.exec(normalized);
+  if (modelEvaluationDetailMatch) {
+    return {
+      name: "model-evaluation-detail",
+      evaluationId: Number(modelEvaluationDetailMatch[1])
+    };
+  }
+  if (normalized === "models/selections") {
+    return { name: "model-selections" };
+  }
+  const modelSelectionDetailMatch = /^models\/selections\/(\d+)$/.exec(normalized);
+  if (modelSelectionDetailMatch) {
+    return {
+      name: "model-selection-detail",
+      selectionId: Number(modelSelectionDetailMatch[1])
+    };
+  }
   const backtestMatch = /^backtests\/(\d+)$/.exec(normalized);
   if (backtestMatch) {
     return {
@@ -184,6 +220,30 @@ export function parseRouteFromHash(hash: string): AppRoute {
 export function routeHash(route: AppRoute): string {
   if (route.name === "backtests") {
     return "#/backtests";
+  }
+  if (route.name === "models") {
+    return "#/models";
+  }
+  if (route.name === "model-registry") {
+    return "#/models/registry";
+  }
+  if (route.name === "model-runs") {
+    return "#/models/runs";
+  }
+  if (route.name === "model-run-detail") {
+    return `#/models/runs/${route.runId}`;
+  }
+  if (route.name === "model-evaluations") {
+    return "#/models/evaluations";
+  }
+  if (route.name === "model-evaluation-detail") {
+    return `#/models/evaluations/${route.evaluationId}`;
+  }
+  if (route.name === "model-selections") {
+    return "#/models/selections";
+  }
+  if (route.name === "model-selection-detail") {
+    return `#/models/selections/${route.selectionId}`;
   }
   if (route.name === "backtest-run") {
     return `#/backtests/${route.runId}`;

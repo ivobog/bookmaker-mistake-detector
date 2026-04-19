@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -16,6 +16,7 @@ from bookmaker_detector_api.api import analyst_backtests as analyst_backtests_ap
 from bookmaker_detector_api.api import analyst_opportunities as analyst_opportunities_api
 from bookmaker_detector_api.api import analyst_patterns as analyst_patterns_api
 from bookmaker_detector_api.api import analyst_trends as analyst_trends_api
+from bookmaker_detector_api.config import settings
 from bookmaker_detector_api.main import app
 from bookmaker_detector_api.repositories import InMemoryIngestionRepository
 from bookmaker_detector_api.services import (
@@ -35,6 +36,12 @@ from bookmaker_detector_api.services.model_records import (
 from bookmaker_detector_api.services.workflow_logging import WORKFLOW_LOGGER_NAME
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def force_in_memory_repository_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "api_repository_mode", "in_memory")
+    monkeypatch.setattr(settings, "api_env", "development")
 
 
 def _workflow_events(caplog: pytest.LogCaptureFixture) -> list[dict[str, object]]:
@@ -3556,13 +3563,18 @@ def test_ingestion_quality_trends_endpoint_supports_scope_filters() -> None:
 
 
 def test_recent_job_runs_endpoint_supports_started_window() -> None:
-    response = client.get("/api/v1/admin/jobs/recent?started_from=2026-04-15&started_to=2026-04-16")
+    today_utc = datetime.now(timezone.utc).date()
+    started_from = today_utc - timedelta(days=3)
+    started_to = today_utc - timedelta(days=2)
+    response = client.get(
+        f"/api/v1/admin/jobs/recent?started_from={started_from.isoformat()}&started_to={started_to.isoformat()}"
+    )
 
     assert response.status_code == 200
     payload = response.json()
     assert len(payload["job_runs"]) == 2
-    assert payload["filters"]["started_from"].startswith("2026-04-15T00:00:00")
-    assert payload["filters"]["started_to"].startswith("2026-04-16T23:59:59")
+    assert payload["filters"]["started_from"].startswith(f"{started_from.isoformat()}T00:00:00")
+    assert payload["filters"]["started_to"].startswith(f"{started_to.isoformat()}T23:59:59")
 
 
 def test_normalize_data_quality_issue_taxonomy_endpoint_returns_summary(monkeypatch) -> None:

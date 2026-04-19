@@ -5,7 +5,7 @@ import {
   fetchBacktestHistory,
   fetchBacktestRunDetail,
   fetchEvaluationDetail,
-  fetchModelHistory,
+  fetchModelAdminHistory,
   fetchModelRunDetail,
   fetchOpportunityDetail,
   fetchOpportunityHistory,
@@ -20,7 +20,6 @@ import type {
   BacktestHistoryResponse,
   BacktestRun,
   EvaluationSnapshot,
-  ModelHistoryResponse,
   ModelTrainingRun,
   OpportunityHistoryResponse,
   OpportunityListResponse,
@@ -30,6 +29,7 @@ import type {
   ScoringRunDetail,
   SelectionSnapshot
 } from "./appTypes";
+import type { ModelAdminHistoryResponse } from "./modelAdminTypes";
 import {
   asRecord,
   formatTimestamp,
@@ -53,6 +53,7 @@ import {
   OpportunityDetailCard as SharedOpportunityDetailCard
 } from "./appOpportunityDetailComponents";
 import { BacktestsWorkspace } from "./backtestsWorkspace";
+import { ModelAdminWorkspace } from "./modelAdminWorkspace";
 import { OpportunitiesWorkspace } from "./opportunitiesWorkspace";
 
 export default function App() {
@@ -60,7 +61,7 @@ export default function App() {
   const [opportunityHistory, setOpportunityHistory] = useState<OpportunityHistoryResponse | null>(null);
   const [opportunityList, setOpportunityList] = useState<OpportunityListResponse | null>(null);
   const [opportunities, setOpportunities] = useState<OpportunityRecord[]>([]);
-  const [modelHistory, setModelHistory] = useState<ModelHistoryResponse["model_history"] | null>(null);
+  const [modelHistory, setModelHistory] = useState<ModelAdminHistoryResponse["model_history"] | null>(null);
   const [activeModelRun, setActiveModelRun] = useState<ModelTrainingRun | null>(null);
   const [activeSelectionSnapshot, setActiveSelectionSnapshot] = useState<SelectionSnapshot | null>(null);
   const [activeEvaluationSnapshot, setActiveEvaluationSnapshot] = useState<EvaluationSnapshot | null>(null);
@@ -114,7 +115,7 @@ export default function App() {
           fetchBacktestHistory(),
           fetchOpportunityHistory(),
           fetchOpportunities(),
-          fetchModelHistory()
+          fetchModelAdminHistory()
         ]);
         if (cancelled) {
           return;
@@ -438,13 +439,32 @@ export default function App() {
 
   const overview = history?.model_backtest_history.overview;
   const opportunityOverview = opportunityHistory?.model_opportunity_history.overview;
+  const inModelAdminDashboard = route.name === "models";
+  const inModelRegistry = route.name === "model-registry";
+  const inModelRuns = route.name === "model-runs";
+  const inModelRunDetailRoute = route.name === "model-run-detail";
+  const inModelEvaluations = route.name === "model-evaluations";
+  const inModelEvaluationDetailRoute = route.name === "model-evaluation-detail";
+  const inModelSelections = route.name === "model-selections";
+  const inModelSelectionDetailRoute = route.name === "model-selection-detail";
+  const inModelAdmin =
+    inModelAdminDashboard ||
+    inModelRegistry ||
+    inModelRuns ||
+    inModelRunDetailRoute ||
+    inModelEvaluations ||
+    inModelEvaluationDetailRoute ||
+    inModelSelections ||
+    inModelSelectionDetailRoute;
   const viewMode =
-    route.name === "backtests" ||
-    route.name === "backtest-run" ||
-    route.name === "backtest-fold" ||
-    route.name === "backtest-fold-model-run" ||
-    route.name === "backtest-fold-evaluation" ||
-    route.name === "artifact-compare"
+    inModelAdmin
+      ? "models"
+      : route.name === "backtests" ||
+          route.name === "backtest-run" ||
+          route.name === "backtest-fold" ||
+          route.name === "backtest-fold-model-run" ||
+          route.name === "backtest-fold-evaluation" ||
+          route.name === "artifact-compare"
       ? "backtests"
       : "opportunities";
   const inBacktestDetail = route.name === "backtest-run";
@@ -465,7 +485,23 @@ export default function App() {
   const inOpportunityContextDetail =
     inOpportunityDetail || inComparableCase || inOpportunityArtifactDetail;
   const heroTitle =
-    route.name === "backtests"
+    route.name === "models"
+      ? "Model admin workspace shell is online."
+      : inModelRegistry
+        ? "Model registry route shell is online."
+        : inModelRuns
+          ? "Training runs route shell is online."
+          : inModelRunDetailRoute
+            ? "Training run detail route shell is online."
+            : inModelEvaluations
+              ? "Evaluation route shell is online."
+              : inModelEvaluationDetailRoute
+                ? "Evaluation detail route shell is online."
+                : inModelSelections
+                  ? "Selection route shell is online."
+                  : inModelSelectionDetailRoute
+                    ? "Selection detail route shell is online."
+                    : route.name === "backtests"
       ? "Phase 4 backtest console is live."
       : inBacktestDetail
         ? "Backtest run inspection is open."
@@ -491,7 +527,23 @@ export default function App() {
         ? "Opportunity investigation is open."
         : "Analyst opportunity desk is online.";
   const heroLead =
-    route.name === "backtests"
+    route.name === "models"
+      ? "This workspace is the dedicated shell for model lifecycle administration. Phase 1 locks the route family and component ownership so the training console can grow without adding more workspace logic to the main app shell."
+      : inModelRegistry
+        ? "This route reserves the model registry workspace surface. The next phase will add filtering, inline registry inspection, and reusable admin artifact cards."
+        : inModelRuns
+          ? "This route reserves the training run list surface. The next phase will add list filters, recent-run rendering, and detail navigation."
+          : inModelRunDetailRoute
+            ? "This route reserves the training run detail surface. The next phase will add the dedicated run artifact and metrics view."
+            : inModelEvaluations
+              ? "This route reserves the evaluation list surface. The next phase will add metric-first list rendering and detail navigation."
+              : inModelEvaluationDetailRoute
+                ? "This route reserves the evaluation detail surface. The next phase will add selected-feature, fallback, and prediction-count inspection."
+                : inModelSelections
+                  ? "This route reserves the selection list surface. The next phase will add active-selection indicators, filter controls, and historical selection rendering."
+                  : inModelSelectionDetailRoute
+                    ? "This route reserves the selection detail surface. The next phase will add policy and rationale rendering for promoted model snapshots."
+                    : route.name === "backtests"
       ? "This dashboard runs and inspects the first walk-forward validation layer on top of the predictive stack. It shows whether the current spread or totals edge logic holds up once we retrain chronologically and simulate threshold-based decisions."
       : inBacktestDetail
         ? "This route focuses on one exact walk-forward validation run, so provenance links can target the specific model-selection and threshold simulation result behind a review workflow."
@@ -517,9 +569,19 @@ export default function App() {
         ? "This route is the analyst deep-dive for one materialized opportunity. It keeps the evidence bundle, comparables, benchmark context, and model provenance in one inspectable workspace."
         : "This view turns the Phase 3 scoring pipeline into an analyst workflow. It surfaces recent opportunities, keeps the evidence bundle attached, and lets you inspect why a case is only reviewable or strong enough to escalate.";
   const activeServicePath =
-    route.name === "backtests"
+    viewMode === "models"
+      ? `${apiBaseUrl}/api/v1/admin/models`
+      : viewMode === "backtests"
       ? `${apiBaseUrl}/api/v1/analyst/backtests`
       : `${apiBaseUrl}/api/v1/analyst/opportunities`;
+  const modelSectionRoute =
+    route.name === "model-run-detail"
+      ? ({ name: "model-runs" } as const)
+      : route.name === "model-evaluation-detail"
+        ? ({ name: "model-evaluations" } as const)
+        : route.name === "model-selection-detail"
+          ? ({ name: "model-selections" } as const)
+          : null;
   const backtestOverviewHref = routeHash({ name: "backtests" });
   const activeRunHref = activeRun ? routeHash({ name: "backtest-run", runId: activeRun.id }) : undefined;
   const activeOpportunityHref =
@@ -716,11 +778,22 @@ export default function App() {
             >
               Opportunities
             </button>
+            <button
+              className={`mode-button${viewMode === "models" ? " mode-button-active" : ""}`}
+              onClick={() => navigate({ name: "models" })}
+              type="button"
+            >
+              Model Admin
+            </button>
           </div>
 
           {viewMode === "backtests" ? (
             <button className="primary-button" disabled={running} onClick={() => void handleRunBacktest()}>
               {running ? "Running backtest..." : "Run new backtest"}
+            </button>
+          ) : viewMode === "models" ? (
+            <button className="primary-button" onClick={() => navigate({ name: "models" })} type="button">
+              Open model dashboard
             </button>
           ) : (
             <button
@@ -736,9 +809,18 @@ export default function App() {
         </div>
       </section>
 
-      {inBacktestDetail || inBacktestFoldDetail || inBacktestArtifactDetail || inArtifactCompare || inOpportunityContextDetail ? (
+      {inBacktestDetail ||
+      inBacktestFoldDetail ||
+      inBacktestArtifactDetail ||
+      inArtifactCompare ||
+      inOpportunityContextDetail ||
+      (inModelAdmin && !inModelAdminDashboard) ? (
         <section className="route-toolbar">
-          {inBacktestDetail || inBacktestFoldDetail || inBacktestArtifactDetail || inArtifactCompare ? (
+          {inModelAdmin && !inModelAdminDashboard ? (
+            <button className="secondary-button" onClick={() => navigate({ name: "models" })} type="button">
+              Back to model dashboard
+            </button>
+          ) : inBacktestDetail || inBacktestFoldDetail || inBacktestArtifactDetail || inArtifactCompare ? (
             <button className="secondary-button" onClick={() => navigate({ name: "backtests" })} type="button">
               Back to runs
             </button>
@@ -784,10 +866,28 @@ export default function App() {
               Back to opportunity
             </button>
           ) : null}
-          {!inBacktestDetail && !inBacktestFoldDetail && !inBacktestArtifactDetail && !inArtifactCompare ? (
-            <button className="secondary-button" onClick={() => navigate({ name: "backtests" })} type="button">
-              Open backtests
+          {modelSectionRoute ? (
+            <button
+              className="secondary-button"
+              onClick={() => navigate(modelSectionRoute)}
+              type="button"
+            >
+              Back to section
             </button>
+          ) : null}
+          {!inBacktestDetail && !inBacktestFoldDetail && !inBacktestArtifactDetail && !inArtifactCompare ? (
+            inModelAdmin ? (
+              <button className="secondary-button" onClick={() => navigate({ name: "opportunities" })} type="button">
+                Open opportunities
+              </button>
+            ) : (
+              <button className="secondary-button" onClick={() => navigate({ name: "backtests" })} type="button">
+                Open backtests
+              </button>
+            )
+          ) : null}
+          {inModelAdmin && !inModelAdminDashboard ? (
+            <p className="route-note">Model Admin workspace | {route.name}</p>
           ) : null}
           {(inBacktestDetail || inBacktestFoldDetail || inBacktestArtifactDetail || inArtifactCompare) && activeRun ? (
             <p className="route-note">
@@ -935,6 +1035,10 @@ export default function App() {
           opportunityHistory={opportunityHistory}
           showQueueDetail={route.name === "opportunities"}
         />
+      ) : null}
+
+      {!loading && viewMode === "models" ? (
+        <ModelAdminWorkspace modelHistory={modelHistory} onNavigate={navigate} route={route} />
       ) : null}
     </main>
   );

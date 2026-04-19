@@ -26,5 +26,10 @@ export default defineConfig({
         ...devices["Desktop Chrome"]
       }
     }
-  ]
+  ],
+  webServer: {
+    command: "npm run dev",
+    reuseExistingServer: true,
+    url: frontendBaseUrl
+  }
 });

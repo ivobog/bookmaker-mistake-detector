@@ -247,7 +247,7 @@ export type SelectionSnapshot = {
   target_task: string;
   model_family: string;
   selection_policy_name: string;
-  rationale: string | null;
+  rationale: string | Record<string, unknown> | null;
   is_active: boolean;
   created_at: string | null;
 };
@@ -314,6 +314,14 @@ export type AppRoute =
       foldIndex: number;
       opportunityId: number;
     }
+  | { name: "models" }
+  | { name: "model-registry" }
+  | { name: "model-runs" }
+  | { name: "model-run-detail"; runId: number }
+  | { name: "model-evaluations" }
+  | { name: "model-evaluation-detail"; evaluationId: number }
+  | { name: "model-selections" }
+  | { name: "model-selection-detail"; selectionId: number }
   | { name: "opportunities" }
   | { name: "opportunity-detail"; opportunityId: number }
   | { name: "comparable-case"; opportunityId: number; comparableIndex: number }

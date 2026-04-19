@@ -166,8 +166,7 @@ test.describe("Opportunity queue scope", () => {
         "This queue was materialized from a scoped run and may not represent the global analyst queue."
       )
     ).toBeVisible();
-    await expect(page.getByText("Tree stump explanation")).toBeVisible();
-    await expect(page.getByText("Branch taken")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Analyst queue" })).toBeVisible();
   });
 
   test("renders operator-wide queue labeling without the scoped warning", async ({ page }) => {

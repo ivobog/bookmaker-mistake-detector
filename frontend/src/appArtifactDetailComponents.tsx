@@ -20,6 +20,20 @@ import {
   routeHash
 } from "./appUtils";
 
+function formatSelectionRationaleValue(rationale: SelectionSnapshot["rationale"]): string {
+  if (rationale === null) {
+    return "n/a";
+  }
+  if (typeof rationale === "string") {
+    return rationale;
+  }
+  const reason = readNested(rationale, "reason");
+  if (reason !== undefined && reason !== null) {
+    return String(reason);
+  }
+  return JSON.stringify(rationale);
+}
+
 export function ModelRunArtifactDetail({
   modelRun,
   provenanceItems
@@ -150,7 +164,11 @@ export function SelectionArtifactDetail({
 
       <section className="sub-panel">
         <p className="sub-panel-title">Rationale</p>
-        <p className="sub-panel-meta">{selection.rationale ?? "No rationale was stored for this snapshot."}</p>
+        <p className="sub-panel-meta">
+          {selection.rationale === null
+            ? "No rationale was stored for this snapshot."
+            : formatSelectionRationaleValue(selection.rationale)}
+        </p>
       </section>
     </article>
   );
@@ -714,7 +732,7 @@ export function ArtifactCompareView({
             </div>
             <div className="detail-list-item">
               <span>Rationale</span>
-              <strong>{selection?.rationale ?? "n/a"}</strong>
+              <strong>{selection ? formatSelectionRationaleValue(selection.rationale) : "n/a"}</strong>
             </div>
           </div>
         </section>
