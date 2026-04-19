@@ -99,6 +99,14 @@ export default function App() {
     window.location.hash = routeHash(nextRoute);
   }
 
+  function handleSelectOpportunity(opportunityId: number) {
+    if (route.name === "opportunities") {
+      setActiveOpportunityId(opportunityId);
+      return;
+    }
+    navigate({ name: "opportunity-detail", opportunityId });
+  }
+
   useEffect(() => {
     let cancelled = false;
 
@@ -1043,7 +1051,7 @@ export default function App() {
               </section>
             )
           }
-          onSelectOpportunity={(opportunityId) => navigate({ name: "opportunity-detail", opportunityId })}
+          onSelectOpportunity={handleSelectOpportunity}
           opportunityList={opportunityList}
           opportunities={opportunities}
           opportunityHistory={opportunityHistory}
