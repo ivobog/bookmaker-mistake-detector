@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
@@ -28,6 +28,11 @@ import {
   fetchOpportunityHistory,
   fetchOpportunities
 } from "./api";
+
+function expectByTestIdValue(testId: string, value: string) {
+  const element = screen.getByTestId(testId);
+  expect(within(element).getByText(value)).not.toBeNull();
+}
 
 afterEach(() => {
   cleanup();
@@ -107,7 +112,32 @@ beforeEach(() => {
       scope_key: "operator-wide"
     },
     model_explainability: null,
-    payload: {},
+    payload: {
+      prediction: {
+        model: {
+          model_family: "linear_feature",
+          selected_feature: "rolling_3_avg_total_error"
+        },
+        evidence: {
+          recommendation: {
+            headline: "Back the Lakers",
+            recommended_action: "Review"
+          },
+          strength: {
+            rating: "strong",
+            overall_score: 0.81
+          },
+          summary: {
+            pattern_sample_size: 11,
+            comparable_count: 4
+          }
+        },
+        market_context: {
+          home_spread_line: -3.5,
+          total_line: 214.5
+        }
+      }
+    },
     created_at: "2026-04-19T10:00:00Z",
     updated_at: "2026-04-19T10:00:00Z"
   };
@@ -119,7 +149,47 @@ beforeEach(() => {
     team_code: "DAL",
     opponent_code: "NYK",
     canonical_game_id: 2,
-    game_date: "2024-11-03"
+    game_date: "2024-11-03",
+    policy_name: "review_only_v2",
+    status: "review_manually",
+    prediction_value: -2.75,
+    signal_strength: 1.7,
+    evidence_rating: "moderate",
+    recommendation_status: "review_manually",
+    materialized_at: "2026-04-20T11:15:00Z",
+    materialization_scope: {
+      team_code: "DAL",
+      season_label: "2024-2025",
+      canonical_game_id: null,
+      source: "team_scoped",
+      scope_key: "team=DAL|season=2024-2025"
+    },
+    payload: {
+      prediction: {
+        model: {
+          model_family: "tree_stump",
+          selected_feature: "days_rest"
+        },
+        evidence: {
+          recommendation: {
+            headline: "Pass on Dallas",
+            recommended_action: "Hold"
+          },
+          strength: {
+            rating: "moderate",
+            overall_score: 0.44
+          },
+          summary: {
+            pattern_sample_size: 7,
+            comparable_count: 2
+          }
+        },
+        market_context: {
+          home_spread_line: 4.5,
+          total_line: 221
+        }
+      }
+    }
   };
 
   vi.mocked(fetchOpportunityHistory).mockResolvedValue({
@@ -170,11 +240,35 @@ describe("App opportunities selection", () => {
     render(<App />);
 
     await screen.findByText("Analyst queue");
-    await screen.findByText("2024-11-05");
+    await screen.findByTestId("opportunity-detail-card");
+    await screen.findByTestId("opportunity-detail-matchup");
+    expectByTestIdValue("opportunity-detail-matchup", "LAL vs BOS");
+    expectByTestIdValue("opportunity-detail-game-date", "2024-11-05");
+    expectByTestIdValue("opportunity-detail-prediction-value", "1.200");
+    expectByTestIdValue("opportunity-detail-signal-strength", "0.80");
+    expectByTestIdValue("opportunity-detail-evidence-rating", "strong");
+    expectByTestIdValue("opportunity-detail-policy", "candidate_v1");
+    expectByTestIdValue("opportunity-detail-model-family", "linear_feature");
+    expectByTestIdValue("opportunity-detail-selected-feature", "rolling_3_avg_total_error");
+    expectByTestIdValue("opportunity-detail-queue-scope", "operator-wide");
+    expectByTestIdValue("opportunity-detail-recommendation", "Back the Lakers");
+    expectByTestIdValue("opportunity-detail-market-context", "Spread -3.5");
 
     fireEvent.click(screen.getByTestId("opportunity-row-102"));
 
-    await waitFor(() => expect(screen.getByText("2024-11-03")).not.toBeNull());
+    await waitFor(() => {
+      expectByTestIdValue("opportunity-detail-matchup", "DAL vs NYK");
+    });
+    expectByTestIdValue("opportunity-detail-game-date", "2024-11-03");
+    expectByTestIdValue("opportunity-detail-prediction-value", "-2.750");
+    expectByTestIdValue("opportunity-detail-signal-strength", "1.70");
+    expectByTestIdValue("opportunity-detail-evidence-rating", "moderate");
+    expectByTestIdValue("opportunity-detail-policy", "review_only_v2");
+    expectByTestIdValue("opportunity-detail-model-family", "tree_stump");
+    expectByTestIdValue("opportunity-detail-selected-feature", "days_rest");
+    expectByTestIdValue("opportunity-detail-queue-scope", "team=DAL|season=2024-2025");
+    expectByTestIdValue("opportunity-detail-recommendation", "Pass on Dallas");
+    expectByTestIdValue("opportunity-detail-market-context", "Spread 4.5");
     expect(window.location.hash).toBe("#/opportunities");
   });
 });

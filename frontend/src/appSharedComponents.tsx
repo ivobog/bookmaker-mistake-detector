@@ -4,14 +4,16 @@ import { formatCompactNumber, readNested } from "./appUtils";
 export function StatTile({
   label,
   value,
-  detail
+  detail,
+  testId
 }: {
   label: string;
   value: string;
   detail?: string;
+  testId?: string;
 }) {
   return (
-    <article className="stat-tile">
+    <article className="stat-tile" data-testid={testId}>
       <p className="stat-label">{label}</p>
       <p className="stat-value">{value}</p>
       {detail ? <p className="stat-detail">{detail}</p> : null}

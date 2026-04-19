@@ -66,7 +66,7 @@ export function OpportunityDetailCard({
       <div className="section-heading">
         <div>
           <p className="eyebrow">Opportunity detail</p>
-          <h2>
+          <h2 data-testid="opportunity-detail-matchup">
             {opportunity.team_code} vs {opportunity.opponent_code}
           </h2>
         </div>
@@ -77,10 +77,27 @@ export function OpportunityDetailCard({
       </div>
 
       <div className="mini-grid">
-        <StatTile label="Prediction value" value={formatCompactNumber(opportunity.prediction_value, 3)} />
-        <StatTile label="Signal strength" value={formatCompactNumber(opportunity.signal_strength, 2)} />
-        <StatTile label="Evidence rating" value={formatLabel(opportunity.evidence_rating)} />
-        <StatTile label="Game date" value={opportunity.game_date} detail={opportunity.season_label} />
+        <StatTile
+          label="Prediction value"
+          testId="opportunity-detail-prediction-value"
+          value={formatCompactNumber(opportunity.prediction_value, 3)}
+        />
+        <StatTile
+          label="Signal strength"
+          testId="opportunity-detail-signal-strength"
+          value={formatCompactNumber(opportunity.signal_strength, 2)}
+        />
+        <StatTile
+          label="Evidence rating"
+          testId="opportunity-detail-evidence-rating"
+          value={formatLabel(opportunity.evidence_rating)}
+        />
+        <StatTile
+          detail={opportunity.season_label}
+          label="Game date"
+          testId="opportunity-detail-game-date"
+          value={opportunity.game_date}
+        />
       </div>
 
       {compareHref ? (
@@ -92,7 +109,7 @@ export function OpportunityDetailCard({
       ) : null}
 
       <div className="opportunity-detail-grid">
-        <div className="sub-panel">
+        <div className="sub-panel" data-testid="opportunity-detail-recommendation">
           <p className="sub-panel-title">Recommendation</p>
           <p className="sub-panel-stat">
             {String(readNested(recommendation, "headline") ?? formatLabel(opportunity.recommendation_status))}
@@ -102,7 +119,7 @@ export function OpportunityDetailCard({
           </p>
         </div>
 
-        <div className="sub-panel">
+        <div className="sub-panel" data-testid="opportunity-detail-evidence-strength">
           <p className="sub-panel-title">Evidence strength</p>
           <p className="sub-panel-stat">
             {formatLabel(String(readNested(strength, "rating") ?? opportunity.evidence_rating ?? "n/a"))}
@@ -112,7 +129,7 @@ export function OpportunityDetailCard({
           </p>
         </div>
 
-        <div className="sub-panel">
+        <div className="sub-panel" data-testid="opportunity-detail-pattern-support">
           <p className="sub-panel-title">Pattern support</p>
           <p className="sub-panel-stat">{String(readNested(evidenceSummary, "pattern_sample_size") ?? "n/a")}</p>
           <p className="sub-panel-meta">
@@ -120,7 +137,7 @@ export function OpportunityDetailCard({
           </p>
         </div>
 
-        <div className="sub-panel">
+        <div className="sub-panel" data-testid="opportunity-detail-market-context">
           <p className="sub-panel-title">Market context</p>
           <p className="sub-panel-stat">
             Spread {String(readNested(marketContext, "home_spread_line") ?? "n/a")}
@@ -132,27 +149,27 @@ export function OpportunityDetailCard({
       </div>
 
       <div className="detail-list">
-        <div className="detail-list-item">
+        <div className="detail-list-item" data-testid="opportunity-detail-policy">
           <span>Policy</span>
           <strong>{opportunity.policy_name}</strong>
         </div>
-        <div className="detail-list-item">
+        <div className="detail-list-item" data-testid="opportunity-detail-model-family">
           <span>Model family</span>
           <strong>{String(readNested(modelContext, "model_family") ?? "n/a")}</strong>
         </div>
-        <div className="detail-list-item">
+        <div className="detail-list-item" data-testid="opportunity-detail-selected-feature">
           <span>Selected feature</span>
           <strong>{String(readNested(modelContext, "selected_feature") ?? "n/a")}</strong>
         </div>
-        <div className="detail-list-item">
+        <div className="detail-list-item" data-testid="opportunity-detail-scenario-key">
           <span>Scenario key</span>
           <strong>{opportunity.scenario_key ?? "historical_game"}</strong>
         </div>
-        <div className="detail-list-item">
+        <div className="detail-list-item" data-testid="opportunity-detail-queue-scope">
           <span>Queue scope</span>
           <strong>{materializationScope.scope_key ?? materializationScope.source ?? "n/a"}</strong>
         </div>
-        <div className="detail-list-item">
+        <div className="detail-list-item" data-testid="opportunity-detail-materialized-at">
           <span>Materialized</span>
           <strong>{formatTimestamp(opportunity.materialized_at)}</strong>
         </div>
