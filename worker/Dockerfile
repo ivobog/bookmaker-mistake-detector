@@ -9,7 +9,6 @@ COPY backend/src ./backend/src
 
 ENV PYTHONPATH=/app/backend/src
 
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir .
+RUN pip install --no-cache-dir --default-timeout=120 --no-build-isolation .
 
 CMD ["python", "-m", "bookmaker_detector_worker.main"]
