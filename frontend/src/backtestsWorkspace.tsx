@@ -136,10 +136,11 @@ function BacktestStrategySections({
           </div>
         </div>
 
-        <div className="fold-grid">
+        <div className="fold-grid" data-testid="backtest-fold-grid">
           {summary.folds.map((fold) => (
             <button
               className="unstyled-card-button"
+              data-testid={`backtest-fold-card-${fold.fold_index}`}
               key={fold.fold_index}
               onClick={() =>
                 onNavigate({
@@ -179,7 +180,7 @@ export function BacktestsWorkspace({
 
   return (
     <>
-      <section className="stat-grid">
+      <section className="stat-grid" data-testid="backtests-page">
         <StatTile label="Backtest runs" value={String(overview.run_count)} />
         <StatTile
           label="Latest task"
@@ -235,7 +236,7 @@ export function BacktestsWorkspace({
               </div>
             </div>
 
-            <div className="table-shell">
+            <div className="table-shell" data-testid="backtests-history-table">
               <table>
                 <thead>
                   <tr>

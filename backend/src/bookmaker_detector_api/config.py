@@ -7,6 +7,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 
 class Settings(BaseSettings):
     api_env: str = "development"
+    api_enable_test_helpers: bool = False
     api_repository_mode: str | None = None
     api_host: str = "0.0.0.0"
     api_port: int = 8000
@@ -59,6 +60,10 @@ class Settings(BaseSettings):
         if configured_mode == "in_memory":
             return False
         return self.api_env.strip().lower() == "production"
+
+    @property
+    def allow_test_helpers(self) -> bool:
+        return self.api_env.strip().lower() != "production" and self.api_enable_test_helpers
 
 
 settings = Settings()

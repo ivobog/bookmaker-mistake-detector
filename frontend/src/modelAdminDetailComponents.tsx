@@ -86,7 +86,7 @@ export function ModelRegistryDetailCard({
   }
 
   return (
-    <article className="panel focus-panel">
+    <article className="panel focus-panel" data-testid="registry-detail-card">
       <div className="section-heading">
         <div>
           <p className="eyebrow">Registry detail</p>
@@ -138,7 +138,7 @@ export function ModelAdminRunDetailCard({
   }
 
   return (
-    <article className="panel focus-panel">
+    <article className="panel focus-panel" data-testid="run-detail-card">
       <ProvenanceRibbon
         items={[
           { label: "Run", value: `#${run.id}` },
@@ -279,7 +279,7 @@ export function ModelAdminEvaluationDetailCard({
   }
 
   return (
-    <article className="panel focus-panel">
+    <article className="panel focus-panel" data-testid="evaluation-detail-card">
       <ProvenanceRibbon
         items={[
           { label: "Evaluation", value: `#${evaluation.id}` },
@@ -373,7 +373,7 @@ export function ModelAdminSelectionDetailCard({
   }
 
   return (
-    <article className="panel focus-panel">
+    <article className="panel focus-panel" data-testid="selection-detail-card">
       <ProvenanceRibbon
         items={[
           { label: "Selection", value: `#${selection.id}` },

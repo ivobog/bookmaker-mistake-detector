@@ -20,6 +20,7 @@ function OpportunityListItem({
   return (
     <button
       className={`opportunity-list-item${active ? " opportunity-list-item-active" : ""}`}
+      data-testid={`opportunity-row-${opportunity.id}`}
       onClick={() => onSelect(opportunity.id)}
       type="button"
     >
@@ -85,7 +86,7 @@ export function OpportunitiesWorkspace({
 
   return (
     <>
-      <section className="stat-grid">
+      <section className="stat-grid" data-testid="opportunities-page">
         <StatTile label="Opportunity count" value={String(opportunityOverview.opportunity_count)} />
         <StatTile
           label="Review queue"
@@ -110,7 +111,10 @@ export function OpportunitiesWorkspace({
                 <h2>Analyst queue</h2>
               </div>
               <div className="pill-row">
-                <span className={`pill${opportunityList.queue_scope_is_scoped ? " pill-warning" : ""}`}>
+                <span
+                  className={`pill${opportunityList.queue_scope_is_scoped ? " pill-warning" : ""}`}
+                  data-testid="opportunities-queue-scope-badge"
+                >
                   {opportunityList.queue_scope_is_scoped ? "Scoped" : "Global"}
                 </span>
                 <span className="pill">
@@ -123,6 +127,7 @@ export function OpportunitiesWorkspace({
             </div>
 
             <div
+              data-testid="opportunities-queue-scope-panel"
               className={`sub-panel queue-scope-panel${
                 opportunityList.queue_scope_is_scoped ? " queue-scope-panel-warning" : ""
               }`}
@@ -130,14 +135,18 @@ export function OpportunitiesWorkspace({
               <div className="section-heading compact-heading">
                 <div>
                   <p className="sub-panel-title">Queue scope</p>
-                  <p className="sub-panel-stat">{queueScopeLabel}</p>
+                  <p className="sub-panel-stat" data-testid="opportunities-queue-scope-label">
+                    {queueScopeLabel}
+                  </p>
                 </div>
                 <div className="pill-row">
                   {opportunityList.queue_batch_id ? (
-                    <span className="pill">Batch {opportunityList.queue_batch_id.slice(0, 8)}</span>
+                    <span className="pill" data-testid="opportunities-queue-batch-id">
+                      Batch {opportunityList.queue_batch_id.slice(0, 8)}
+                    </span>
                   ) : null}
                   {opportunityList.queue_materialized_at ? (
-                    <span className="pill">
+                    <span className="pill" data-testid="opportunities-queue-materialized-at">
                       {formatTimestamp(opportunityList.queue_materialized_at)}
                     </span>
                   ) : null}

@@ -205,6 +205,7 @@ export function ModelAdminDashboardPage({
     <>
       <section className="dashboard-grid">
         <article className="panel focus-panel">
+          <div data-testid="model-admin-summary" />
           <div className="section-heading">
             <div>
               <p className="eyebrow">Workspace overview</p>
@@ -277,19 +278,39 @@ export function ModelAdminDashboardPage({
           </div>
 
           <div className="list-stack">
-            <button className="model-admin-list-card" onClick={() => onNavigate({ name: "model-registry" })} type="button">
+            <button
+              className="model-admin-list-card"
+              data-testid="model-admin-registry-tab"
+              onClick={() => onNavigate({ name: "model-registry" })}
+              type="button"
+            >
               <p className="sub-panel-title">Registry</p>
               <p className="sub-panel-meta">Inspect registered model families and version metadata.</p>
             </button>
-            <button className="model-admin-list-card" onClick={() => onNavigate({ name: "model-runs" })} type="button">
+            <button
+              className="model-admin-list-card"
+              data-testid="model-admin-runs-tab"
+              onClick={() => onNavigate({ name: "model-runs" })}
+              type="button"
+            >
               <p className="sub-panel-title">Runs</p>
               <p className="sub-panel-meta">Inspect recent training runs and open detailed artifacts.</p>
             </button>
-            <button className="model-admin-list-card" onClick={() => onNavigate({ name: "model-evaluations" })} type="button">
+            <button
+              className="model-admin-list-card"
+              data-testid="model-admin-evaluations-tab"
+              onClick={() => onNavigate({ name: "model-evaluations" })}
+              type="button"
+            >
               <p className="sub-panel-title">Evaluations</p>
               <p className="sub-panel-meta">Inspect snapshot metrics, selected feature, and fallback behavior.</p>
             </button>
-            <button className="model-admin-list-card" onClick={() => onNavigate({ name: "model-selections" })} type="button">
+            <button
+              className="model-admin-list-card"
+              data-testid="model-admin-selections-tab"
+              onClick={() => onNavigate({ name: "model-selections" })}
+              type="button"
+            >
               <p className="sub-panel-title">Selections</p>
               <p className="sub-panel-meta">Inspect active and historical promoted model snapshots.</p>
             </button>
@@ -405,7 +426,7 @@ export function ModelRegistryPage({
           </div>
         </div>
 
-        <div className="table-shell">
+        <div className="table-shell" data-testid="registry-table">
           <table>
             <thead>
               <tr>
@@ -423,6 +444,7 @@ export function ModelRegistryPage({
               ) : (
                 entries.map((entry) => (
                   <tr
+                    data-testid={`registry-row-${entry.id}`}
                     className={selectedEntryId === entry.id ? "row-active" : undefined}
                     key={entry.id}
                     onClick={() => onSelectEntry(entry.id)}
@@ -470,7 +492,7 @@ export function ModelRunsPage({
           </div>
         </div>
 
-        <div className="table-shell">
+        <div className="table-shell" data-testid="runs-table">
           <table>
             <thead>
               <tr>
@@ -489,6 +511,7 @@ export function ModelRunsPage({
               ) : (
                 runs.map((run) => (
                   <tr
+                    data-testid={`run-row-${run.id}`}
                     className={selectedRunId === run.id ? "row-active" : undefined}
                     key={run.id}
                     onClick={() => onNavigate({ name: "model-run-detail", runId: run.id })}
@@ -541,7 +564,7 @@ export function ModelEvaluationsPage({
           </div>
         </div>
 
-        <div className="table-shell">
+        <div className="table-shell" data-testid="evaluations-table">
           <table>
             <thead>
               <tr>
@@ -560,6 +583,7 @@ export function ModelEvaluationsPage({
               ) : (
                 evaluations.map((snapshot) => (
                   <tr
+                    data-testid={`evaluation-row-${snapshot.id}`}
                     className={selectedEvaluationId === snapshot.id ? "row-active" : undefined}
                     key={snapshot.id}
                     onClick={() =>
@@ -614,7 +638,7 @@ export function ModelSelectionsPage({
           </div>
         </div>
 
-        <div className="table-shell">
+        <div className="table-shell" data-testid="selections-table">
           <table>
             <thead>
               <tr>
@@ -633,6 +657,7 @@ export function ModelSelectionsPage({
               ) : (
                 selections.map((selection) => (
                   <tr
+                    data-testid={`selection-row-${selection.id}`}
                     className={selectedSelectionId === selection.id ? "row-active" : undefined}
                     key={selection.id}
                     onClick={() =>

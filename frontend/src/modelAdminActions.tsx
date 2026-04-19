@@ -109,6 +109,7 @@ export function ModelAdminActionsPanel({
           {enableTrain ? (
             <button
               className={`secondary-button${openAction === "train" ? " action-toggle-active" : ""}`}
+              data-testid="model-admin-train-action"
               onClick={() => {
                 setFormError(null);
                 setOpenAction((current) => (current === "train" ? null : "train"));
@@ -121,6 +122,7 @@ export function ModelAdminActionsPanel({
           {enableSelect ? (
             <button
               className={`secondary-button${openAction === "select" ? " action-toggle-active" : ""}`}
+              data-testid="model-admin-select-action"
               onClick={() => {
                 setFormError(null);
                 setOpenAction((current) => (current === "select" ? null : "select"));
@@ -141,18 +143,27 @@ export function ModelAdminActionsPanel({
       {formError ? <div className="banner banner-error action-banner">{formError}</div> : null}
 
       {openAction === "train" ? (
-        <div className="action-form-grid">
+        <div className="action-form-grid" data-testid="train-model-form">
           <label className="filter-field">
             <span className="filter-label">Feature key</span>
-            <input onChange={(event) => setFeatureKey(event.target.value)} value={featureKey} />
+            <input
+              data-testid="train-feature-key"
+              onChange={(event) => setFeatureKey(event.target.value)}
+              value={featureKey}
+            />
           </label>
           <label className="filter-field">
             <span className="filter-label">Target task</span>
-            <input onChange={(event) => setTrainTargetTask(event.target.value)} value={trainTargetTask} />
+            <input
+              data-testid="train-target-task"
+              onChange={(event) => setTrainTargetTask(event.target.value)}
+              value={trainTargetTask}
+            />
           </label>
           <label className="filter-field">
             <span className="filter-label">Team code</span>
             <input
+              data-testid="train-team-code"
               onChange={(event) => setTrainTeamCode(event.target.value)}
               placeholder="Optional"
               value={trainTeamCode}
@@ -161,6 +172,7 @@ export function ModelAdminActionsPanel({
           <label className="filter-field">
             <span className="filter-label">Season label</span>
             <input
+              data-testid="train-season-label"
               onChange={(event) => setTrainSeasonLabel(event.target.value)}
               placeholder="Optional"
               value={trainSeasonLabel}
@@ -168,16 +180,25 @@ export function ModelAdminActionsPanel({
           </label>
           <label className="filter-field">
             <span className="filter-label">Train ratio</span>
-            <input onChange={(event) => setTrainRatio(event.target.value)} value={trainRatio} />
+            <input
+              data-testid="train-train-ratio"
+              onChange={(event) => setTrainRatio(event.target.value)}
+              value={trainRatio}
+            />
           </label>
           <label className="filter-field">
             <span className="filter-label">Validation ratio</span>
-            <input onChange={(event) => setValidationRatio(event.target.value)} value={validationRatio} />
+            <input
+              data-testid="train-validation-ratio"
+              onChange={(event) => setValidationRatio(event.target.value)}
+              value={validationRatio}
+            />
           </label>
 
           <div className="action-submit-row">
             <button
               className="primary-button action-primary-button"
+              data-testid="train-submit"
               disabled={busyAction === "train"}
               onClick={() => void handleTrainSubmit()}
               type="button"
@@ -189,10 +210,11 @@ export function ModelAdminActionsPanel({
       ) : null}
 
       {openAction === "select" ? (
-        <div className="action-form-grid action-form-grid-compact">
+        <div className="action-form-grid action-form-grid-compact" data-testid="select-model-form">
           <label className="filter-field">
             <span className="filter-label">Target task</span>
             <input
+              data-testid="select-target-task"
               onChange={(event) => setSelectionTargetTask(event.target.value)}
               value={selectionTargetTask}
             />
@@ -200,6 +222,7 @@ export function ModelAdminActionsPanel({
           <label className="filter-field">
             <span className="filter-label">Selection policy</span>
             <input
+              data-testid="select-policy-name"
               onChange={(event) => setSelectionPolicyName(event.target.value)}
               value={selectionPolicyName}
             />
@@ -208,6 +231,7 @@ export function ModelAdminActionsPanel({
           <div className="action-submit-row">
             <button
               className="primary-button action-primary-button"
+              data-testid="select-submit"
               disabled={busyAction === "select"}
               onClick={() => void handleSelectSubmit()}
               type="button"

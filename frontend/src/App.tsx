@@ -754,7 +754,7 @@ export default function App() {
   };
 
   return (
-    <main className="app-shell">
+    <main className="app-shell" data-testid="app-shell">
       <section className="hero">
         <div className="hero-copy">
           <p className="eyebrow">Bookmaker Mistake Detector</p>
@@ -763,8 +763,9 @@ export default function App() {
         </div>
 
         <div className="hero-actions">
-          <div className="mode-switch">
+          <div className="mode-switch" data-testid="model-admin-nav">
             <button
+              data-testid="nav-backtests"
               className={`mode-button${viewMode === "backtests" ? " mode-button-active" : ""}`}
               onClick={() => navigate({ name: "backtests" })}
               type="button"
@@ -772,6 +773,7 @@ export default function App() {
               Backtests
             </button>
             <button
+              data-testid="nav-opportunities"
               className={`mode-button${viewMode === "opportunities" ? " mode-button-active" : ""}`}
               onClick={() => navigate({ name: "opportunities" })}
               type="button"
@@ -779,6 +781,7 @@ export default function App() {
               Opportunities
             </button>
             <button
+              data-testid="nav-model-admin"
               className={`mode-button${viewMode === "models" ? " mode-button-active" : ""}`}
               onClick={() => navigate({ name: "models" })}
               type="button"
@@ -788,16 +791,27 @@ export default function App() {
           </div>
 
           {viewMode === "backtests" ? (
-            <button className="primary-button" disabled={running} onClick={() => void handleRunBacktest()}>
+            <button
+              className="primary-button"
+              data-testid="run-backtest-button"
+              disabled={running}
+              onClick={() => void handleRunBacktest()}
+            >
               {running ? "Running backtest..." : "Run new backtest"}
             </button>
           ) : viewMode === "models" ? (
-            <button className="primary-button" onClick={() => navigate({ name: "models" })} type="button">
+            <button
+              className="primary-button"
+              data-testid="open-model-dashboard-button"
+              onClick={() => navigate({ name: "models" })}
+              type="button"
+            >
               Open model dashboard
             </button>
           ) : (
             <button
               className="primary-button"
+              data-testid="opportunities-refresh-button"
               disabled={materializingOpportunity}
               onClick={() => void handleMaterializeOpportunities()}
             >

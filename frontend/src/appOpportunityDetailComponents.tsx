@@ -59,7 +59,7 @@ export function OpportunityDetailCard({
   const showTreeStumpExplainability = explainability?.model_family === "tree_stump";
 
   return (
-    <article className="panel focus-panel">
+    <article className="panel focus-panel" data-testid="opportunity-detail-card">
       <ProvenanceRibbon items={provenanceItems ?? []} title="Provenance" />
       {provenanceData ? <ProvenanceInspector data={provenanceData} /> : null}
 
@@ -400,9 +400,12 @@ export function OpportunityDetailCard({
         ) : null}
 
         {showTreeStumpExplainability ? (
-          <section className="sub-panel stump-explainability-panel">
+          <section
+            className="sub-panel stump-explainability-panel"
+            data-testid="stump-explainability-card"
+          >
             <p className="sub-panel-title">Tree stump explanation</p>
-            <p className="sub-panel-stat">
+            <p className="sub-panel-stat" data-testid="stump-selected-feature">
               {String(explainability.selected_feature ?? "n/a")}
             </p>
             <p className="sub-panel-meta">
@@ -411,7 +414,7 @@ export function OpportunityDetailCard({
             <div className="detail-list compact-list">
               <div className="detail-list-item">
                 <span>Threshold</span>
-                <strong>{String(explainability.threshold ?? "n/a")}</strong>
+                <strong data-testid="stump-threshold">{String(explainability.threshold ?? "n/a")}</strong>
               </div>
               <div className="detail-list-item">
                 <span>Selected feature value</span>
@@ -423,11 +426,15 @@ export function OpportunityDetailCard({
               </div>
               <div className="detail-list-item">
                 <span>Left leaf prediction</span>
-                <strong>{String(explainability.left_prediction ?? "n/a")}</strong>
+                <strong data-testid="stump-left-prediction">
+                  {String(explainability.left_prediction ?? "n/a")}
+                </strong>
               </div>
               <div className="detail-list-item">
                 <span>Right leaf prediction</span>
-                <strong>{String(explainability.right_prediction ?? "n/a")}</strong>
+                <strong data-testid="stump-right-prediction">
+                  {String(explainability.right_prediction ?? "n/a")}
+                </strong>
               </div>
             </div>
           </section>
