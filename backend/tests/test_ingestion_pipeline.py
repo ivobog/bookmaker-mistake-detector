@@ -2,6 +2,8 @@ import json
 from datetime import date
 from pathlib import Path
 
+import pytest
+
 from bookmaker_detector_api.fetching import FetchedPage
 from bookmaker_detector_api.ingestion.models import ParseStatus, RawGameRow
 from bookmaker_detector_api.ingestion.providers import CoversHistoricalTeamPageProvider
@@ -82,6 +84,26 @@ def test_ingestion_pipeline_persists_fixture_run_in_memory() -> None:
     assert len(repository.data_quality_issues) == 3
     assert repository.canonical_games[0]["id"] == 1
     assert repository.metrics[0]["canonical_game_id"] == 1
+
+
+def test_ingestion_pipeline_rejects_team_identity_mismatch() -> None:
+    provider = CoversHistoricalTeamPageProvider()
+    repository = InMemoryIngestionRepository()
+    fixture_html = _load_fixture(provider, "covers_sample_team_page.html")
+
+    with pytest.raises(ValueError, match="identity mismatch"):
+        ingest_historical_team_page(
+            request=HistoricalIngestionRequest(
+                provider_name="covers",
+                team_code="PHX",
+                season_label="2024-2025",
+                source_url="https://example.com/covers/phx/2024-2025",
+                requested_by="test-suite",
+                html=fixture_html,
+            ),
+            provider=provider,
+            repository=repository,
+        )
 
 
 def test_ingestion_pipeline_skips_invalid_rows_from_canonicalization() -> None:

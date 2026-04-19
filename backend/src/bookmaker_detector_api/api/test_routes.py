@@ -34,19 +34,19 @@ _E2E_SEED_RUNS = (
         "source_url": "https://example.com/covers/lal/2024-2025",
     },
     {
-        "fixture_name": "covers_sample_team_page.html",
+        "fixture_name": "covers_team_page_dal_2024_2025.html",
         "team_code": "DAL",
         "season_label": "2024-2025",
         "source_url": "https://example.com/covers/dal/2024-2025",
     },
     {
-        "fixture_name": "covers_sample_team_page.html",
+        "fixture_name": "covers_team_page_chi_2024_2025.html",
         "team_code": "CHI",
         "season_label": "2024-2025",
         "source_url": "https://example.com/covers/chi/2024-2025",
     },
     {
-        "fixture_name": "covers_sample_team_page.html",
+        "fixture_name": "covers_team_page_phx_2024_2025.html",
         "team_code": "PHX",
         "season_label": "2024-2025",
         "source_url": "https://example.com/covers/phx/2024-2025",

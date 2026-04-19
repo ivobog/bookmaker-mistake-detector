@@ -219,10 +219,10 @@ def _seed_in_memory_demo_data(repository: IngestionRepository) -> None:
     if not isinstance(repository, InMemoryIngestionRepository):
         return
 
-    fixture_path = (
-        Path(__file__).resolve().parents[1] / "fixtures" / "covers_sample_team_page.html"
-    ).resolve()
-    artifact_root = Path(mkdtemp(prefix="admin-diagnostics-seed-", dir=str(Path.cwd())))
+    fixture_dir = (Path(__file__).resolve().parents[1] / "fixtures").resolve()
+    fixture_path = (fixture_dir / "covers_sample_team_page.html").resolve()
+    alt_scope_fixture_path = (fixture_dir / "covers_team_page_nyk_2023_2024.html").resolve()
+    artifact_root = Path(mkdtemp(prefix="admin-diagnostics-seed-"))
     original_payload_dir = settings.raw_payload_dir
     original_parser_snapshot_dir = settings.parser_snapshot_dir
     settings.raw_payload_dir = str(artifact_root / "raw-payloads")
@@ -245,7 +245,7 @@ def _seed_in_memory_demo_data(repository: IngestionRepository) -> None:
         repository_mode="in_memory",
         team_code="NYK",
         season_label="2023-2024",
-        source_url=fixture_path.as_uri(),
+        source_url=alt_scope_fixture_path.as_uri(),
         requested_by="admin-diagnostics-seed-alt-scope",
         persist_payload=False,
         repository_override=repository,

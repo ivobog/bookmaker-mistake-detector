@@ -8,6 +8,9 @@ from bookmaker_detector_api.demo import seed_phase_two_feature_in_memory
 from bookmaker_detector_api.services import (
     model_market_board_sources as market_board_sources_module,
 )
+from bookmaker_detector_api.services import (
+    model_opportunities,
+)
 from bookmaker_detector_api.services.models import (
     get_model_backtest_detail_in_memory,
     get_model_backtest_history_in_memory,
@@ -495,6 +498,70 @@ def test_materialize_model_opportunities_in_memory_emits_structured_workflow_log
     assert succeeded[1]["opportunity_count"] == materialized["opportunity_count"]
     assert succeeded[1]["materialized_count"] == materialized["materialized_count"]
     assert succeeded[1]["scoring_preview_count"] == materialized["scored_prediction_count"]
+
+
+def test_build_model_opportunities_collapses_mirrored_game_predictions() -> None:
+    scoring_preview = {
+        "active_selection": {"id": 11},
+        "active_evaluation_snapshot": {"id": 12},
+        "feature_version": {"id": 13},
+        "predictions": [
+            {
+                "canonical_game_id": 12,
+                "season_label": "2024-2025",
+                "game_date": "2024-11-05",
+                "team_code": "MIA",
+                "opponent_code": "PHX",
+                "venue": "away",
+                "prediction_value": -3.9286,
+                "signal_strength": 3.9286,
+                "evidence": {
+                    "strength": {"rating": "medium"},
+                    "recommendation": {"status": "lean"},
+                },
+            },
+            {
+                "canonical_game_id": 12,
+                "season_label": "2024-2025",
+                "game_date": "2024-11-05",
+                "team_code": "PHX",
+                "opponent_code": "MIA",
+                "venue": "home",
+                "prediction_value": 3.5,
+                "signal_strength": 3.5,
+                "evidence": {
+                    "strength": {"rating": "medium"},
+                    "recommendation": {"status": "lean"},
+                },
+            },
+        ],
+    }
+    policy = {
+        "policy_name": "spread_edge_policy_v1",
+        "candidate_min_signal_strength": 10.0,
+        "candidate_evidence_ratings": ["strong"],
+        "candidate_recommendation_statuses": ["bet"],
+        "review_min_signal_strength": 1.0,
+        "review_evidence_ratings": ["medium", "strong"],
+        "review_recommendation_statuses": ["lean", "bet"],
+    }
+
+    opportunities = model_opportunities.build_model_opportunities(
+        scoring_preview=scoring_preview,
+        target_task="spread_error_regression",
+        policy=policy,
+    )
+
+    assert len(opportunities) == 1
+    assert opportunities[0].canonical_game_id == 12
+    assert opportunities[0].team_code == "PHX"
+    assert opportunities[0].opponent_code == "MIA"
+    assert opportunities[0].prediction_value == pytest.approx(-3.9286)
+    assert opportunities[0].payload["prediction"]["team_code"] == "MIA"
+    assert (
+        opportunities[0].opportunity_key
+        == "spread_error_regression:game:12:spread_edge_policy_v1"
+    )
 
 
 def test_get_model_future_game_preview_in_memory_scores_both_perspectives() -> None:
@@ -2026,6 +2093,104 @@ def test_model_opportunity_queue_in_memory_prefers_latest_relevant_batch() -> No
         entry.materialization_batch_id == team_batch_id
         for entry in team_queue["opportunities"]
     )
+
+
+def test_model_opportunity_queue_in_memory_dedupes_mirrored_rows_in_latest_batch() -> None:
+    repository, _, _ = seed_phase_two_feature_in_memory()
+    batch_id = "batch-operator-global"
+    materialized_at = datetime(2026, 4, 19, 18, 39, tzinfo=timezone.utc)
+    repository.model_opportunities.extend(
+        [
+            {
+                "id": 1,
+                "model_scoring_run_id": 11,
+                "model_selection_snapshot_id": 12,
+                "model_evaluation_snapshot_id": 13,
+                "feature_version_id": 1,
+                "target_task": "spread_error_regression",
+                "source_kind": "historical_game",
+                "scenario_key": None,
+                "opportunity_key": "spread_error_regression:game:12:spread_edge_policy_v1",
+                "team_code": "MIA",
+                "opponent_code": "PHX",
+                "season_label": "2024-2025",
+                "canonical_game_id": 12,
+                "game_date": date(2024, 11, 5),
+                "policy_name": "spread_edge_policy_v1",
+                "status": "review_manually",
+                "prediction_value": -3.9286,
+                "signal_strength": 3.9286,
+                "evidence_rating": "medium",
+                "recommendation_status": "lean",
+                "materialization_batch_id": batch_id,
+                "materialized_at": materialized_at,
+                "materialization_scope_team_code": None,
+                "materialization_scope_season_label": None,
+                "materialization_scope_canonical_game_id": None,
+                "materialization_scope_source": "operator",
+                "materialization_scope_key": "operator-wide",
+                "payload": {
+                    "prediction": {
+                        "team_code": "MIA",
+                        "opponent_code": "PHX",
+                        "venue": "away",
+                    }
+                },
+                "created_at": materialized_at,
+                "updated_at": materialized_at,
+            },
+            {
+                "id": 2,
+                "model_scoring_run_id": 11,
+                "model_selection_snapshot_id": 12,
+                "model_evaluation_snapshot_id": 13,
+                "feature_version_id": 1,
+                "target_task": "spread_error_regression",
+                "source_kind": "historical_game",
+                "scenario_key": None,
+                "opportunity_key": "spread_error_regression:game:12:spread_edge_policy_v1",
+                "team_code": "PHX",
+                "opponent_code": "MIA",
+                "season_label": "2024-2025",
+                "canonical_game_id": 12,
+                "game_date": date(2024, 11, 5),
+                "policy_name": "spread_edge_policy_v1",
+                "status": "review_manually",
+                "prediction_value": 3.5,
+                "signal_strength": 3.5,
+                "evidence_rating": "medium",
+                "recommendation_status": "lean",
+                "materialization_batch_id": batch_id,
+                "materialized_at": materialized_at,
+                "materialization_scope_team_code": None,
+                "materialization_scope_season_label": None,
+                "materialization_scope_canonical_game_id": None,
+                "materialization_scope_source": "operator",
+                "materialization_scope_key": "operator-wide",
+                "payload": {
+                    "prediction": {
+                        "team_code": "PHX",
+                        "opponent_code": "MIA",
+                        "venue": "home",
+                    }
+                },
+                "created_at": materialized_at,
+                "updated_at": materialized_at,
+            },
+        ]
+    )
+
+    queue = get_model_opportunity_queue_in_memory(
+        repository,
+        target_task="spread_error_regression",
+    )
+
+    assert queue["queue_batch_id"] == batch_id
+    assert len(queue["opportunities"]) == 1
+    assert queue["opportunities"][0].canonical_game_id == 12
+    assert queue["opportunities"][0].team_code == "PHX"
+    assert queue["opportunities"][0].opponent_code == "MIA"
+    assert queue["opportunities"][0].prediction_value == pytest.approx(-3.9286)
 
 
 def test_train_phase_three_models_rejects_unsupported_targets() -> None:

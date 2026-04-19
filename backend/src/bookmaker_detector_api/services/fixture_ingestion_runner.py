@@ -18,6 +18,13 @@ from bookmaker_detector_api.services.repository_factory import (
 from bookmaker_detector_api.services.workflow_logging import start_workflow_span
 
 FIXTURE_DIR = Path(__file__).resolve().parents[1] / "fixtures"
+FIXTURE_BY_TEAM_CODE: dict[str, str] = {
+    "CHI": "covers_team_page_chi_2024_2025.html",
+    "DAL": "covers_team_page_dal_2024_2025.html",
+    "LAL": "covers_sample_team_page.html",
+    "PHX": "covers_team_page_phx_2024_2025.html",
+    "NYK": "covers_team_page_nyk_2023_2024.html",
+}
 
 
 def run_fixture_ingestion(
@@ -29,7 +36,8 @@ def run_fixture_ingestion(
     requested_by: str,
 ) -> dict[str, object]:
     provider = CoversHistoricalTeamPageProvider()
-    fixture_html = provider.load_fixture(FIXTURE_DIR / "covers_sample_team_page.html")
+    fixture_name = FIXTURE_BY_TEAM_CODE.get(team_code.upper(), "covers_sample_team_page.html")
+    fixture_html = provider.load_fixture(FIXTURE_DIR / fixture_name)
     span = start_workflow_span(
         workflow_name="ingestion.fixture_ingestion",
         repository_mode=repository_mode,

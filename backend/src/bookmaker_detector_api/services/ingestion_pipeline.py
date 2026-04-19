@@ -171,6 +171,14 @@ def _parse_raw_rows(
         )
         return raw_rows, diagnostics
 
+    validate_team_page_identity = getattr(provider, "validate_team_page_identity", None)
+    if callable(validate_team_page_identity):
+        validate_team_page_identity(
+            page_content=html,
+            team_code=team_code,
+            team_main_page_url=source_url,
+        )
+
     season_block = provider.extract_season_block(
         page_content=html,
         season_label=season_label,

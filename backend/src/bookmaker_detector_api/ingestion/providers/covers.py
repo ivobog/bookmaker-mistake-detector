@@ -67,6 +67,34 @@ class CoversHistoricalTeamPageProvider:
     def fetch_page(self, *, url: str) -> FetchedPage:
         return fetch_page(url)
 
+    def validate_team_page_identity(
+        self,
+        *,
+        page_content: str,
+        team_code: str,
+        team_main_page_url: str,
+    ) -> None:
+        document = _parse_document(page_content)
+        declared_team_code = _extract_declared_team_identity_value(
+            document,
+            attribute_name="data-team-code",
+        )
+        if declared_team_code is None:
+            return
+        resolved_expected_team_code, _ = resolve_team_code_or_name(team_code)
+        expected_team_code = (resolved_expected_team_code or team_code).strip().upper()
+        resolved_declared_team_code, _ = resolve_team_code_or_name(declared_team_code)
+        normalized_declared_team_code = (
+            resolved_declared_team_code or declared_team_code
+        ).strip().upper()
+        if normalized_declared_team_code == expected_team_code:
+            return
+        raise ValueError(
+            "Covers team page identity mismatch: "
+            f"requested {expected_team_code}, fixture declares {normalized_declared_team_code} "
+            f"for {team_main_page_url}."
+        )
+
     def fetch_team_main_page(
         self,
         *,
@@ -460,6 +488,11 @@ class CoversHistoricalTeamPageProvider:
         season_label: str,
         source_url: str,
     ) -> list[RawGameRow]:
+        self.validate_team_page_identity(
+            page_content=html,
+            team_code=team_code,
+            team_main_page_url=source_url,
+        )
         season_block = self.extract_season_block(
             page_content=html,
             season_label=season_label,
@@ -501,6 +534,18 @@ def _extract_team_slug(href: str) -> str | None:
     if match is None:
         return None
     return match.group("slug").strip()
+
+
+def _extract_declared_team_identity_value(
+    document: "_HtmlNode",
+    *,
+    attribute_name: str,
+) -> str | None:
+    for element in document.iter():
+        attribute_value = (element.attributes.get(attribute_name) or "").strip()
+        if attribute_value:
+            return attribute_value
+    return None
 
 
 def _team_name_from_slug(slug: str) -> str:

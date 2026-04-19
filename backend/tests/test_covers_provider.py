@@ -1,3 +1,5 @@
+import pytest
+
 from bookmaker_detector_api.fetching import FetchedPage
 from bookmaker_detector_api.ingestion.models import ParseStatus
 from bookmaker_detector_api.ingestion.providers import CoversHistoricalTeamPageProvider
@@ -38,6 +40,19 @@ def test_covers_provider_parses_only_regular_season_rows() -> None:
     assert rows[1].is_away is True
     assert rows[2].ats_line == -1.5
     assert rows[2].total_line == 221.5
+
+
+def test_covers_provider_rejects_team_identity_mismatch() -> None:
+    provider = CoversHistoricalTeamPageProvider()
+    html = _load_sample_team_page(provider)
+
+    with pytest.raises(ValueError, match="identity mismatch"):
+        provider.parse_team_page(
+            html=html,
+            team_code="PHX",
+            season_label="2024-2025",
+            source_url="https://example.com/covers/phx/2024-2025",
+        )
 
 
 def test_covers_provider_discovers_team_pages_from_index_page(monkeypatch) -> None:

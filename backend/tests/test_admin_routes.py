@@ -3087,13 +3087,13 @@ def test_ingestion_stats_endpoint_returns_breakdowns() -> None:
     stats = payload["stats"]
     assert stats["parse_status_counts"] == {"VALID": 8, "INVALID": 1}
     assert stats["reconciliation_status_counts"] == {
-        "PARTIAL_SINGLE_ROW": 5,
-        "CONFLICT_SCORE": 2,
+        "PARTIAL_SINGLE_ROW": 6,
+        "CONFLICT_SCORE": 1,
     }
-    assert stats["data_quality_issue_type_counts"]["canonical.single_team_perspective_only"] == 5
+    assert stats["data_quality_issue_type_counts"]["canonical.single_team_perspective_only"] == 6
     assert stats["data_quality_issue_type_counts"]["parse.invalid_score_format"] == 1
-    assert stats["data_quality_issue_type_counts"]["canonical.score_mismatch"] == 2
-    assert stats["data_quality_issue_severity_counts"] == {"warning": 5, "error": 3}
+    assert stats["data_quality_issue_type_counts"]["canonical.score_mismatch"] == 1
+    assert stats["data_quality_issue_severity_counts"] == {"warning": 6, "error": 2}
 
 
 def test_ingestion_issues_endpoint_supports_scope_filters() -> None:
@@ -3141,14 +3141,12 @@ def test_ingestion_stats_endpoint_supports_scope_filters() -> None:
     assert payload["filters"]["season_label"] == "2023-2024"
     assert payload["stats"]["parse_status_counts"] == {"VALID": 3}
     assert payload["stats"]["reconciliation_status_counts"] == {
-        "PARTIAL_SINGLE_ROW": 2,
-        "CONFLICT_SCORE": 1,
+        "PARTIAL_SINGLE_ROW": 3,
     }
     assert payload["stats"]["data_quality_issue_type_counts"] == {
-        "canonical.single_team_perspective_only": 2,
-        "canonical.score_mismatch": 1,
+        "canonical.single_team_perspective_only": 3,
     }
-    assert payload["stats"]["data_quality_issue_severity_counts"] == {"warning": 2, "error": 1}
+    assert payload["stats"]["data_quality_issue_severity_counts"] == {"warning": 3}
     assert payload["stats"]["diagnostic_counts"] == {"season_block_selector_match:page-fallback": 1}
 
 
@@ -3393,7 +3391,7 @@ def test_ingestion_trends_endpoint_returns_recent_run_rollup() -> None:
     assert overview["job_count"] == 5
     assert overview["completed_jobs"] == 4
     assert overview["failed_jobs"] == 1
-    assert overview["total_warning_count"] == 5
+    assert overview["total_warning_count"] == 4
     assert overview["total_quality_issues_saved"] == 8
     assert overview["diagnostic_counts"] == {"season_block_selector_match:page-fallback": 2}
     assert len(payload["trends"]["recent_runs"]) == 5
@@ -3426,12 +3424,10 @@ def test_ingestion_trends_endpoint_supports_scope_filters() -> None:
     assert recent_run["parse_status_counts"] == {"VALID": 3}
     assert recent_run["diagnostics"] == ["season_block_selector_match:page-fallback"]
     assert recent_run["reconciliation_status_counts"] == {
-        "PARTIAL_SINGLE_ROW": 2,
-        "CONFLICT_SCORE": 1,
+        "PARTIAL_SINGLE_ROW": 3,
     }
     assert recent_run["data_quality_issue_type_counts"] == {
-        "canonical.single_team_perspective_only": 2,
-        "canonical.score_mismatch": 1,
+        "canonical.single_team_perspective_only": 3,
     }
     assert payload["trends"]["overview"]["diagnostic_counts"] == {
         "season_block_selector_match:page-fallback": 1
@@ -3502,12 +3498,12 @@ def test_ingestion_quality_trends_endpoint_returns_rollup() -> None:
     assert overview["parse_valid_count"] == 8
     assert overview["parse_invalid_count"] == 1
     assert overview["parse_warning_count"] == 0
-    assert overview["reconciliation_partial_single_row_count"] == 5
-    assert overview["reconciliation_conflict_score_count"] == 2
+    assert overview["reconciliation_partial_single_row_count"] == 6
+    assert overview["reconciliation_conflict_score_count"] == 1
     assert overview["reconciliation_conflict_total_line_count"] == 0
     assert overview["reconciliation_conflict_spread_line_count"] == 0
-    assert overview["quality_issue_warning_count"] == 5
-    assert overview["quality_issue_error_count"] == 3
+    assert overview["quality_issue_warning_count"] == 6
+    assert overview["quality_issue_error_count"] == 2
     assert overview["parser_provenance_counts"] == {
         "opponent_resolution_mode": {"direct_code": 6},
         "ats_parse_mode": {"full": 6},
@@ -3545,10 +3541,10 @@ def test_ingestion_quality_trends_endpoint_supports_scope_filters() -> None:
     assert overview["job_count"] == 1
     assert overview["parse_valid_count"] == 3
     assert overview["parse_invalid_count"] == 0
-    assert overview["reconciliation_partial_single_row_count"] == 2
-    assert overview["reconciliation_conflict_score_count"] == 1
-    assert overview["quality_issue_warning_count"] == 2
-    assert overview["quality_issue_error_count"] == 1
+    assert overview["reconciliation_partial_single_row_count"] == 3
+    assert overview["reconciliation_conflict_score_count"] == 0
+    assert overview["quality_issue_warning_count"] == 3
+    assert overview["quality_issue_error_count"] == 0
     assert overview["parser_provenance_counts"] == {
         "opponent_resolution_mode": {"direct_code": 3},
         "ats_parse_mode": {"full": 3},

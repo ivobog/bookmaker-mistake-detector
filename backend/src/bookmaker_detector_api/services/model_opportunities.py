@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
@@ -53,13 +54,21 @@ def build_model_opportunities(
     resolved_materialization_context = materialization_context or build_materialization_context()
     opportunities = []
     predictions = list(scoring_preview.get("predictions", []))
-    for prediction in predictions:
-        status = evaluate_opportunity_status(prediction=prediction, policy=policy)
-        if status == "discarded":
-            continue
+    materializable_predictions = [
+        (prediction, evaluate_opportunity_status(prediction=prediction, policy=policy))
+        for prediction in predictions
+    ]
+    for prediction, status in _select_materialized_predictions(
+        materializable_predictions,
+        scenario=scenario,
+    ):
         canonical_game_id = positive_int_or_none(prediction.get("canonical_game_id"))
         source_kind = "future_scenario" if scenario is not None else "historical_game"
         scenario_key = str(scenario["scenario_key"]) if scenario is not None else None
+        canonical_team_code, canonical_opponent_code = _resolve_opportunity_matchup(
+            prediction=prediction,
+            scenario=scenario,
+        )
         payload = {
             "prediction": prediction,
             "policy": policy,
@@ -81,11 +90,10 @@ def build_model_opportunities(
                     target_task=target_task,
                     canonical_game_id=canonical_game_id,
                     scenario_key=scenario_key,
-                    team_code=str(prediction["team_code"]),
                     policy_name=str(policy["policy_name"]),
                 ),
-                team_code=str(prediction["team_code"]),
-                opponent_code=str(prediction["opponent_code"]),
+                team_code=canonical_team_code,
+                opponent_code=canonical_opponent_code,
                 season_label=str(prediction["season_label"]),
                 canonical_game_id=canonical_game_id,
                 game_date=model_future_scenarios.coerce_date(prediction["game_date"]),
@@ -125,11 +133,15 @@ def build_model_opportunities(
     if not opportunities and allow_best_effort_review and predictions:
         strongest_prediction = max(
             predictions,
-            key=lambda entry: float(entry.get("signal_strength", 0.0)),
+            key=_prediction_preference_key,
         )
         canonical_game_id = positive_int_or_none(strongest_prediction.get("canonical_game_id"))
         source_kind = "future_scenario" if scenario is not None else "historical_game"
         scenario_key = str(scenario["scenario_key"]) if scenario is not None else None
+        canonical_team_code, canonical_opponent_code = _resolve_opportunity_matchup(
+            prediction=strongest_prediction,
+            scenario=scenario,
+        )
         payload = {
             "prediction": strongest_prediction,
             "policy": policy,
@@ -152,11 +164,10 @@ def build_model_opportunities(
                     target_task=target_task,
                     canonical_game_id=canonical_game_id,
                     scenario_key=scenario_key,
-                    team_code=str(strongest_prediction["team_code"]),
                     policy_name=str(policy["policy_name"]),
                 ),
-                team_code=str(strongest_prediction["team_code"]),
-                opponent_code=str(strongest_prediction["opponent_code"]),
+                team_code=canonical_team_code,
+                opponent_code=canonical_opponent_code,
                 season_label=str(strongest_prediction["season_label"]),
                 canonical_game_id=canonical_game_id,
                 game_date=model_future_scenarios.coerce_date(strongest_prediction["game_date"]),
@@ -297,11 +308,13 @@ def build_model_opportunity_key(
     target_task: str,
     canonical_game_id: int | None,
     scenario_key: str | None,
-    team_code: str,
     policy_name: str,
 ) -> str:
-    subject_key = scenario_key if scenario_key is not None else f"game:{canonical_game_id}"
-    return f"{target_task}:{subject_key}:{team_code}:{policy_name}"
+    subject_key = _build_opportunity_subject_key(
+        canonical_game_id=canonical_game_id,
+        scenario_key=scenario_key,
+    )
+    return f"{target_task}:{subject_key}:{policy_name}"
 
 
 def nested_get(payload: dict[str, Any] | None, *keys: str) -> Any:
@@ -546,7 +559,7 @@ def list_model_opportunities_in_memory(
         )
     ]
     return sorted(
-        selected,
+        _dedupe_materialized_opportunities(selected),
         key=_opportunity_sort_key,
         reverse=True,
     )
@@ -636,7 +649,7 @@ def list_model_opportunities_postgres(
     with connection.cursor() as cursor:
         cursor.execute(query, params)
         rows = cursor.fetchall()
-    return [
+    opportunities = [
         ModelOpportunityRecord(
             id=int(row[0]),
             model_scoring_run_id=int(row[1]) if row[1] is not None else None,
@@ -673,6 +686,7 @@ def list_model_opportunities_postgres(
         )
         for row in rows
     ]
+    return _dedupe_materialized_opportunities(opportunities)
 
 
 def get_model_opportunity_queue_in_memory(
@@ -1089,6 +1103,179 @@ def _opportunity_sort_key(entry: ModelOpportunityRecord) -> tuple[datetime, date
         entry.created_at or minimum,
         entry.id,
     )
+
+
+def _select_materialized_predictions(
+    predictions_with_status: list[tuple[dict[str, Any], str]],
+    *,
+    scenario: dict[str, Any] | None,
+) -> list[tuple[dict[str, Any], str]]:
+    selected_by_subject: dict[str, tuple[dict[str, Any], str]] = {}
+    for prediction, status in predictions_with_status:
+        if status == "discarded":
+            continue
+        subject_key = _build_prediction_subject_key(
+            prediction=prediction,
+            scenario=scenario,
+        )
+        current = selected_by_subject.get(subject_key)
+        if current is None or _prediction_with_status_preference_key(
+            prediction,
+            status,
+        ) > _prediction_with_status_preference_key(*current):
+            selected_by_subject[subject_key] = (prediction, status)
+    return list(selected_by_subject.values())
+
+
+def _build_prediction_subject_key(
+    *,
+    prediction: dict[str, Any],
+    scenario: dict[str, Any] | None,
+) -> str:
+    return _build_opportunity_subject_key(
+        canonical_game_id=positive_int_or_none(prediction.get("canonical_game_id")),
+        scenario_key=(str(scenario["scenario_key"]) if scenario is not None else None),
+        prediction=prediction,
+    )
+
+
+def _build_record_subject_key(entry: ModelOpportunityRecord) -> str:
+    return _build_opportunity_subject_key(
+        canonical_game_id=entry.canonical_game_id,
+        scenario_key=entry.scenario_key,
+        prediction={
+            "game_date": entry.game_date.isoformat(),
+            "team_code": entry.team_code,
+            "opponent_code": entry.opponent_code,
+        },
+    )
+
+
+def _build_opportunity_subject_key(
+    *,
+    canonical_game_id: int | None,
+    scenario_key: str | None,
+    prediction: dict[str, Any] | None = None,
+) -> str:
+    if scenario_key is not None:
+        return f"scenario:{scenario_key}"
+    if canonical_game_id is not None:
+        return f"game:{canonical_game_id}"
+    if prediction is None:
+        return "unknown"
+    team_code = str(prediction.get("team_code") or "")
+    opponent_code = str(prediction.get("opponent_code") or "")
+    ordered_matchup = ":".join(sorted((team_code, opponent_code)))
+    return f"matchup:{prediction.get('game_date')}:{ordered_matchup}"
+
+
+def _dedupe_materialized_opportunities(
+    opportunities: list[ModelOpportunityRecord],
+) -> list[ModelOpportunityRecord]:
+    selected_by_subject: dict[tuple[str, str], ModelOpportunityRecord] = {}
+    for opportunity in opportunities:
+        normalized = _normalize_materialized_opportunity_matchup(opportunity)
+        subject_key = (
+            normalized.materialization_batch_id,
+            _build_record_subject_key(normalized),
+        )
+        current = selected_by_subject.get(subject_key)
+        if current is None or _record_preference_key(normalized) > _record_preference_key(
+            current
+        ):
+            selected_by_subject[subject_key] = normalized
+    return list(selected_by_subject.values())
+
+
+def _normalize_materialized_opportunity_matchup(
+    opportunity: ModelOpportunityRecord,
+) -> ModelOpportunityRecord:
+    canonical_team_code, canonical_opponent_code = _resolve_opportunity_matchup(
+        prediction=_extract_prediction_payload(opportunity),
+        scenario=_extract_scenario_payload(opportunity),
+        fallback_team_code=opportunity.team_code,
+        fallback_opponent_code=opportunity.opponent_code,
+    )
+    if (
+        canonical_team_code == opportunity.team_code
+        and canonical_opponent_code == opportunity.opponent_code
+    ):
+        return opportunity
+    return replace(
+        opportunity,
+        team_code=canonical_team_code,
+        opponent_code=canonical_opponent_code,
+    )
+
+
+def _extract_prediction_payload(opportunity: ModelOpportunityRecord) -> dict[str, Any]:
+    payload = opportunity.payload if isinstance(opportunity.payload, dict) else {}
+    prediction = payload.get("prediction")
+    return prediction if isinstance(prediction, dict) else {}
+
+
+def _extract_scenario_payload(
+    opportunity: ModelOpportunityRecord,
+) -> dict[str, Any] | None:
+    payload = opportunity.payload if isinstance(opportunity.payload, dict) else {}
+    scenario = payload.get("scenario")
+    return scenario if isinstance(scenario, dict) else None
+
+
+def _resolve_opportunity_matchup(
+    *,
+    prediction: dict[str, Any],
+    scenario: dict[str, Any] | None,
+    fallback_team_code: str | None = None,
+    fallback_opponent_code: str | None = None,
+) -> tuple[str, str]:
+    if scenario is not None:
+        home_team_code = scenario.get("home_team_code")
+        away_team_code = scenario.get("away_team_code")
+        if home_team_code is not None and away_team_code is not None:
+            return str(home_team_code), str(away_team_code)
+    team_code = str(prediction.get("team_code") or fallback_team_code or "")
+    opponent_code = str(prediction.get("opponent_code") or fallback_opponent_code or "")
+    venue = prediction.get("venue")
+    if venue == "home":
+        return team_code, opponent_code
+    if venue == "away":
+        return opponent_code, team_code
+    return team_code, opponent_code
+
+
+def _prediction_with_status_preference_key(
+    prediction: dict[str, Any],
+    status: str,
+) -> tuple[int, float, int, str]:
+    return (
+        _status_priority(status),
+        _prediction_preference_key(prediction),
+        1 if prediction.get("venue") == "home" else 0,
+        str(prediction.get("team_code") or ""),
+    )
+
+
+def _prediction_preference_key(prediction: dict[str, Any]) -> float:
+    return float(prediction.get("signal_strength", 0.0))
+
+
+def _record_preference_key(entry: ModelOpportunityRecord) -> tuple[int, float, int, int]:
+    created_at_rank = int(entry.created_at.timestamp()) if entry.created_at is not None else -1
+    return (
+        _status_priority(entry.status),
+        float(entry.signal_strength),
+        created_at_rank,
+        entry.id,
+    )
+
+
+def _status_priority(status: str | None) -> int:
+    if status == "candidate_signal":
+        return 2
+    if status == "review_manually":
+        return 1
+    return 0
 
 
 def _opportunity_entry_sort_key(entry: dict[str, Any]) -> tuple[datetime, datetime, int]:
