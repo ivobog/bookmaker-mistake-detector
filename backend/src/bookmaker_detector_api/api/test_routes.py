@@ -8,12 +8,12 @@ from bookmaker_detector_api.config import settings
 from bookmaker_detector_api.db.postgres import postgres_connection
 from bookmaker_detector_api.demo import seed_phase_two_feature_postgres
 from bookmaker_detector_api.ingestion.providers import CoversHistoricalTeamPageProvider
+from bookmaker_detector_api.services.features import (
+    materialize_baseline_feature_snapshots_for_postgres,
+)
 from bookmaker_detector_api.services.ingestion_pipeline import (
     HistoricalIngestionRequest,
     ingest_historical_team_page,
-)
-from bookmaker_detector_api.services.features import (
-    materialize_baseline_feature_snapshots_for_postgres,
 )
 from bookmaker_detector_api.services.models import (
     list_model_evaluation_snapshots_postgres,

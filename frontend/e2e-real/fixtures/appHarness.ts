@@ -15,10 +15,10 @@ type Harness = {
 };
 
 export const test = base.extend<Harness>({
-  featureKey: async ({}, use) => use(process.env.E2E_FEATURE_KEY ?? "baseline_team_features_v1"),
-  seasonLabel: async ({}, use) => use(process.env.E2E_SEASON_LABEL ?? "2024-2025"),
-  targetTask: async ({}, use) => use(process.env.E2E_TARGET_TASK ?? "spread_error_regression"),
-  teamCode: async ({}, use) => use(process.env.E2E_TEAM_CODE ?? "LAL")
+  featureKey: async (_args, use) => use(process.env.E2E_FEATURE_KEY ?? "baseline_team_features_v1"),
+  seasonLabel: async (_args, use) => use(process.env.E2E_SEASON_LABEL ?? "2024-2025"),
+  targetTask: async (_args, use) => use(process.env.E2E_TARGET_TASK ?? "spread_error_regression"),
+  teamCode: async (_args, use) => use(process.env.E2E_TEAM_CODE ?? "LAL")
 });
 
 test.beforeEach(async ({ request }) => {

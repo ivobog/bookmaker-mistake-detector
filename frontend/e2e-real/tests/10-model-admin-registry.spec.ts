@@ -1,6 +1,6 @@
 import { test, expect } from "../fixtures/appHarness";
 import { trainModel } from "../helpers/api";
-import { row, rows, scalar } from "../helpers/db";
+import { rows, scalar } from "../helpers/db";
 import { collectPageErrors, expectNoFatalUiErrors, openRoute } from "../helpers/ui";
 
 test("registry rows match Postgres and target-task filtering stays consistent", async ({
