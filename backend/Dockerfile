@@ -5,7 +5,8 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src ./src
 
-RUN pip install --no-cache-dir --default-timeout=120 --no-build-isolation .
+RUN pip install --no-cache-dir --default-timeout=120 setuptools wheel \
+    && pip install --no-cache-dir --default-timeout=120 --no-build-isolation .
 
 EXPOSE 8000
 
