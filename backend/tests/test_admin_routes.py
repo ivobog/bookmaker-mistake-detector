@@ -3009,7 +3009,10 @@ def test_data_quality_issues_endpoint_supports_issue_type_filter() -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    assert len(payload["data_quality_issues"]) == 5
+    assert len(payload["data_quality_issues"]) == 6
+    assert {issue["issue_type"] for issue in payload["data_quality_issues"]} == {
+        "canonical.single_team_perspective_only"
+    }
 
 
 def test_data_quality_issues_endpoint_supports_severity_filter() -> None:
@@ -3017,7 +3020,7 @@ def test_data_quality_issues_endpoint_supports_severity_filter() -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    assert len(payload["data_quality_issues"]) == 3
+    assert len(payload["data_quality_issues"]) == 2
     assert {issue["issue_type"] for issue in payload["data_quality_issues"]} == {
         "canonical.score_mismatch",
         "parse.invalid_score_format",
