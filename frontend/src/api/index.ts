@@ -30,6 +30,7 @@ export {
   fetchModelAdminSelectionHistory,
   fetchModelAdminSelections,
   fetchModelAdminSummary,
+  materializeFeatureSnapshots,
   selectBestModel,
   trainModels
 } from "./modelAdmin";

@@ -11,15 +11,18 @@ import type {
 } from "./modelAdminTypes";
 
 type MutationAction = "select" | "train" | null;
+type ActionKind = MutationAction | "materialize";
 
 type ActionPanelProps = {
-  busyAction: MutationAction;
+  busyAction: ActionKind;
   defaultSeasonLabel: string;
   defaultSelectionPolicyName?: string;
   defaultTargetTask: string;
   defaultTeamCode: string;
+  enableMaterializeFeatures?: boolean;
   enableSelect: boolean;
   enableTrain: boolean;
+  onMaterializeFeaturesSubmit: (featureKey: string) => Promise<void>;
   onSelectSubmit: (input: ModelAdminSelectionMutationInput) => Promise<void>;
   onTrainSubmit: (input: ModelAdminTrainingMutationInput) => Promise<void>;
   selectionPolicyOptions?: string[];
@@ -32,14 +35,16 @@ export function ModelAdminActionsPanel({
   defaultSelectionPolicyName = resolveCanonicalSelectionPolicyName(),
   defaultTargetTask,
   defaultTeamCode,
+  enableMaterializeFeatures = false,
   enableSelect,
   enableTrain,
+  onMaterializeFeaturesSubmit,
   onSelectSubmit,
   onTrainSubmit,
   selectionPolicyOptions,
   targetTaskOptions
 }: ActionPanelProps) {
-  const [openAction, setOpenAction] = useState<MutationAction>(null);
+  const [openAction, setOpenAction] = useState<ActionKind | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   const [featureKey, setFeatureKey] = useState("baseline_team_features_v1");
@@ -109,6 +114,26 @@ export function ModelAdminActionsPanel({
     }
   }
 
+  async function handleMaterializeSubmit() {
+    try {
+      setFormError(null);
+      const normalizedFeatureKey = featureKey.trim();
+      if (!normalizedFeatureKey) {
+        setFormError("Feature key is required.");
+        return;
+      }
+      await onMaterializeFeaturesSubmit(normalizedFeatureKey);
+      setFeatureKey(normalizedFeatureKey);
+      setOpenAction(null);
+    } catch (submissionError) {
+      setFormError(
+        submissionError instanceof Error
+          ? submissionError.message
+          : "Failed to submit the feature materialization request."
+      );
+    }
+  }
+
   return (
     <section className="panel action-panel">
       <div className="section-heading">
@@ -117,6 +142,19 @@ export function ModelAdminActionsPanel({
           <h2>Operate the training lifecycle</h2>
         </div>
         <div className="pill-row">
+          {enableMaterializeFeatures ? (
+            <button
+              className={`secondary-button${openAction === "materialize" ? " action-toggle-active" : ""}`}
+              data-testid="model-admin-materialize-action"
+              onClick={() => {
+                setFormError(null);
+                setOpenAction((current) => (current === "materialize" ? null : "materialize"));
+              }}
+              type="button"
+            >
+              Materialize features
+            </button>
+          ) : null}
           {enableTrain ? (
             <button
               className={`secondary-button${openAction === "train" ? " action-toggle-active" : ""}`}
@@ -152,6 +190,31 @@ export function ModelAdminActionsPanel({
       </p>
 
       {formError ? <div className="banner banner-error action-banner">{formError}</div> : null}
+
+      {openAction === "materialize" ? (
+        <div className="action-form-grid action-form-grid-compact" data-testid="materialize-features-form">
+          <label className="filter-field">
+            <span className="filter-label">Feature key</span>
+            <input
+              data-testid="materialize-feature-key"
+              onChange={(event) => setFeatureKey(event.target.value)}
+              value={featureKey}
+            />
+          </label>
+
+          <div className="action-submit-row">
+            <button
+              className="primary-button action-primary-button"
+              data-testid="materialize-submit"
+              disabled={busyAction === "materialize"}
+              onClick={() => void handleMaterializeSubmit()}
+              type="button"
+            >
+              {busyAction === "materialize" ? "Materializing features..." : "Materialize snapshots"}
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {openAction === "train" ? (
         <div className="action-form-grid" data-testid="train-model-form">

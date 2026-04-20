@@ -13,12 +13,33 @@ from bookmaker_detector_api.services.features import (
     get_feature_training_manifest_postgres,
     get_feature_training_task_matrix_postgres,
     get_feature_training_view_postgres,
+    materialize_baseline_feature_snapshots_for_postgres,
     materialize_feature_analysis_artifacts_postgres,
 )
 
 from .admin_model_support import _resolve_target_task, _validate_model_admin_inputs
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+@router.post("/features/snapshots/materialize")
+def materialize_feature_snapshots(
+    feature_key: str = Query(default="baseline_team_features_v1"),
+) -> dict[str, object]:
+    with postgres_connection() as connection:
+        materialize_result = materialize_baseline_feature_snapshots_for_postgres(
+            connection,
+            feature_key=feature_key,
+        )
+
+    return {
+        "filters": {
+            "feature_key": feature_key,
+        },
+        "feature_version": materialize_result["feature_version"],
+        "canonical_game_count": materialize_result["canonical_game_count"],
+        "snapshots_saved": materialize_result["snapshots_saved"],
+    }
 
 
 @router.get("/features/snapshots")

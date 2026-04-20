@@ -1,5 +1,6 @@
 import type {
   ModelAdminCapabilitiesResponse,
+  ModelAdminFeatureMaterializeResponse,
   ModelAdminEvaluationDetailResponse,
   ModelAdminEvaluationFilters,
   ModelAdminEvaluationHistoryResponse,
@@ -188,6 +189,16 @@ export async function selectBestModel(
   }
   return apiPost<ModelAdminSelectResponse>("/api/v1/admin/models/select", {
     errorPrefix: "Failed to select the best model",
+    query
+  });
+}
+
+export async function materializeFeatureSnapshots(featureKey = "baseline_team_features_v1"): Promise<ModelAdminFeatureMaterializeResponse> {
+  const query = new URLSearchParams({
+    feature_key: featureKey
+  });
+  return apiPost<ModelAdminFeatureMaterializeResponse>("/api/v1/admin/features/snapshots/materialize", {
+    errorPrefix: "Failed to materialize feature snapshots",
     query
   });
 }

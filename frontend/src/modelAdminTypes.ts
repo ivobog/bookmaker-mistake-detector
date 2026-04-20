@@ -253,6 +253,15 @@ export type ModelAdminTrainResponse = {
   persisted_run_count?: number;
 };
 
+export type ModelAdminFeatureMaterializeResponse = {
+  filters: {
+    feature_key: string;
+  };
+  feature_version: ModelAdminFeatureVersion | null;
+  canonical_game_count: number;
+  snapshots_saved: number;
+};
+
 export type ModelAdminSelectResponse = {
   filters: ModelAdminFilterResponse;
   selection_policy_name: string;

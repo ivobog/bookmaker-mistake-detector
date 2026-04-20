@@ -28,6 +28,7 @@ describe("ModelAdminActionsPanel", () => {
         defaultTeamCode=""
         enableSelect={false}
         enableTrain
+        onMaterializeFeaturesSubmit={vi.fn().mockResolvedValue(undefined)}
         onSelectSubmit={vi.fn().mockResolvedValue(undefined)}
         onTrainSubmit={onTrainSubmit}
       />
@@ -53,6 +54,7 @@ describe("ModelAdminActionsPanel", () => {
         defaultTeamCode="LAL"
         enableSelect={false}
         enableTrain
+        onMaterializeFeaturesSubmit={vi.fn().mockResolvedValue(undefined)}
         onSelectSubmit={vi.fn().mockResolvedValue(undefined)}
         onTrainSubmit={onTrainSubmit}
       />
@@ -93,6 +95,7 @@ describe("ModelAdminActionsPanel", () => {
         defaultTeamCode=""
         enableSelect
         enableTrain={false}
+        onMaterializeFeaturesSubmit={vi.fn().mockResolvedValue(undefined)}
         onSelectSubmit={vi.fn().mockResolvedValue(undefined)}
         onTrainSubmit={vi.fn().mockResolvedValue(undefined)}
       />
@@ -112,6 +115,7 @@ describe("ModelAdminActionsPanel", () => {
         defaultTeamCode=""
         enableSelect
         enableTrain={false}
+        onMaterializeFeaturesSubmit={vi.fn().mockResolvedValue(undefined)}
         onSelectSubmit={vi.fn().mockResolvedValue(undefined)}
         onTrainSubmit={vi.fn().mockResolvedValue(undefined)}
       />
@@ -122,6 +126,62 @@ describe("ModelAdminActionsPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Promote best model" }));
 
     await screen.findByText("Selection policy is required.");
+  });
+
+  it("submits normalized feature key and closes the materialize panel after success", async () => {
+    const onMaterializeFeaturesSubmit = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <ModelAdminActionsPanel
+        busyAction={null}
+        defaultSeasonLabel=""
+        defaultTargetTask="spread_error_regression"
+        defaultTeamCode=""
+        enableMaterializeFeatures
+        enableSelect={false}
+        enableTrain={false}
+        onMaterializeFeaturesSubmit={onMaterializeFeaturesSubmit}
+        onSelectSubmit={vi.fn().mockResolvedValue(undefined)}
+        onTrainSubmit={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Materialize features" }));
+    fireEvent.change(screen.getByLabelText("Feature key"), {
+      target: { value: " baseline_team_features_v1 " }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Materialize snapshots" }));
+
+    await waitFor(() =>
+      expect(onMaterializeFeaturesSubmit).toHaveBeenCalledWith("baseline_team_features_v1")
+    );
+    expect(screen.queryByRole("button", { name: "Materialize snapshots" })).toBeNull();
+  });
+
+  it("shows materialization validation feedback instead of submitting an empty feature key", async () => {
+    const onMaterializeFeaturesSubmit = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <ModelAdminActionsPanel
+        busyAction={null}
+        defaultSeasonLabel=""
+        defaultTargetTask="spread_error_regression"
+        defaultTeamCode=""
+        enableMaterializeFeatures
+        enableSelect={false}
+        enableTrain={false}
+        onMaterializeFeaturesSubmit={onMaterializeFeaturesSubmit}
+        onSelectSubmit={vi.fn().mockResolvedValue(undefined)}
+        onTrainSubmit={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Materialize features" }));
+    fireEvent.change(screen.getByLabelText("Feature key"), { target: { value: " " } });
+    fireEvent.click(screen.getByRole("button", { name: "Materialize snapshots" }));
+
+    await screen.findByText("Feature key is required.");
+    expect(onMaterializeFeaturesSubmit).not.toHaveBeenCalled();
   });
 });
 

@@ -13,6 +13,7 @@ import {
   fetchModelAdminSelectionHistory,
   fetchModelAdminSelections,
   fetchModelAdminSummary,
+  materializeFeatureSnapshots,
   selectBestModel,
   trainModels
 } from "./api";
@@ -112,7 +113,7 @@ export function ModelAdminWorkspace({
   const [selectionDetail, setSelectionDetail] = useState<ModelAdminSelectionSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mutationAction, setMutationAction] = useState<"select" | "train" | null>(null);
+  const [mutationAction, setMutationAction] = useState<"materialize" | "select" | "train" | null>(null);
   const [mutationNotice, setMutationNotice] = useState<{
     actionLabel?: string;
     actionRoute?: AppRoute;
@@ -359,6 +360,31 @@ export function ModelAdminWorkspace({
         mutationError instanceof Error
           ? mutationError.message
           : "Failed to select the best model from the workspace.";
+      setError(message);
+      setMutationNotice({ message, tone: "error" });
+      throw mutationError;
+    } finally {
+      setMutationAction(null);
+    }
+  }
+
+  async function handleMaterializeFeaturesMutation(featureKey: string) {
+    try {
+      setMutationAction("materialize");
+      setError(null);
+      setMutationNotice(null);
+      const result = await materializeFeatureSnapshots(featureKey);
+      await refreshDashboardState();
+      setMutationNotice({
+        message: `Feature snapshots materialized. Saved ${result.snapshots_saved} snapshot(s) across ${result.canonical_game_count} canonical game(s).`,
+        tone: "success"
+      });
+      setRefreshToken((current) => current + 1);
+    } catch (mutationError) {
+      const message =
+        mutationError instanceof Error
+          ? mutationError.message
+          : "Failed to materialize feature snapshots from the workspace.";
       setError(message);
       setMutationNotice({ message, tone: "error" });
       throw mutationError;
@@ -645,8 +671,10 @@ export function ModelAdminWorkspace({
             defaultSelectionPolicyName={defaultSelectionPolicyName}
             defaultTargetTask={trainingDraftFilters.targetTask}
             defaultTeamCode={trainingDraftFilters.teamCode}
+            enableMaterializeFeatures
             enableSelect
             enableTrain
+            onMaterializeFeaturesSubmit={handleMaterializeFeaturesMutation}
             onSelectSubmit={handleSelectMutation}
             onTrainSubmit={handleTrainMutation}
             selectionPolicyOptions={selectionPolicyOptions}
@@ -783,8 +811,10 @@ export function ModelAdminWorkspace({
             defaultSelectionPolicyName={defaultSelectionPolicyName}
             defaultTargetTask={selectionDraftFilters.targetTask}
             defaultTeamCode={trainingDraftFilters.teamCode}
+            enableMaterializeFeatures={false}
             enableSelect
             enableTrain={false}
+            onMaterializeFeaturesSubmit={handleMaterializeFeaturesMutation}
             onSelectSubmit={handleSelectMutation}
             onTrainSubmit={handleTrainMutation}
             selectionPolicyOptions={selectionPolicyOptions}

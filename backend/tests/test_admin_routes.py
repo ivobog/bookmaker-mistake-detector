@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 import bookmaker_detector_api.main as main_module
 from bookmaker_detector_api.api import admin_diagnostics_routes as admin_diagnostics_api
+from bookmaker_detector_api.api import admin_feature_routes as admin_feature_api
 from bookmaker_detector_api.api import admin_model_routes as admin_model_api
 from bookmaker_detector_api.api import analyst_patterns as analyst_patterns_api
 from bookmaker_detector_api.api import analyst_opportunities as analyst_opportunities_api
@@ -27,6 +28,7 @@ def _fake_postgres_connection():
 def client(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(main_module, "postgres_connection", _fake_postgres_connection)
     monkeypatch.setattr(admin_model_api, "postgres_connection", _fake_postgres_connection)
+    monkeypatch.setattr(admin_feature_api, "postgres_connection", _fake_postgres_connection)
     monkeypatch.setattr(
         analyst_opportunities_api,
         "postgres_connection",
@@ -194,6 +196,36 @@ def test_admin_diagnostics_endpoint_uses_postgres_contract(
     assert "repository_mode" not in payload
     assert payload["filters"]["provider_name"] == "covers"
     assert payload["stats"]["job_count"] == 3
+
+
+def test_feature_snapshot_materialization_endpoint_returns_postgres_contract(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        admin_feature_api,
+        "materialize_baseline_feature_snapshots_for_postgres",
+        lambda connection, **kwargs: {
+            "feature_version": {
+                "id": 1,
+                "feature_key": kwargs["feature_key"],
+            },
+            "canonical_game_count": 3502,
+            "snapshots_saved": 3502,
+        },
+    )
+
+    response = client.post(
+        "/api/v1/admin/features/snapshots/materialize?feature_key=baseline_team_features_v1"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "repository_mode" not in payload
+    assert payload["filters"]["feature_key"] == "baseline_team_features_v1"
+    assert payload["feature_version"]["feature_key"] == "baseline_team_features_v1"
+    assert payload["canonical_game_count"] == 3502
+    assert payload["snapshots_saved"] == 3502
 
 
 def test_analyst_opportunities_endpoint_uses_postgres_contract(
