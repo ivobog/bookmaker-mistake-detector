@@ -1,11 +1,16 @@
 # Manual Smoke Checklist
 
+## Status Note
+- This checklist was refreshed on `2026-04-20` for the current Postgres-only runtime on `main / faacd2c`.
+- The previous recorded smoke pass predated the Phase 1 to Phase 4 cutover and referenced removed demo/runtime-mode routes.
+- Treat this document as the current Phase 5 checklist template until a fresh operator pass fills in the result columns.
+
 ## Run Metadata
-- Date: `2026-04-17 02:30:00 +02:00`
+- Date: `2026-04-20 04:58:23 +02:00`
 - Operator: `Codex`
-- Branch / commit: `main / c5c8211`
-- Environment: `local Docker Compose on Windows`
-- Notes: `API-oriented smoke pass completed. Frontend root was validated, and a Playwright browser-smoke harness was added for the Phase 4 routes, but live browser execution was explicitly skipped for this release-candidate pass.`
+- Branch / commit: `main / faacd2c`
+- Environment: `local Docker Compose on Windows with reused Postgres volume on port 5433`
+- Notes: `Applied 024_phase1_multi_target_capability_schema.sql manually to the reused Postgres volume before restarting the backend. Seeded a persisted smoke dataset through /api/v1/test/reset and /api/v1/test/seed-e2e-dataset. Worker startup still fails because it imports retired ingestion-runner modules.`
 
 ## Result Keys
 - `pass`
@@ -28,84 +33,84 @@ When a step fails or is unexpectedly slow, append these notes in the step row:
 ## 1. Environment Bring-up
 | Step | Result | Notes |
 | --- | --- | --- |
-| `docker compose up --build` completes | `pass` | Stack came up after clearing stale created containers left behind by a previous Compose run. |
+| `docker compose up --build` completes | `pass` | Images rebuilt successfully and the stack started. A reused Postgres volume needed the missing Phase 1 capability SQL applied before the backend could come up. |
 | frontend loads at `http://localhost:5173` | `pass` | HTTP 200 from the frontend root. |
-| backend health route responds | `pass` | `GET /api/v1/health` returned HTTP 200 with `{\"status\":\"ok\"}`. |
-| backend starts cleanly with current `.env` | `pass` | Backend started successfully with current environment values. |
+| backend health route responds | `pass` | `GET /api/v1/health` returned HTTP 200 with `{\"status\":\"ok\",\"service\":\"bookmaker-detector-api\"}`. |
+| backend starts cleanly with current `.env` | `pass` | Backend started after the documented schema preflight for the reused local database volume. |
+| worker process starts cleanly | `fail` | `docker compose up --build` leaves `bookmaker-worker` exited because `worker/src/bookmaker_detector_worker/main.py` still imports removed `fetch_ingestion_runner` and `fixture_ingestion_runner` modules. |
 
-## 2. Historical Ingestion
+## 2. Historical Ingestion and Diagnostics
 | Step | Result | Notes |
 | --- | --- | --- |
-| Phase 1 demo route responds | `pass` | `GET /api/v1/admin/phase-1-demo` returned HTTP 200. Expected workflow family: `none` for the pure demo route. |
-| Phase 1 fetch demo responds | `not-run` | Not exercised in this slice. Expected workflow family: `ingestion.fetch_and_ingest`. |
-| failed-fetch demo records diagnostics cleanly | `not-run` | Not exercised in this slice. |
-| ingestion stats endpoint returns expected payload shape | `not-run` | Not exercised in this slice. |
-| data-quality issue view returns issues and filters correctly | `not-run` | Not exercised in this slice. |
+| ingestion stats endpoint returns expected payload shape | `pass` | `GET /api/v1/admin/ingestion/stats` returned HTTP 200. |
+| data-quality issue view returns issues and filters correctly | `pass` | `GET /api/v1/admin/data-quality/issues` returned HTTP 200. |
+| initial production dataset bootstrap can be invoked or explicitly waived | `waived` | No live production source-url template was configured for this local smoke pass. Persisted smoke data was seeded through `/api/v1/test/reset` and `/api/v1/test/seed-e2e-dataset` instead. Expected workflow family remains `ingestion.initial_dataset_load`. |
+| capability endpoint returns the four Phase A tasks | `pass` | `GET /api/v1/admin/model-capabilities` returned HTTP 200 with the four enabled Phase A regression tasks. |
 
 ## 3. Analytical Core
 | Step | Result | Notes |
 | --- | --- | --- |
-| Phase 2 feature demo responds | `pass` | `GET /api/v1/admin/phase-2-feature-demo?repository_mode=in_memory` returned HTTP 200. |
-| feature dataset/profile endpoints respond | `not-run` | Not exercised in this slice. |
-| patterns endpoint returns grouped results | `not-run` | Not exercised in this slice. |
-| comparables endpoint returns ranked examples | `not-run` | Not exercised in this slice. |
-| evidence endpoint returns strength and recommendation | `not-run` | Not exercised in this slice. |
+| feature dataset/profile endpoints respond | `pass` | `GET /api/v1/admin/features/dataset?team_code=LAL` and `GET /api/v1/admin/features/dataset/profile` both returned HTTP 200. |
+| patterns endpoint returns grouped results | `pass` | `GET /api/v1/analyst/patterns?target_task=spread_error_regression` returned HTTP 200 with grouped patterns. |
+| comparables endpoint returns ranked examples | `pass` | `GET /api/v1/analyst/comparables?target_task=spread_error_regression&canonical_game_id=1&team_code=LAL` returned HTTP 200. Omitting `team_code` still produced a 500 instead of a validation response; tracked in `docs/known_issues.md`. |
+| evidence endpoint returns strength and recommendation | `pass` | `GET /api/v1/analyst/evidence?target_task=spread_error_regression&canonical_game_id=1&team_code=LAL` returned HTTP 200 with strength and recommendation payloads. Omitting `team_code` triggers the same known validation gap as comparables. |
 
 ## 4. Predictive Workflow
 | Step | Result | Notes |
 | --- | --- | --- |
-| model training route completes | `pass` | `POST /api/v1/admin/models/train?...` returned HTTP 200. Expected workflow family: `model_training.train`. |
-| model selection route promotes an active model | `pass` | `POST /api/v1/admin/models/select?...` returned HTTP 200. Expected workflow family: `model_training.promote`. |
-| score preview returns scored cases | `not-run` | Not exercised in this slice. Expected workflow family: `model_scoring.preview`. |
-| opportunity materialization returns persisted opportunities | `pass` | `POST /api/v1/admin/models/opportunities/materialize?...` returned HTTP 200. Expected workflow family: `model_opportunities.materialize`. |
-| opportunity history returns surfaced artifacts | `not-run` | Not exercised in this slice. |
+| model training route completes for one Phase A task | `pass` | Exceeded the checklist: `POST /api/v1/admin/models/train` returned HTTP 200 for all four Phase A tasks. Expected workflow family: `model_training.train`. |
+| model selection route promotes an active model | `pass` | Exceeded the checklist: `POST /api/v1/admin/models/select` returned HTTP 200 for all four Phase A tasks. Expected workflow family: `model_training.promote`. |
+| score preview returns scored cases | `pass` | Exceeded the checklist: `GET /api/v1/admin/models/score-preview` returned HTTP 200 for all four Phase A tasks. Expected workflow family: `model_scoring.preview`. |
+| future game or future slate preview responds | `pass` | Exceeded the checklist: `GET /api/v1/admin/models/future-game-preview` returned HTTP 200 for all four Phase A tasks. Expected workflow family: `model_scoring.future_game_preview`. |
+| opportunity materialization returns persisted opportunities | `pass` | Exceeded the checklist: `POST /api/v1/admin/models/opportunities/materialize?team_code=LAL&limit=3` returned HTTP 200 for all four Phase A tasks. Expected workflow family: `model_opportunities.materialize`. |
+| opportunity history returns surfaced artifacts | `pass` | `GET /api/v1/admin/models/opportunities/history?target_task=spread_error_regression` returned HTTP 200. |
 
 ## 5. Market Board and Cadence
 | Step | Result | Notes |
 | --- | --- | --- |
 | market-board source catalog loads | `pass` | `GET /api/v1/admin/models/market-board/sources` returned HTTP 200. |
-| file-backed or demo refresh completes | `pass` | `POST /api/v1/admin/models/market-board/refresh?...source_name=demo_daily_lines_v1` returned HTTP 200. Expected workflow family: `model_market_board.refresh`. |
-| refresh history records change summary and source run | `not-run` | Not exercised in this slice. |
-| scoring queue shows a board lifecycle | `not-run` | Not exercised in this slice. |
-| cadence/orchestration run completes end to end | `pass` | `POST /api/v1/admin/models/market-board/orchestrate-cadence?...` returned HTTP 200. Expected workflow family: `model_market_board.cadence_orchestration`. |
-| board operations page returns combined state | `not-run` | Not exercised in this slice. |
+| file-backed refresh completes | `pass` | `POST /api/v1/admin/models/market-board/refresh` returned HTTP 200 for `spread_error_regression` and `total_points_regression` using `source_name=demo_daily_lines_v1`. Expected workflow family: `model_market_board.refresh`. |
+| refresh history records change summary and source run | `pass` | `GET /api/v1/admin/models/market-board/history?target_task=spread_error_regression&source_name=demo_daily_lines_v1` returned HTTP 200. |
+| scoring queue shows a board lifecycle | `pass` | `GET /api/v1/admin/models/market-board/queue?target_task=spread_error_regression` returned HTTP 200. |
+| cadence/orchestration run completes end to end | `pass` | `POST /api/v1/admin/models/market-board/orchestrate-cadence?target_task=spread_error_regression&source_name=demo_daily_lines_v1` returned HTTP 200. Expected workflow family: `model_market_board.cadence_orchestration`. |
+| board operations page returns combined state | `not-run` | The smoke pass did not materialize a standalone board record for an operations-detail drill-through. Cadence dashboard and queue endpoints were exercised instead. |
 
 ## 6. Backtesting
 | Step | Result | Notes |
 | --- | --- | --- |
-| backtest run route completes | `pass` | `POST /api/v1/admin/models/backtests/run?...` returned HTTP 200. Expected workflow family: `model_backtest.run`. |
-| backtest history returns recent runs | `not-run` | Not exercised in this slice. |
-| fold summaries are present in run detail | `not-run` | Not exercised in this slice. |
-| strategy metrics and ROI fields are visible | `not-run` | Not exercised in this slice. |
+| backtest run route completes for one Phase A task | `pass` | Exceeded the checklist: `POST /api/v1/admin/models/backtests/run` returned HTTP 200 for all four Phase A tasks. Expected workflow family: `model_backtest.run`. |
+| backtest history returns recent runs | `pass` | `GET /api/v1/analyst/backtests?target_task=spread_error_regression` returned HTTP 200. |
+| fold summaries are present in run detail | `pass` | `GET /api/v1/analyst/backtests/1` returned HTTP 200 and the payload contained 11 fold summaries. |
+| strategy metrics and ROI fields are visible | `pass` | Backtest detail exposed `review_threshold` and `candidate_threshold` strategy payloads, including an ROI field in the strategy result structure. |
 
 ## 7. Frontend Analyst Workflow
 | Step | Result | Notes |
 | --- | --- | --- |
-| backtests dashboard loads | `waived` | Browser validation was skipped for this release-candidate pass at operator request. |
-| one backtest run route loads | `waived` | Browser validation was skipped for this release-candidate pass at operator request. |
-| one fold route loads | `waived` | Browser validation was skipped for this release-candidate pass at operator request. |
-| opportunity queue loads | `waived` | Browser validation was skipped for this release-candidate pass at operator request. |
-| one opportunity detail route loads | `waived` | Browser validation was skipped for this release-candidate pass at operator request. |
-| one comparable case route loads | `waived` | Browser validation was skipped for this release-candidate pass at operator request. |
-| one provenance artifact route loads | `waived` | Browser validation was skipped for this release-candidate pass at operator request. |
-| compare route loads | `waived` | Browser validation was skipped for this release-candidate pass at operator request. |
-| compare route shows alignment summary, mismatch review, and decision summary | `waived` | Browser validation was skipped for this release-candidate pass at operator request. |
+| backtests dashboard loads | `pass` | Covered by Playwright `Phase 5 browser smoke › loads the core analyst routes in a real browser`. |
+| one backtest run route loads | `pass` | Covered by the same Playwright smoke test. |
+| one fold route loads | `pass` | Covered by the same Playwright smoke test. |
+| opportunity queue loads | `pass` | Covered by the existing Playwright opportunity queue scope tests plus the core analyst smoke test. |
+| one opportunity detail route loads | `pass` | Covered by the core analyst Playwright smoke test. |
+| one comparable case route loads | `pass` | Covered by the core analyst Playwright smoke test. |
+| one provenance artifact route loads | `pass` | Covered by the model admin artifact-detail Playwright smoke test. |
+| compare route loads | `pass` | Covered by the core analyst Playwright smoke test. |
+| compare route shows alignment summary, mismatch review, and decision summary | `pass` | Covered by the core analyst Playwright smoke test. |
 
 ## 8. External Source Validation
 Use this section only if a real The Odds API key is configured.
 
 | Step | Result | Notes |
 | --- | --- | --- |
-| backend starts with `THE_ODDS_API_*` configured | `waived` | No live API key was configured for this smoke pass. |
-| external source appears in market-board sources | `waived` | Not validated with live credentials in this slice. |
-| refresh using `the_odds_api_v4_nba` completes | `waived` | Not validated with live credentials in this slice. |
-| source run is persisted | `waived` | Not validated with live credentials in this slice. |
-| resulting board can be scored and surfaced | `waived` | Not validated with live credentials in this slice. |
+| backend starts with `THE_ODDS_API_*` configured | `waived` | No live API key was configured for this local smoke pass. |
+| external source appears in market-board sources | `waived` | Live external-source validation was not exercised without credentials. |
+| refresh using `the_odds_api_v4_nba` completes | `waived` | Live external-source validation was not exercised without credentials. |
+| source run is persisted | `waived` | Live external-source validation was not exercised without credentials. |
+| resulting board can be scored and surfaced | `waived` | Live external-source validation was not exercised without credentials. |
 
 ## 9. Release Decision Summary
-- Regression script run: `pass`
+- Regression script run: `pass` on `main / faacd2c`
 - Manual smoke result: `partial`
 - Blocking issues logged in `docs/known_issues.md`: `yes`
 - External source status: `waived`
-- Frontend browser-route status: `waived`
-- Release-candidate recommendation: `ready for an internal release candidate with explicit waivers; backend/API smoke is healthy, browser-route validation was skipped by request, and live external-source validation remains waived until a real API key is available.`
+- Frontend browser-route status: `partial` (`npm run test:smoke` finished 4/5 passing; one model-admin mutation verification is still failing)
+- Release-candidate recommendation: `not yet ready for formal Phase 5 closeout; the Postgres-backed API matrix is strong, but worker startup and the remaining browser mutation smoke failure still need resolution or an explicit waiver.`

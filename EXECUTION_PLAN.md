@@ -28,7 +28,8 @@ Observed in the repository on April 20, 2026:
 - selection-policy handling now defaults and normalizes to `validation_regression_candidate_v1` while still accepting `validation_mae_candidate_v1` as a temporary compatibility alias
 - [frontend/src/api/defaults.ts](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend/src/api/defaults.ts) has replaced the old mode-based client plumbing, and model-admin task/policy controls now resolve from backend capabilities
 - frontend model-admin forms and tests now use canonical capability-driven defaults instead of legacy spread-only or alias-only assumptions
-- the main remaining work is Phase 5 regression and release hardening rather than Phase 1 to Phase 4 cutover work
+- the automated Phase 5 regression gate is green at `main / faacd2c`, including backend Ruff, backend pytest, Python compile checks, frontend typecheck, frontend lint, and frontend build
+- the main remaining work is Phase 5 manual smoke, acceptance signoff, and residual-risk closeout rather than Phase 1 to Phase 4 cutover work
 
 ## 4. Delivery Strategy
 Execute the SDD in six controlled phases:
@@ -48,7 +49,10 @@ Current execution status:
 - `Phase 2`: complete
 - `Phase 3`: complete
 - `Phase 4`: complete
-- `Phase 5`: pending
+- `Phase 5`: in progress
+  - automated regression gate: complete
+  - PostgreSQL-backed smoke pass: partial complete
+  - acceptance closeout and residual-risk resolution: pending
 
 ## 5. Workstreams
 

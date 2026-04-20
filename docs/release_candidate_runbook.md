@@ -93,6 +93,10 @@ What it covers:
 - frontend lint
 - frontend production build
 
+Current status:
+- this automated regression pass is green on `main / faacd2c`
+- treat that pass as necessary but not sufficient for Phase 5 closeout
+
 Optional browser-route smoke:
 
 ```powershell
@@ -133,20 +137,21 @@ After the regression script passes:
 1. Start the stack with `docker compose up --build`.
 2. Open the frontend at `http://localhost:5173`.
 3. Confirm the API health route at `http://localhost:8000/api/v1/health`.
-4. Run the Phase 1 demo route.
-5. Run one Phase 3 market-board refresh and one cadence/orchestration flow.
-6. Run one Phase 4 backtest from the frontend.
-7. Open:
+4. Confirm `GET /api/v1/admin/model-capabilities` returns the four Phase A regression tasks.
+5. Confirm one persisted ingestion/diagnostics route such as `GET /api/v1/admin/ingestion/stats` or a diagnostics listing route.
+6. Run one market-board refresh and one cadence/orchestration flow.
+7. Run one backtest workflow and one opportunity-materialization workflow against the current Postgres-backed runtime.
+8. Open:
    - one backtest run
    - one fold
    - one opportunity
    - one comparable case
    - one compare route
-8. Confirm the compare route shows:
+9. Confirm the compare route shows:
    - alignment summary
    - mismatch review
    - decision summary
-9. If you want browser-backed route verification instead of manual clicking, run `npm run test:smoke`
+10. If you want browser-backed route verification instead of manual clicking, run `npm run test:smoke`
    from [frontend](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend) after the stack is up.
 
 As you complete the smoke pass:

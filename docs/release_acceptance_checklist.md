@@ -3,6 +3,11 @@
 ## Purpose
 This checklist is the Phase 5 acceptance matrix for deciding whether the MVP is ready for internal release-candidate use.
 
+Current status note as of `2026-04-20` on `main / faacd2c`:
+- the automated Phase 5 regression gate is green
+- a fresh Postgres-backed manual smoke pass has now been executed and recorded in [docs/manual_smoke_checklist.md](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/docs/manual_smoke_checklist.md)
+- release-candidate closeout is still open because that smoke pass surfaced remaining worker and browser-smoke issues
+
 Use it together with:
 - [docs/release_candidate_runbook.md](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/docs/release_candidate_runbook.md)
 - [docs/manual_smoke_checklist.md](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/docs/manual_smoke_checklist.md)
@@ -29,7 +34,7 @@ Use it together with:
 ### 1. Historical ingestion and raw storage
 | Requirement area | Status | Evidence |
 | --- | --- | --- |
-| Team-season retrieval and batch ingestion | `pass` | Phase 1 ingestion pipeline, worker flow, and admin demos. |
+| Team-season retrieval and batch ingestion | `pass` | Phase 1 ingestion pipeline, worker flow, and persisted-only admin flows. |
 | Retrieval metadata and raw payload preservation | `pass` | `page_retrieval`, raw payload snapshots, retrieval trends, source runs. |
 | Regular-season section filtering | `pass` | Phase 1 parser and canonical ingestion flow. |
 | Row parsing for venue, score, ATS, O/U | `pass` | Raw row parsing and quality issue capture are implemented. |
@@ -76,10 +81,10 @@ Use it together with:
 ### 7. Operational readiness
 | Requirement area | Status | Evidence |
 | --- | --- | --- |
-| Regression path for release candidate | `pass` | [scripts/run_phase5_regression.ps1](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/scripts/run_phase5_regression.ps1). |
-| Manual release smoke path | `pass` | [docs/manual_smoke_checklist.md](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/docs/manual_smoke_checklist.md), now including expected workflow families and failure-evidence capture rules. |
+| Regression path for release candidate | `pass` | [scripts/run_phase5_regression.ps1](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/scripts/run_phase5_regression.ps1), most recently green on `main / faacd2c`. |
+| Manual release smoke path | `issue` | [docs/manual_smoke_checklist.md](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/docs/manual_smoke_checklist.md) now contains a current Postgres-backed pass, but the result is partial because the worker still fails on startup and browser mutation smoke is not fully green. |
 | Structured workflow logging for operator golden paths | `pass` | [backend/src/bookmaker_detector_api/services/workflow_logging.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/workflow_logging.py) plus instrumented training, promotion, scoring preview/materialization, backtest, opportunity-materialization, market-board orchestration, and ingestion maintenance services, now correlated with route-level `X-Request-ID` headers. |
-| Optional browser-route smoke harness | `pass` | Playwright smoke scaffolding now exists in [frontend/playwright.config.ts](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend/playwright.config.ts) and [frontend/e2e/phase5-smoke.spec.ts](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend/e2e/phase5-smoke.spec.ts). |
+| Optional browser-route smoke harness | `issue` | The Playwright smoke harness exists in [frontend/playwright.config.ts](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend/playwright.config.ts) and [frontend/e2e/phase5-smoke.spec.ts](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend/e2e/phase5-smoke.spec.ts), but the latest run finished 4/5 passing with one model-admin mutation verification still failing. |
 | Known-issues tracking | `pass` | [docs/known_issues.md](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/docs/known_issues.md). |
 | Live external source validation | `manual-check` | External provider exists, but should be validated with a real `THE_ODDS_API_KEY` during release smoke. |
 
@@ -93,9 +98,9 @@ Use it together with:
 ## Release Decision
 Mark this section when a real release-candidate pass is completed.
 
-- Regression script: `pass`
+- Regression script: `pass` on `main / faacd2c`
 - Manual smoke checklist: `partial`
 - Known issues reviewed: `pass`
 - External source validated or explicitly waived: `waived`
-- Frontend browser-route validation: `waived by operator request`
-- Release recommendation: `ready for an internal release candidate with explicit waivers for live external-source validation and browser-route execution.`
+- Frontend browser-route validation: `partial`
+- Release recommendation: `not yet formally closed; automated regression is green and the Postgres-backed API smoke matrix is strong, but worker startup and the remaining browser mutation smoke failure still block a clean Phase 5 signoff.`
