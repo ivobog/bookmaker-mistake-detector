@@ -64,7 +64,6 @@ def phase_three_model_market_board_refresh(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "target_task": target_task,
             "source_name": source_name,
@@ -102,7 +101,6 @@ def phase_three_model_market_board_history(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "target_task": target_task,
             "source_name": source_name,
@@ -142,7 +140,6 @@ def phase_three_model_market_board_source_runs(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "target_task": target_task,
             "source_name": source_name,
@@ -185,7 +182,6 @@ def phase_three_model_market_board_refresh_queue(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "target_task": target_task,
             "source_name": source_name,
@@ -229,7 +225,6 @@ def phase_three_model_market_board_queue(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "target_task": target_task,
             "source_name": source_name,
@@ -273,7 +268,6 @@ def phase_three_model_market_board_orchestrate_refresh(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "target_task": target_task,
             "source_name": source_name,
@@ -331,7 +325,6 @@ def phase_three_model_market_board_orchestrate_score(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "target_task": target_task,
             "source_name": source_name,
@@ -400,7 +393,6 @@ def phase_three_model_market_board_orchestrate_cadence(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "target_task": target_task,
             "source_name": source_name,
@@ -450,7 +442,6 @@ def phase_three_model_market_board_refresh_orchestration_history(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "target_task": target_task,
             "source_name": source_name,
@@ -496,7 +487,6 @@ def phase_three_model_market_board_cadence_history(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "target_task": target_task,
             "source_name": source_name,
@@ -545,7 +535,6 @@ def phase_three_model_market_board_orchestration_history(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "target_task": target_task,
             "source_name": source_name,
@@ -593,7 +582,6 @@ def phase_three_model_market_board_cadence(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "target_task": target_task,
             "source_name": source_name,
@@ -631,7 +619,6 @@ def phase_three_model_market_board_materialize(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "target_task": target_task,
             "slate_label": request.slate_label,
@@ -663,7 +650,6 @@ def phase_three_model_market_boards(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "target_task": target_task,
             "season_label": season_label,
@@ -693,7 +679,6 @@ def phase_three_model_market_board_detail(
         board = get_model_market_board_detail_postgres(connection, board_id=board_id)
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "target_task": target_task,
             "season_label": season_label,
@@ -730,7 +715,6 @@ def phase_three_model_market_board_operations(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "target_task": target_task,
             "source_name": source_name,
@@ -786,7 +770,6 @@ def phase_three_model_market_board_score(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "board_id": board_id,
             "target_task": target_task,

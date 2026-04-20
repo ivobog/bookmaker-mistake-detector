@@ -11,24 +11,20 @@ def test_settings_ignore_empty_odds_api_env_values(monkeypatch):
     assert settings.the_odds_api_bookmakers is None
 
 
-def test_settings_resolve_repository_mode_override() -> None:
-    assert Settings(_env_file=None, api_env="development").use_postgres_stable_read_mode is False
+def test_settings_allow_test_helpers_only_outside_production() -> None:
     assert (
-        Settings(_env_file=None, api_env="production").use_postgres_stable_read_mode is True
-    )
-    assert (
-        Settings(
-            _env_file=None,
-            api_env="development",
-            api_repository_mode="postgres",
-        ).use_postgres_stable_read_mode
+        Settings(_env_file=None, api_env="development", api_enable_test_helpers=True).allow_test_helpers
         is True
     )
     assert (
-        Settings(
-            _env_file=None,
-            api_env="production",
-            api_repository_mode="in_memory",
-        ).use_postgres_stable_read_mode
+        Settings(_env_file=None, api_env="production", api_enable_test_helpers=True).allow_test_helpers
         is False
+    )
+
+
+def test_settings_default_runtime_schema_mutation_to_disabled() -> None:
+    assert Settings(_env_file=None).resolved_postgres_allow_runtime_schema_mutation is False
+    assert (
+        Settings(_env_file=None, postgres_allow_runtime_schema_mutation=True).resolved_postgres_allow_runtime_schema_mutation
+        is True
     )

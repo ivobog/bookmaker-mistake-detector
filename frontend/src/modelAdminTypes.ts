@@ -1,9 +1,39 @@
-export type ModelAdminRepositoryMode = "in_memory" | "postgres";
-
 export type ModelAdminFeatureVersion = {
   feature_key: string;
   version_label?: string | null;
   id?: number | null;
+};
+
+export type ModelAdminTaskCapability = {
+  task_key: string;
+  task_kind: string;
+  label: string;
+  description: string;
+  market_type: string;
+  primary_metric_name: string;
+  metric_direction: string;
+  supported_model_families: string[];
+  default_selection_policy_name: string;
+  valid_selection_policy_names: string[];
+  default_opportunity_policy_name: string;
+  scoring_output_semantics?: string | null;
+  signal_strength_interpretation?: string | null;
+  workflow_support: Record<string, boolean>;
+  is_enabled: boolean;
+  config: Record<string, unknown>;
+};
+
+export type ModelAdminCapabilitiesUiDefaults = {
+  default_feature_key: string;
+  default_target_task: string | null;
+  default_train_ratio: number;
+  default_validation_ratio: number;
+};
+
+export type ModelAdminCapabilitiesResponse = {
+  task_count: number;
+  target_tasks: ModelAdminTaskCapability[];
+  ui_defaults: ModelAdminCapabilitiesUiDefaults;
 };
 
 export type ModelAdminQueryOptions = {
@@ -159,74 +189,62 @@ export type ModelAdminSelectionHistory = {
 };
 
 export type ModelAdminRegistryResponse = {
-  repository_mode: ModelAdminRepositoryMode;
   filters: ModelAdminFilterResponse;
   model_registry_count: number;
   model_registry: ModelAdminRegistryEntry[];
 };
 
 export type ModelAdminRunsResponse = {
-  repository_mode: ModelAdminRepositoryMode;
   filters: ModelAdminFilterResponse;
   model_run_count: number;
   model_runs: ModelAdminRun[];
 };
 
 export type ModelAdminRunDetailResponse = {
-  repository_mode: ModelAdminRepositoryMode;
   model_run: ModelAdminRun | null;
 };
 
 export type ModelAdminSummaryResponse = {
-  repository_mode: ModelAdminRepositoryMode;
   filters: ModelAdminFilterResponse;
   model_summary: ModelAdminSummary;
 };
 
 export type ModelAdminHistoryResponse = {
-  repository_mode: ModelAdminRepositoryMode;
   filters: ModelAdminFilterResponse;
   model_history: ModelAdminTrainingHistory;
 };
 
 export type ModelAdminEvaluationsResponse = {
-  repository_mode: ModelAdminRepositoryMode;
   filters: ModelAdminFilterResponse;
   evaluation_snapshot_count: number;
   evaluation_snapshots: ModelAdminEvaluationSnapshot[];
 };
 
 export type ModelAdminEvaluationHistoryResponse = {
-  repository_mode: ModelAdminRepositoryMode;
   filters: ModelAdminFilterResponse;
   model_evaluation_history: ModelAdminEvaluationHistory;
 };
 
 export type ModelAdminEvaluationDetailResponse = {
-  repository_mode: ModelAdminRepositoryMode;
   evaluation_snapshot: ModelAdminEvaluationSnapshot | null;
 };
 
 export type ModelAdminSelectionsResponse = {
-  repository_mode: ModelAdminRepositoryMode;
   filters: ModelAdminFilterResponse;
   selection_count: number;
   selections: ModelAdminSelectionSnapshot[];
 };
 
 export type ModelAdminSelectionHistoryResponse = {
-  repository_mode: ModelAdminRepositoryMode;
   filters: ModelAdminFilterResponse;
   model_selection_history: ModelAdminSelectionHistory;
 };
 
 export type ModelAdminSelectionDetailResponse = {
-  repository_mode: ModelAdminRepositoryMode;
   selection: ModelAdminSelectionSnapshot | null;
 };
 
 export type ModelAdminTrainResponse = {
-  repository_mode: ModelAdminRepositoryMode;
   filters: ModelAdminFilterResponse;
   feature_version: ModelAdminFeatureVersion | null;
   dataset_row_count: number;
@@ -236,7 +254,6 @@ export type ModelAdminTrainResponse = {
 };
 
 export type ModelAdminSelectResponse = {
-  repository_mode: ModelAdminRepositoryMode;
   filters: ModelAdminFilterResponse;
   selection_policy_name: string;
   selected_snapshot: ModelAdminEvaluationSnapshot | null;

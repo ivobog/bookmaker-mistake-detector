@@ -46,7 +46,6 @@ def recent_job_runs(
         started_to=resolved_started_to,
     )
     return {
-        "repository_mode": diagnostics["repository_mode"],
         "filters": diagnostics["filters"],
         "job_runs": diagnostics["job_runs"],
     }
@@ -73,7 +72,6 @@ def recent_ingestion_issues(
         run_label=run_label,
     )
     return {
-        "repository_mode": diagnostics["repository_mode"],
         "filters": diagnostics["filters"],
         "page_retrievals": diagnostics["page_retrievals"],
     }
@@ -101,7 +99,6 @@ def recent_data_quality_issues(
         run_label=run_label,
     )
     return {
-        "repository_mode": diagnostics["repository_mode"],
         "filters": diagnostics["filters"],
         "data_quality_issues": diagnostics["data_quality_issues"],
     }
@@ -121,7 +118,6 @@ def ingestion_stats(
         run_label=run_label,
     )
     return {
-        "repository_mode": diagnostics["repository_mode"],
         "filters": diagnostics["filters"],
         "stats": diagnostics["stats"],
     }
@@ -153,7 +149,6 @@ def compare_validation_runs(
         started_to=resolved_started_to,
     )
     return {
-        "repository_mode": diagnostics["repository_mode"],
         "filters": diagnostics["filters"],
         "validation_run_comparison": diagnostics["validation_run_comparison"],
     }
@@ -187,7 +182,6 @@ def ingestion_trends(
         started_to=resolved_started_to,
     )
     return {
-        "repository_mode": diagnostics["repository_mode"],
         "filters": diagnostics["filters"],
         "trends": diagnostics["trends"],
     }
@@ -219,7 +213,6 @@ def retrieval_trends(
         started_to=resolved_started_to,
     )
     return {
-        "repository_mode": diagnostics["repository_mode"],
         "filters": diagnostics["filters"],
         "retrieval_trends": diagnostics["retrieval_trends"],
     }
@@ -249,7 +242,6 @@ def ingestion_quality_trends(
         started_to=resolved_started_to,
     )
     return {
-        "repository_mode": diagnostics["repository_mode"],
         "filters": diagnostics["filters"],
         "quality_trends": diagnostics["quality_trends"],
     }

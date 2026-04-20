@@ -10,9 +10,9 @@ import { apiGet } from "./client";
 import {
   buildModelArtifactQuery,
   buildSharedTrainingQuery,
+  resolveDefaultTargetTask,
   resolveScenarioDefaults,
-  sharedTrainingDefaults
-} from "./mode";
+} from "./defaults";
 
 function requireScenarioValue(
   scenario: Record<string, unknown>,
@@ -31,30 +31,34 @@ function requireScenarioValue(
 }
 
 export async function fetchModelHistory(): Promise<ModelHistoryResponse> {
+  const query = await buildModelArtifactQuery(5);
   return apiGet<ModelHistoryResponse>("/api/v1/admin/models/history", {
     errorPrefix: "Failed to load model history",
-    query: buildModelArtifactQuery(5)
+    query
   });
 }
 
 export async function fetchModelRunDetail(runId: number): Promise<ModelRunDetailResponse> {
+  const query = await buildModelArtifactQuery();
   return apiGet<ModelRunDetailResponse>(`/api/v1/admin/models/runs/${runId}`, {
     errorPrefix: "Failed to load model run detail",
-    query: buildModelArtifactQuery()
+    query
   });
 }
 
 export async function fetchSelectionDetail(selectionId: number): Promise<SelectionDetailResponse> {
+  const query = await buildModelArtifactQuery();
   return apiGet<SelectionDetailResponse>(`/api/v1/admin/models/selections/${selectionId}`, {
     errorPrefix: "Failed to load model selection detail",
-    query: buildModelArtifactQuery()
+    query
   });
 }
 
 export async function fetchEvaluationDetail(snapshotId: number): Promise<EvaluationDetailResponse> {
+  const query = await buildModelArtifactQuery();
   return apiGet<EvaluationDetailResponse>(`/api/v1/admin/models/evaluations/${snapshotId}`, {
     errorPrefix: "Failed to load model evaluation detail",
-    query: buildModelArtifactQuery()
+    query
   });
 }
 
@@ -63,10 +67,11 @@ export async function fetchScoringRunDetail(
   scenario: Record<string, unknown>
 ): Promise<ScoringRunDetailResponse> {
   const scenarioDefaults = resolveScenarioDefaults();
-  const query = buildSharedTrainingQuery();
+  const query = await buildSharedTrainingQuery();
+  const defaultTargetTask = await resolveDefaultTargetTask();
   query.set(
     "target_task",
-    String(readNested(scenario, "target_task") ?? sharedTrainingDefaults.targetTask)
+    String(readNested(scenario, "target_task") ?? defaultTargetTask)
   );
   query.set(
     "season_label",

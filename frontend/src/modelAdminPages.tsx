@@ -57,6 +57,7 @@ export function SharedTrainingFilters({
   setSeasonLabel,
   setTargetTask,
   setTeamCode,
+  taskOptions,
   targetTask,
   teamCode
 }: {
@@ -66,6 +67,7 @@ export function SharedTrainingFilters({
   setSeasonLabel: (value: string) => void;
   setTargetTask: (value: string) => void;
   setTeamCode: (value: string) => void;
+  taskOptions?: Array<{ label: string; value: string }>;
   targetTask: string;
   teamCode: string;
 }) {
@@ -84,7 +86,17 @@ export function SharedTrainingFilters({
       title="Training scope"
     >
       <FilterField label="Target task">
-        <input onChange={(event) => setTargetTask(event.target.value)} value={targetTask} />
+        {taskOptions?.length ? (
+          <select onChange={(event) => setTargetTask(event.target.value)} value={targetTask}>
+            {taskOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input onChange={(event) => setTargetTask(event.target.value)} value={targetTask} />
+        )}
       </FilterField>
       <FilterField label="Team code">
         <input onChange={(event) => setTeamCode(event.target.value)} placeholder="Optional" value={teamCode} />
@@ -106,6 +118,7 @@ export function EvaluationFilters({
   onReset,
   setModelFamily,
   setTargetTask,
+  taskOptions,
   targetTask
 }: {
   modelFamily: string;
@@ -113,6 +126,7 @@ export function EvaluationFilters({
   onReset: () => void;
   setModelFamily: (value: string) => void;
   setTargetTask: (value: string) => void;
+  taskOptions?: Array<{ label: string; value: string }>;
   targetTask: string;
 }) {
   return (
@@ -130,7 +144,17 @@ export function EvaluationFilters({
       title="Evaluation scope"
     >
       <FilterField label="Target task">
-        <input onChange={(event) => setTargetTask(event.target.value)} value={targetTask} />
+        {taskOptions?.length ? (
+          <select onChange={(event) => setTargetTask(event.target.value)} value={targetTask}>
+            {taskOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input onChange={(event) => setTargetTask(event.target.value)} value={targetTask} />
+        )}
       </FilterField>
       <FilterField label="Model family">
         <input
@@ -149,6 +173,7 @@ export function SelectionFilters({
   onReset,
   setActiveOnly,
   setTargetTask,
+  taskOptions,
   targetTask
 }: {
   activeOnly: boolean;
@@ -156,6 +181,7 @@ export function SelectionFilters({
   onReset: () => void;
   setActiveOnly: (value: boolean) => void;
   setTargetTask: (value: string) => void;
+  taskOptions?: Array<{ label: string; value: string }>;
   targetTask: string;
 }) {
   return (
@@ -173,7 +199,17 @@ export function SelectionFilters({
       title="Selection scope"
     >
       <FilterField label="Target task">
-        <input onChange={(event) => setTargetTask(event.target.value)} value={targetTask} />
+        {taskOptions?.length ? (
+          <select onChange={(event) => setTargetTask(event.target.value)} value={targetTask}>
+            {taskOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input onChange={(event) => setTargetTask(event.target.value)} value={targetTask} />
+        )}
       </FilterField>
       <label className="checkbox-field">
         <input checked={activeOnly} onChange={(event) => setActiveOnly(event.target.checked)} type="checkbox" />

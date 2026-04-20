@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
-
-RepositoryMode = Literal["in_memory", "postgres"]
-
 
 class AnalystBacktestListFilters(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
@@ -39,7 +36,6 @@ class AnalystBacktestRun(BaseModel):
 class AnalystBacktestListResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    repository_mode: RepositoryMode
     backtest_run_count: int
     backtest_runs: list[AnalystBacktestRun]
 
@@ -47,7 +43,6 @@ class AnalystBacktestListResponse(BaseModel):
 class AnalystBacktestDetailResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    repository_mode: RepositoryMode
     backtest_run: AnalystBacktestRun | None = None
 
 
@@ -98,7 +93,6 @@ class AnalystOpportunity(BaseModel):
 class AnalystOpportunityListResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    repository_mode: RepositoryMode
     queue_batch_id: str | None = None
     queue_materialized_at: str | None = None
     queue_scope: dict[str, Any] = Field(default_factory=dict)
@@ -111,7 +105,6 @@ class AnalystOpportunityListResponse(BaseModel):
 class AnalystOpportunityDetailResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    repository_mode: RepositoryMode
     opportunity: AnalystOpportunity | None = None
 
 
@@ -126,7 +119,6 @@ class AnalystTrendFilters(BaseModel):
 class AnalystTrendResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    repository_mode: RepositoryMode
     filters: AnalystTrendFilters
     feature_version: dict[str, Any] | None = None
     snapshot_count: int
@@ -150,7 +142,6 @@ class AnalystPatternFilters(BaseModel):
 class AnalystPatternResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    repository_mode: RepositoryMode
     filters: AnalystPatternFilters
     feature_version: dict[str, Any] | None = None
     row_count: int
@@ -176,7 +167,6 @@ class AnalystComparableFilters(BaseModel):
 class AnalystComparableResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    repository_mode: RepositoryMode
     filters: AnalystComparableFilters
     feature_version: dict[str, Any] | None = None
     row_count: int
@@ -208,7 +198,6 @@ class AnalystEvidenceFilters(BaseModel):
 class AnalystEvidenceResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    repository_mode: RepositoryMode
     filters: AnalystEvidenceFilters
     feature_version: dict[str, Any] | None = None
     row_count: int

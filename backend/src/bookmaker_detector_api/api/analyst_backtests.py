@@ -43,7 +43,7 @@ def _serialize_backtest_run(run: ModelBacktestRunRecord) -> AnalystBacktestRun:
 
 def _load_backtest_runs(
     filters: AnalystBacktestListFilters,
-) -> tuple[str, list[ModelBacktestRunRecord]]:
+) -> list[ModelBacktestRunRecord]:
     with postgres_connection() as connection:
         runs = list_model_backtest_runs_postgres(
             connection,
@@ -51,25 +51,24 @@ def _load_backtest_runs(
             team_code=filters.team_code,
             season_label=filters.season_label,
         )
-    return "postgres", runs
+    return runs
 
 
-def _load_backtest_detail(backtest_run_id: int) -> tuple[str, dict[str, object] | None]:
+def _load_backtest_detail(backtest_run_id: int) -> dict[str, object] | None:
     with postgres_connection() as connection:
         backtest_run = get_model_backtest_detail_postgres(
             connection,
             backtest_run_id=backtest_run_id,
         )
-    return "postgres", backtest_run
+    return backtest_run
 
 
 @router.get("/backtests", response_model=AnalystBacktestListResponse)
 def phase_four_model_backtests(
     filters: Annotated[AnalystBacktestListFilters, Depends()],
 ) -> AnalystBacktestListResponse:
-    repository_mode, runs = _load_backtest_runs(filters)
+    runs = _load_backtest_runs(filters)
     return AnalystBacktestListResponse(
-        repository_mode=repository_mode,
         backtest_run_count=len(runs),
         backtest_runs=[_serialize_backtest_run(run) for run in runs],
     )
@@ -79,9 +78,8 @@ def phase_four_model_backtests(
 def phase_four_model_backtest_detail(
     backtest_run_id: int,
 ) -> AnalystBacktestDetailResponse:
-    repository_mode, backtest_run = _load_backtest_detail(backtest_run_id)
+    backtest_run = _load_backtest_detail(backtest_run_id)
     return AnalystBacktestDetailResponse(
-        repository_mode=repository_mode,
         backtest_run=(
             AnalystBacktestRun.model_validate(backtest_run) if backtest_run is not None else None
         ),

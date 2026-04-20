@@ -1,4 +1,5 @@
 import type {
+  ModelAdminCapabilitiesResponse,
   ModelAdminEvaluationDetailResponse,
   ModelAdminEvaluationFilters,
   ModelAdminEvaluationHistoryResponse,
@@ -20,10 +21,16 @@ import type {
   ModelAdminTrainResponse
 } from "../modelAdminTypes";
 import { apiGet, apiPost } from "./client";
-import { buildSharedTrainingQuery } from "./mode";
+import { buildSharedTrainingQuery } from "./defaults";
 
-function buildModelAdminQuery(options?: ModelAdminQueryOptions): URLSearchParams {
-  const query = buildSharedTrainingQuery();
+export async function fetchModelCapabilities(): Promise<ModelAdminCapabilitiesResponse> {
+  return apiGet<ModelAdminCapabilitiesResponse>("/api/v1/admin/model-capabilities", {
+    errorPrefix: "Failed to load model capabilities"
+  });
+}
+
+async function buildModelAdminQuery(options?: ModelAdminQueryOptions): Promise<URLSearchParams> {
+  const query = await buildSharedTrainingQuery();
   if (options?.featureKey) {
     query.set("feature_key", options.featureKey);
   }
@@ -51,18 +58,20 @@ function buildModelAdminQuery(options?: ModelAdminQueryOptions): URLSearchParams
 export async function fetchModelAdminRegistry(
   options?: ModelAdminRegistryFilters
 ): Promise<ModelAdminRegistryResponse> {
+  const query = await buildModelAdminQuery(options);
   return apiGet<ModelAdminRegistryResponse>("/api/v1/admin/models/registry", {
     errorPrefix: "Failed to load model registry",
-    query: buildModelAdminQuery(options)
+    query
   });
 }
 
 export async function fetchModelAdminRuns(
   options?: ModelAdminQueryOptions
 ): Promise<ModelAdminRunsResponse> {
+  const query = await buildModelAdminQuery(options);
   return apiGet<ModelAdminRunsResponse>("/api/v1/admin/models/runs", {
     errorPrefix: "Failed to load model runs",
-    query: buildModelAdminQuery(options)
+    query
   });
 }
 
@@ -75,25 +84,27 @@ export async function fetchModelAdminRunDetail(runId: number): Promise<ModelAdmi
 export async function fetchModelAdminSummary(
   options?: ModelAdminQueryOptions
 ): Promise<ModelAdminSummaryResponse> {
+  const query = await buildModelAdminQuery(options);
   return apiGet<ModelAdminSummaryResponse>("/api/v1/admin/models/summary", {
     errorPrefix: "Failed to load model summary",
-    query: buildModelAdminQuery(options)
+    query
   });
 }
 
 export async function fetchModelAdminHistory(
   options?: ModelAdminQueryOptions
 ): Promise<ModelAdminHistoryResponse> {
+  const query = await buildModelAdminQuery(options);
   return apiGet<ModelAdminHistoryResponse>("/api/v1/admin/models/history", {
     errorPrefix: "Failed to load model history",
-    query: buildModelAdminQuery(options)
+    query
   });
 }
 
 export async function fetchModelAdminEvaluations(
   options?: ModelAdminEvaluationFilters
 ): Promise<ModelAdminEvaluationsResponse> {
-  const query = buildModelAdminQuery(options);
+  const query = await buildModelAdminQuery(options);
   if (options?.modelFamily) {
     query.set("model_family", options.modelFamily);
   }
@@ -106,7 +117,7 @@ export async function fetchModelAdminEvaluations(
 export async function fetchModelAdminEvaluationHistory(
   options?: ModelAdminEvaluationFilters
 ): Promise<ModelAdminEvaluationHistoryResponse> {
-  const query = buildModelAdminQuery(options);
+  const query = await buildModelAdminQuery(options);
   if (options?.modelFamily) {
     query.set("model_family", options.modelFamily);
   }
@@ -127,7 +138,7 @@ export async function fetchModelAdminEvaluationDetail(
 export async function fetchModelAdminSelections(
   options?: ModelAdminSelectionFilters
 ): Promise<ModelAdminSelectionsResponse> {
-  const query = buildModelAdminQuery(options);
+  const query = await buildModelAdminQuery(options);
   if (options?.activeOnly !== undefined) {
     query.set("active_only", String(options.activeOnly));
   }
@@ -140,7 +151,7 @@ export async function fetchModelAdminSelections(
 export async function fetchModelAdminSelectionHistory(
   options?: ModelAdminSelectionFilters
 ): Promise<ModelAdminSelectionHistoryResponse> {
-  const query = buildModelAdminQuery(options);
+  const query = await buildModelAdminQuery(options);
   if (options?.activeOnly !== undefined) {
     query.set("active_only", String(options.activeOnly));
   }
@@ -161,16 +172,17 @@ export async function fetchModelAdminSelectionDetail(
 export async function trainModels(
   options?: ModelAdminTrainingMutationInput
 ): Promise<ModelAdminTrainResponse> {
+  const query = await buildModelAdminQuery(options);
   return apiPost<ModelAdminTrainResponse>("/api/v1/admin/models/train", {
     errorPrefix: "Failed to train models",
-    query: buildModelAdminQuery(options)
+    query
   });
 }
 
 export async function selectBestModel(
   options?: ModelAdminSelectionMutationInput
 ): Promise<ModelAdminSelectResponse> {
-  const query = buildModelAdminQuery(options);
+  const query = await buildModelAdminQuery(options);
   if (options?.selectionPolicyName) {
     query.set("selection_policy_name", options.selectionPolicyName);
   }

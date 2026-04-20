@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ModelAdminWorkspace } from "./modelAdminWorkspace";
 
 vi.mock("./api", () => ({
+  fetchModelCapabilities: vi.fn(),
   fetchModelAdminEvaluationDetail: vi.fn(),
   fetchModelAdminEvaluationHistory: vi.fn(),
   fetchModelAdminEvaluations: vi.fn(),
@@ -22,6 +23,7 @@ vi.mock("./api", () => ({
 }));
 
 import {
+  fetchModelCapabilities,
   fetchModelAdminEvaluationDetail,
   fetchModelAdminEvaluationHistory,
   fetchModelAdminHistory,
@@ -53,8 +55,50 @@ afterEach(() => {
 });
 
 beforeEach(() => {
+  vi.mocked(fetchModelCapabilities).mockResolvedValue({
+    task_count: 2,
+    target_tasks: [
+      {
+        task_key: "spread_error_regression",
+        task_kind: "regression",
+        label: "Spread Error",
+        description: "Spread task",
+        market_type: "spread",
+        primary_metric_name: "mae",
+        metric_direction: "lower_is_better",
+        supported_model_families: ["linear_feature", "tree_stump"],
+        default_selection_policy_name: "validation_mae_candidate_v1",
+        valid_selection_policy_names: ["validation_mae_candidate_v1"],
+        default_opportunity_policy_name: "spread_signal_v1",
+        workflow_support: { training: true, selection: true, scoring: true },
+        is_enabled: true,
+        config: {}
+      },
+      {
+        task_key: "total_points_regression",
+        task_kind: "regression",
+        label: "Total Points",
+        description: "Totals task",
+        market_type: "total",
+        primary_metric_name: "mae",
+        metric_direction: "lower_is_better",
+        supported_model_families: ["linear_feature"],
+        default_selection_policy_name: "validation_mae_candidate_v1",
+        valid_selection_policy_names: ["validation_mae_candidate_v1"],
+        default_opportunity_policy_name: "totals_signal_v1",
+        workflow_support: { training: true, selection: true, scoring: true },
+        is_enabled: true,
+        config: {}
+      }
+    ],
+    ui_defaults: {
+      default_feature_key: "baseline_team_features_v1",
+      default_target_task: "spread_error_regression",
+      default_train_ratio: 0.7,
+      default_validation_ratio: 0.15
+    }
+  });
   vi.mocked(fetchModelAdminHistory).mockResolvedValue({
-    repository_mode: "in_memory",
     filters: {
       target_task: "spread_error_regression",
       team_code: null,
@@ -73,7 +117,6 @@ beforeEach(() => {
     }
   });
   vi.mocked(fetchModelAdminSummary).mockResolvedValue({
-    repository_mode: "in_memory",
     filters: {
       target_task: "spread_error_regression"
     },
@@ -86,7 +129,6 @@ beforeEach(() => {
     }
   });
   vi.mocked(fetchModelAdminEvaluationHistory).mockResolvedValue({
-    repository_mode: "in_memory",
     filters: {
       target_task: "spread_error_regression",
       recent_limit: 8
@@ -101,7 +143,6 @@ beforeEach(() => {
     }
   });
   vi.mocked(fetchModelAdminSelectionHistory).mockResolvedValue({
-    repository_mode: "in_memory",
     filters: {
       target_task: "spread_error_regression",
       recent_limit: 8
@@ -116,7 +157,6 @@ beforeEach(() => {
     }
   });
   vi.mocked(fetchModelAdminRuns).mockResolvedValue({
-    repository_mode: "in_memory",
     filters: {
       target_task: "spread_error_regression"
     },
@@ -124,7 +164,6 @@ beforeEach(() => {
     model_runs: []
   });
   vi.mocked(fetchModelAdminEvaluations).mockResolvedValue({
-    repository_mode: "in_memory",
     filters: {
       target_task: "spread_error_regression"
     },
@@ -132,7 +171,6 @@ beforeEach(() => {
     evaluation_snapshots: []
   });
   vi.mocked(fetchModelAdminSelections).mockResolvedValue({
-    repository_mode: "in_memory",
     filters: {
       target_task: "spread_error_regression",
       active_only: false
@@ -141,19 +179,15 @@ beforeEach(() => {
     selections: []
   });
   vi.mocked(fetchModelAdminRunDetail).mockResolvedValue({
-    repository_mode: "in_memory",
     model_run: null
   });
   vi.mocked(fetchModelAdminEvaluationDetail).mockResolvedValue({
-    repository_mode: "in_memory",
     evaluation_snapshot: null
   });
   vi.mocked(fetchModelAdminSelectionDetail).mockResolvedValue({
-    repository_mode: "in_memory",
     selection: null
   });
   vi.mocked(fetchModelAdminRegistry).mockResolvedValue({
-    repository_mode: "in_memory",
     filters: {
       target_task: "spread_error_regression"
     },
@@ -161,7 +195,6 @@ beforeEach(() => {
     model_registry: []
   });
   vi.mocked(trainModels).mockResolvedValue({
-    repository_mode: "in_memory",
     filters: {
       target_task: "spread_error_regression"
     },
@@ -174,7 +207,6 @@ beforeEach(() => {
     persisted_run_count: 0
   });
   vi.mocked(selectBestModel).mockResolvedValue({
-    repository_mode: "in_memory",
     filters: {
       target_task: "spread_error_regression"
     },
@@ -216,7 +248,6 @@ describe("ModelAdminWorkspace", () => {
     await screen.findByText("Loading Model Admin workspace...");
 
     historyRequest.resolve({
-      repository_mode: "in_memory",
       filters: {
         target_task: "spread_error_regression",
         team_code: null,
@@ -235,7 +266,6 @@ describe("ModelAdminWorkspace", () => {
       }
     });
     summaryRequest.resolve({
-      repository_mode: "in_memory",
       filters: { target_task: "spread_error_regression" },
       model_summary: {
         run_count: 1,
@@ -246,7 +276,6 @@ describe("ModelAdminWorkspace", () => {
       }
     });
     evaluationHistoryRequest.resolve({
-      repository_mode: "in_memory",
       filters: { target_task: "spread_error_regression", recent_limit: 8 },
       model_evaluation_history: {
         overview: { snapshot_count: 0, latest_snapshot: null },
@@ -255,7 +284,6 @@ describe("ModelAdminWorkspace", () => {
       }
     });
     selectionHistoryRequest.resolve({
-      repository_mode: "in_memory",
       filters: { target_task: "spread_error_regression", recent_limit: 8 },
       model_selection_history: {
         overview: {
@@ -268,6 +296,24 @@ describe("ModelAdminWorkspace", () => {
     });
 
     await screen.findByRole("heading", { name: "Recent training activity" });
+  });
+
+  it("loads task options from model capabilities into the admin actions form", async () => {
+    render(
+      <ModelAdminWorkspace
+        modelHistory={null}
+        onNavigate={vi.fn()}
+        route={{ name: "models" }}
+      />
+    );
+
+    await screen.findByRole("heading", { name: "Recent training activity" });
+    fireEvent.click(screen.getByRole("button", { name: "Train model" }));
+
+    const targetTaskSelect = screen.getByTestId("train-target-task");
+    expect(screen.getAllByRole("option", { name: "Spread Error" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("option", { name: "Total Points" }).length).toBeGreaterThan(0);
+    expect((targetTaskSelect as HTMLSelectElement).value).toBe("spread_error_regression");
   });
 
   it("shows an error banner when dashboard loading fails", async () => {
@@ -287,7 +333,6 @@ describe("ModelAdminWorkspace", () => {
   it("shows a success mutation banner after training and exposes the follow-up action", async () => {
     const onNavigate = vi.fn();
     vi.mocked(trainModels).mockResolvedValueOnce({
-      repository_mode: "in_memory",
       filters: {
         target_task: "spread_error_regression"
       },
@@ -334,7 +379,6 @@ describe("ModelAdminWorkspace", () => {
       persisted_run_count: 1
     });
     vi.mocked(fetchModelAdminRuns).mockResolvedValueOnce({
-      repository_mode: "in_memory",
       filters: {
         target_task: "spread_error_regression"
       },
@@ -360,7 +404,6 @@ describe("ModelAdminWorkspace", () => {
       ]
     });
     vi.mocked(fetchModelAdminRunDetail).mockResolvedValueOnce({
-      repository_mode: "in_memory",
       model_run: {
         id: 301,
         model_registry_id: 11,
@@ -414,7 +457,6 @@ describe("ModelAdminWorkspace", () => {
   it("shows a success mutation banner after selection and exposes the follow-up action", async () => {
     const onNavigate = vi.fn();
     vi.mocked(selectBestModel).mockResolvedValueOnce({
-      repository_mode: "in_memory",
       filters: {
         target_task: "spread_error_regression"
       },
@@ -438,7 +480,6 @@ describe("ModelAdminWorkspace", () => {
       selection_count: 1
     });
     vi.mocked(fetchModelAdminSelections).mockResolvedValueOnce({
-      repository_mode: "in_memory",
       filters: {
         target_task: "spread_error_regression",
         active_only: false
@@ -463,7 +504,6 @@ describe("ModelAdminWorkspace", () => {
       ]
     });
     vi.mocked(fetchModelAdminSelectionDetail).mockResolvedValueOnce({
-      repository_mode: "in_memory",
       selection: {
         id: 501,
         model_evaluation_snapshot_id: 401,
@@ -529,7 +569,6 @@ describe("ModelAdminWorkspace", () => {
     await screen.findByRole("heading", { name: "Recent training activity" });
 
     vi.mocked(fetchModelAdminRuns).mockResolvedValueOnce({
-      repository_mode: "in_memory",
       filters: {
         target_task: "spread_error_regression"
       },
@@ -567,7 +606,6 @@ describe("ModelAdminWorkspace", () => {
     await screen.findByText("#301");
 
     vi.mocked(fetchModelAdminSelectionDetail).mockResolvedValueOnce({
-      repository_mode: "in_memory",
       selection: {
         id: 501,
         model_evaluation_snapshot_id: 401,
@@ -585,7 +623,6 @@ describe("ModelAdminWorkspace", () => {
       }
     });
     vi.mocked(fetchModelAdminSelections).mockResolvedValueOnce({
-      repository_mode: "in_memory",
       filters: {
         target_task: "spread_error_regression",
         active_only: false
@@ -632,13 +669,15 @@ describe("ModelAdminWorkspace", () => {
     );
 
     await screen.findByRole("heading", { name: "Selection snapshots" });
-    expect(vi.mocked(fetchModelAdminSelections)).toHaveBeenLastCalledWith({
-      activeOnly: false,
-      targetTask: "spread_error_regression"
-    });
+    await waitFor(() =>
+      expect(vi.mocked(fetchModelAdminSelections)).toHaveBeenLastCalledWith({
+        activeOnly: false,
+        targetTask: "spread_error_regression"
+      })
+    );
 
     fireEvent.change(screen.getByLabelText("Target task"), {
-      target: { value: "custom_target_task" }
+      target: { value: "total_points_regression" }
     });
     fireEvent.click(screen.getByLabelText("Active selections only"));
     fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
@@ -646,7 +685,7 @@ describe("ModelAdminWorkspace", () => {
     await waitFor(() =>
       expect(vi.mocked(fetchModelAdminSelections)).toHaveBeenLastCalledWith({
         activeOnly: true,
-        targetTask: "custom_target_task"
+        targetTask: "total_points_regression"
       })
     );
 

@@ -26,7 +26,6 @@ def feature_summary(
         )
 
     return AnalystTrendResponse(
-        repository_mode="postgres",
         filters=filters,
         feature_version=summary_result.get("feature_version"),
         snapshot_count=int(summary_result.get("snapshot_count", 0)),

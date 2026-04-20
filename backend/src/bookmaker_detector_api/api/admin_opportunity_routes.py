@@ -62,7 +62,6 @@ def phase_three_model_future_opportunity_materialize(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "target_task": target_task,
@@ -118,7 +117,6 @@ def phase_three_model_opportunity_materialize(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "target_task": target_task,
@@ -155,7 +153,6 @@ def phase_three_model_opportunity_history(
         )
 
     return AdminOpportunityHistoryResponse(
-        repository_mode="postgres",
         filters=filters,
         model_opportunity_history=history,
     )

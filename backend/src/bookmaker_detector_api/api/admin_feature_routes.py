@@ -38,7 +38,6 @@ def feature_snapshots(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "team_code": team_code,
@@ -69,7 +68,6 @@ def feature_dataset(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "team_code": team_code,
@@ -96,7 +94,6 @@ def feature_dataset_profile(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "team_code": team_code,
@@ -149,7 +146,6 @@ def materialize_feature_analysis(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "target_task": target_task,
@@ -211,7 +207,6 @@ def feature_analysis_artifacts(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "artifact_type": artifact_type,
@@ -274,7 +269,6 @@ def feature_analysis_history(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "artifact_type": artifact_type,
@@ -319,7 +313,6 @@ def feature_dataset_splits(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "team_code": team_code,
@@ -355,7 +348,6 @@ def feature_dataset_training_view(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "target_task": target_task,
@@ -388,7 +380,6 @@ def feature_dataset_training_manifest(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "target_task": target_task,
@@ -425,7 +416,6 @@ def feature_dataset_training_bundle(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "target_task": target_task,
@@ -463,7 +453,6 @@ def feature_dataset_training_benchmark(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "target_task": target_task,
@@ -498,7 +487,6 @@ def feature_dataset_training_task_matrix(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "team_code": team_code,

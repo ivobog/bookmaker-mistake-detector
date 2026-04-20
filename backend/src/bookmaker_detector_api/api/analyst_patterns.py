@@ -49,7 +49,6 @@ def feature_patterns(
 
     response_filters = filters.model_copy(update={"dimensions": parsed_dimensions})
     return AnalystPatternResponse(
-        repository_mode="postgres",
         filters=response_filters,
         feature_version=pattern_result.get("feature_version"),
         row_count=int(pattern_result.get("row_count", 0)),
@@ -88,7 +87,6 @@ def feature_comparables(
         }
     )
     return AnalystComparableResponse(
-        repository_mode="postgres",
         filters=response_filters,
         feature_version=comparable_result.get("feature_version"),
         row_count=int(comparable_result.get("row_count", 0)),
@@ -133,7 +131,6 @@ def feature_evidence(
         }
     )
     return AnalystEvidenceResponse(
-        repository_mode="postgres",
         filters=response_filters,
         feature_version=evidence_result.get("feature_version"),
         row_count=int(evidence_result.get("row_count", 0)),

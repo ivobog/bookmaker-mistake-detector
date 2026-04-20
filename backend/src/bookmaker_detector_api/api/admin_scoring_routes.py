@@ -87,7 +87,6 @@ def phase_three_model_score_preview(
         )
 
     return AdminScoringPreviewResponse(
-        repository_mode="postgres",
         filters=filters,
         **scoring_preview,
     )
@@ -129,7 +128,6 @@ def phase_three_model_future_game_preview(
         )
 
     return AdminFutureGamePreviewResponse(
-        repository_mode="postgres",
         filters=filters,
         **preview,
     )
@@ -176,7 +174,6 @@ def phase_three_model_future_game_preview_materialize(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "target_task": target_task,
@@ -222,7 +219,6 @@ def phase_three_model_future_game_preview_runs(
         )
 
     return AdminScoringRunsResponse(
-        repository_mode="postgres",
         filters=filters,
         scoring_run_count=len(scoring_runs),
         scoring_runs=[_serialize_scoring_run(scoring_run) for scoring_run in scoring_runs[:limit]],
@@ -254,7 +250,6 @@ def phase_three_model_future_game_preview_run_detail(
         )
 
     return AdminScoringRunDetailResponse(
-        repository_mode="postgres",
         filters=filters,
         scoring_run=scoring_run,
     )
@@ -289,7 +284,6 @@ def phase_three_model_future_game_preview_history(
         )
 
     return AdminScoringHistoryResponse(
-        repository_mode="postgres",
         filters=filters,
         model_scoring_history=history,
     )
@@ -328,7 +322,6 @@ def phase_three_model_future_slate_preview(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "target_task": target_task,
@@ -375,7 +368,6 @@ def phase_three_model_future_slate_materialize(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "target_task": target_task,

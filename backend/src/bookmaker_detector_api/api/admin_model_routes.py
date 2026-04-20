@@ -157,7 +157,6 @@ def phase_three_model_train(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "target_task": target_task,
@@ -203,7 +202,6 @@ def phase_four_model_backtest_run(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "target_task": target_task,
@@ -237,7 +235,6 @@ def phase_four_model_backtest_history(
         )
 
     return AdminBacktestHistoryResponse(
-        repository_mode="postgres",
         filters=filters,
         model_backtest_history=history,
     )
@@ -258,7 +255,6 @@ def phase_three_model_registry(
         )
 
     return AdminModelRegistryResponse(
-        repository_mode="postgres",
         filters=filters,
         model_registry_count=len(registries),
         model_registry=[_serialize_model_registry_entry(entry) for entry in registries],
@@ -282,7 +278,6 @@ def phase_three_model_runs(
         )
 
     return AdminModelRunsResponse(
-        repository_mode="postgres",
         filters=filters,
         model_run_count=len(runs),
         model_runs=[_serialize_model_run(run) for run in runs],
@@ -297,7 +292,6 @@ def phase_three_model_run_detail(
         run = get_model_training_run_detail_postgres(connection, run_id=run_id)
 
     return AdminModelRunDetailResponse(
-        repository_mode="postgres",
         model_run=_serialize_model_run(run) if run is not None else None,
     )
 
@@ -319,7 +313,6 @@ def phase_three_model_summary(
         )
 
     return AdminModelSummaryResponse(
-        repository_mode="postgres",
         filters=filters,
         model_summary=summary,
     )
@@ -343,7 +336,6 @@ def phase_three_model_history(
         )
 
     return AdminModelHistoryResponse(
-        repository_mode="postgres",
         filters=filters,
         model_history=history,
     )
@@ -366,7 +358,6 @@ def phase_three_model_evaluations(
         )
 
     return AdminModelEvaluationsResponse(
-        repository_mode="postgres",
         filters=filters,
         evaluation_snapshot_count=len(snapshots),
         evaluation_snapshots=[_serialize_evaluation_snapshot(snapshot) for snapshot in snapshots],
@@ -391,7 +382,6 @@ def phase_three_model_evaluation_history(
         )
 
     return AdminEvaluationHistoryResponse(
-        repository_mode="postgres",
         filters=filters,
         model_evaluation_history=history,
     )
@@ -408,7 +398,6 @@ def phase_three_model_evaluation_detail(
         )
 
     return AdminEvaluationDetailResponse(
-        repository_mode="postgres",
         evaluation_snapshot=(
             _serialize_evaluation_snapshot(snapshot) if snapshot is not None else None
         ),
@@ -438,7 +427,6 @@ def phase_three_model_select(
         )
 
     return {
-        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "target_task": target_task,
@@ -466,7 +454,6 @@ def phase_three_model_selections(
         )
 
     return AdminModelSelectionsResponse(
-        repository_mode="postgres",
         filters=filters,
         selection_count=len(selections),
         selections=[_serialize_selection_snapshot(selection) for selection in selections],
@@ -489,7 +476,6 @@ def phase_three_model_selection_history(
         )
 
     return AdminSelectionHistoryResponse(
-        repository_mode="postgres",
         filters=filters,
         model_selection_history=history,
     )
@@ -506,6 +492,5 @@ def phase_three_model_selection_detail(
         )
 
     return AdminSelectionDetailResponse(
-        repository_mode="postgres",
         selection=(_serialize_selection_snapshot(selection) if selection is not None else None),
     )

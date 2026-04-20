@@ -29,7 +29,7 @@ def _serialize_opportunity(opportunity: ModelOpportunityRecord) -> AnalystOpport
 
 def _load_opportunities(
     filters: AnalystOpportunityListFilters,
-) -> tuple[str, dict[str, object]]:
+) -> dict[str, object]:
     with postgres_connection() as connection:
         queue = get_model_opportunity_queue_postgres(
             connection,
@@ -40,27 +40,26 @@ def _load_opportunities(
             source_kind=filters.source_kind,
             scenario_key=filters.scenario_key,
         )
-    return "postgres", queue
+    return queue
 
 
-def _load_opportunity_detail(opportunity_id: int) -> tuple[str, dict[str, object] | None]:
+def _load_opportunity_detail(opportunity_id: int) -> dict[str, object] | None:
     with postgres_connection() as connection:
         opportunity = get_model_opportunity_detail_postgres(
             connection,
             opportunity_id=opportunity_id,
         )
-    return "postgres", opportunity
+    return opportunity
 
 
 @router.get("/opportunities", response_model=AnalystOpportunityListResponse)
 def phase_three_model_opportunities(
     filters: Annotated[AnalystOpportunityListFilters, Depends()],
 ) -> AnalystOpportunityListResponse:
-    repository_mode, queue = _load_opportunities(filters)
+    queue = _load_opportunities(filters)
     opportunities = list(queue.get("opportunities", []))
     selected = opportunities[: filters.limit]
     return AnalystOpportunityListResponse(
-        repository_mode=repository_mode,
         queue_batch_id=queue.get("queue_batch_id"),
         queue_materialized_at=queue.get("queue_materialized_at"),
         queue_scope=dict(queue.get("queue_scope", {})),
@@ -75,9 +74,8 @@ def phase_three_model_opportunities(
 def phase_three_model_opportunity_detail(
     opportunity_id: int,
 ) -> AnalystOpportunityDetailResponse:
-    repository_mode, opportunity = _load_opportunity_detail(opportunity_id)
+    opportunity = _load_opportunity_detail(opportunity_id)
     return AnalystOpportunityDetailResponse(
-        repository_mode=repository_mode,
         opportunity=(
             AnalystOpportunity.model_validate(opportunity) if opportunity is not None else None
         ),

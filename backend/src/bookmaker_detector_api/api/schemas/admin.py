@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
-
-RepositoryMode = Literal["in_memory", "postgres"]
-
 
 class AdminBacktestHistoryFilters(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
@@ -237,7 +234,6 @@ class AdminScoringRun(BaseModel):
 class AdminBacktestHistoryResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    repository_mode: RepositoryMode
     filters: AdminBacktestHistoryFilters
     model_backtest_history: dict[str, Any] = Field(default_factory=dict)
 
@@ -245,7 +241,6 @@ class AdminBacktestHistoryResponse(BaseModel):
 class AdminModelRegistryResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    repository_mode: RepositoryMode
     filters: AdminModelRegistryFilters
     model_registry_count: int
     model_registry: list[AdminModelRegistryEntry] = Field(default_factory=list)
@@ -254,7 +249,6 @@ class AdminModelRegistryResponse(BaseModel):
 class AdminModelRunsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    repository_mode: RepositoryMode
     filters: AdminModelRunsFilters
     model_run_count: int
     model_runs: list[AdminModelRun] = Field(default_factory=list)
@@ -263,7 +257,6 @@ class AdminModelRunsResponse(BaseModel):
 class AdminModelHistoryResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    repository_mode: RepositoryMode
     filters: AdminModelHistoryFilters
     model_history: dict[str, Any] = Field(default_factory=dict)
 
@@ -271,7 +264,6 @@ class AdminModelHistoryResponse(BaseModel):
 class AdminModelSummaryResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    repository_mode: RepositoryMode
     filters: AdminModelSummaryFilters
     model_summary: dict[str, Any] = Field(default_factory=dict)
 
@@ -279,14 +271,12 @@ class AdminModelSummaryResponse(BaseModel):
 class AdminModelRunDetailResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    repository_mode: RepositoryMode
     model_run: AdminModelRun | None = None
 
 
 class AdminModelEvaluationsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    repository_mode: RepositoryMode
     filters: AdminModelEvaluationsFilters
     evaluation_snapshot_count: int
     evaluation_snapshots: list[AdminEvaluationSnapshot] = Field(default_factory=list)
@@ -295,7 +285,6 @@ class AdminModelEvaluationsResponse(BaseModel):
 class AdminEvaluationHistoryResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    repository_mode: RepositoryMode
     filters: AdminEvaluationHistoryFilters
     model_evaluation_history: dict[str, Any] = Field(default_factory=dict)
 
@@ -303,14 +292,12 @@ class AdminEvaluationHistoryResponse(BaseModel):
 class AdminEvaluationDetailResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    repository_mode: RepositoryMode
     evaluation_snapshot: AdminEvaluationSnapshot | None = None
 
 
 class AdminModelSelectionsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    repository_mode: RepositoryMode
     filters: AdminModelSelectionsFilters
     selection_count: int
     selections: list[AdminSelectionSnapshot] = Field(default_factory=list)
@@ -319,7 +306,6 @@ class AdminModelSelectionsResponse(BaseModel):
 class AdminSelectionHistoryResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    repository_mode: RepositoryMode
     filters: AdminSelectionHistoryFilters
     model_selection_history: dict[str, Any] = Field(default_factory=dict)
 
@@ -327,14 +313,12 @@ class AdminSelectionHistoryResponse(BaseModel):
 class AdminSelectionDetailResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    repository_mode: RepositoryMode
     selection: AdminSelectionSnapshot | None = None
 
 
 class AdminScoringPreviewResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    repository_mode: RepositoryMode
     filters: AdminScoringPreviewFilters
     feature_version: dict[str, Any] | None = None
     active_selection: dict[str, Any] | None = None
@@ -348,7 +332,6 @@ class AdminScoringPreviewResponse(BaseModel):
 class AdminFutureGamePreviewResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    repository_mode: RepositoryMode
     filters: AdminFutureGamePreviewFilters
     feature_version: dict[str, Any] | None = None
     active_selection: dict[str, Any] | None = None
@@ -363,7 +346,6 @@ class AdminFutureGamePreviewResponse(BaseModel):
 class AdminScoringRunsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    repository_mode: RepositoryMode
     filters: AdminFutureGamePreviewFilters
     scoring_run_count: int
     scoring_runs: list[AdminScoringRun] = Field(default_factory=list)
@@ -372,7 +354,6 @@ class AdminScoringRunsResponse(BaseModel):
 class AdminScoringRunDetailResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    repository_mode: RepositoryMode
     filters: AdminFutureGamePreviewFilters
     scoring_run: dict[str, Any] | None = None
 
@@ -380,7 +361,6 @@ class AdminScoringRunDetailResponse(BaseModel):
 class AdminScoringHistoryResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    repository_mode: RepositoryMode
     filters: AdminFutureGamePreviewFilters
     model_scoring_history: dict[str, Any] = Field(default_factory=dict)
 
@@ -388,7 +368,6 @@ class AdminScoringHistoryResponse(BaseModel):
 class AdminOpportunityHistoryResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    repository_mode: RepositoryMode
     filters: AdminOpportunityHistoryFilters
     model_opportunity_history: dict[str, Any] = Field(default_factory=dict)
 

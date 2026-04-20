@@ -14,23 +14,29 @@ type MutationAction = "select" | "train" | null;
 type ActionPanelProps = {
   busyAction: MutationAction;
   defaultSeasonLabel: string;
+  defaultSelectionPolicyName?: string;
   defaultTargetTask: string;
   defaultTeamCode: string;
   enableSelect: boolean;
   enableTrain: boolean;
   onSelectSubmit: (input: ModelAdminSelectionMutationInput) => Promise<void>;
   onTrainSubmit: (input: ModelAdminTrainingMutationInput) => Promise<void>;
+  selectionPolicyOptions?: string[];
+  targetTaskOptions?: Array<{ label: string; value: string }>;
 };
 
 export function ModelAdminActionsPanel({
   busyAction,
   defaultSeasonLabel,
+  defaultSelectionPolicyName = "validation_mae_candidate_v1",
   defaultTargetTask,
   defaultTeamCode,
   enableSelect,
   enableTrain,
   onSelectSubmit,
-  onTrainSubmit
+  onTrainSubmit,
+  selectionPolicyOptions,
+  targetTaskOptions
 }: ActionPanelProps) {
   const [openAction, setOpenAction] = useState<MutationAction>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -43,12 +49,16 @@ export function ModelAdminActionsPanel({
   const [validationRatio, setValidationRatio] = useState("0.15");
 
   const [selectionTargetTask, setSelectionTargetTask] = useState(defaultTargetTask);
-  const [selectionPolicyName, setSelectionPolicyName] = useState("validation_mae_candidate_v1");
+  const [selectionPolicyName, setSelectionPolicyName] = useState(defaultSelectionPolicyName);
 
   useEffect(() => {
     setTrainTargetTask(defaultTargetTask);
     setSelectionTargetTask(defaultTargetTask);
   }, [defaultTargetTask]);
+
+  useEffect(() => {
+    setSelectionPolicyName(defaultSelectionPolicyName);
+  }, [defaultSelectionPolicyName]);
 
   useEffect(() => {
     setTrainTeamCode(defaultTeamCode);
@@ -154,11 +164,25 @@ export function ModelAdminActionsPanel({
           </label>
           <label className="filter-field">
             <span className="filter-label">Target task</span>
-            <input
-              data-testid="train-target-task"
-              onChange={(event) => setTrainTargetTask(event.target.value)}
-              value={trainTargetTask}
-            />
+            {targetTaskOptions?.length ? (
+              <select
+                data-testid="train-target-task"
+                onChange={(event) => setTrainTargetTask(event.target.value)}
+                value={trainTargetTask}
+              >
+                {targetTaskOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                data-testid="train-target-task"
+                onChange={(event) => setTrainTargetTask(event.target.value)}
+                value={trainTargetTask}
+              />
+            )}
           </label>
           <label className="filter-field">
             <span className="filter-label">Team code</span>
@@ -213,19 +237,47 @@ export function ModelAdminActionsPanel({
         <div className="action-form-grid action-form-grid-compact" data-testid="select-model-form">
           <label className="filter-field">
             <span className="filter-label">Target task</span>
-            <input
-              data-testid="select-target-task"
-              onChange={(event) => setSelectionTargetTask(event.target.value)}
-              value={selectionTargetTask}
-            />
+            {targetTaskOptions?.length ? (
+              <select
+                data-testid="select-target-task"
+                onChange={(event) => setSelectionTargetTask(event.target.value)}
+                value={selectionTargetTask}
+              >
+                {targetTaskOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                data-testid="select-target-task"
+                onChange={(event) => setSelectionTargetTask(event.target.value)}
+                value={selectionTargetTask}
+              />
+            )}
           </label>
           <label className="filter-field">
             <span className="filter-label">Selection policy</span>
-            <input
-              data-testid="select-policy-name"
-              onChange={(event) => setSelectionPolicyName(event.target.value)}
-              value={selectionPolicyName}
-            />
+            {selectionPolicyOptions?.length ? (
+              <select
+                data-testid="select-policy-name"
+                onChange={(event) => setSelectionPolicyName(event.target.value)}
+                value={selectionPolicyName}
+              >
+                {selectionPolicyOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                data-testid="select-policy-name"
+                onChange={(event) => setSelectionPolicyName(event.target.value)}
+                value={selectionPolicyName}
+              />
+            )}
           </label>
 
           <div className="action-submit-row">

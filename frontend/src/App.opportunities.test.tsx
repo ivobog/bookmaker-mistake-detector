@@ -44,7 +44,6 @@ beforeEach(() => {
   window.location.hash = "#/opportunities";
 
   vi.mocked(fetchBacktestHistory).mockResolvedValue({
-    repository_mode: "in_memory",
     filters: {
       target_task: "spread_error_regression",
       team_code: null,
@@ -66,7 +65,6 @@ beforeEach(() => {
   });
 
   vi.mocked(fetchModelAdminHistory).mockResolvedValue({
-    repository_mode: "in_memory",
     filters: {
       target_task: "spread_error_regression",
       team_code: null,
@@ -193,7 +191,6 @@ beforeEach(() => {
   };
 
   vi.mocked(fetchOpportunityHistory).mockResolvedValue({
-    repository_mode: "in_memory",
     filters: {
       target_task: "spread_error_regression",
       team_code: null,
@@ -213,7 +210,6 @@ beforeEach(() => {
   });
 
   vi.mocked(fetchOpportunities).mockResolvedValue({
-    repository_mode: "in_memory",
     queue_batch_id: "batch-1",
     queue_materialized_at: "2026-04-19T10:00:00Z",
     queue_scope: {
@@ -230,7 +226,6 @@ beforeEach(() => {
   });
 
   vi.mocked(fetchOpportunityDetail).mockImplementation(async (opportunityId: number) => ({
-    repository_mode: "in_memory",
     opportunity: opportunityId === 102 ? opportunityTwo : opportunityOne
   }));
 });

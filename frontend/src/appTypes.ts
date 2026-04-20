@@ -1,5 +1,4 @@
 export type BacktestHistoryResponse = {
-  repository_mode: string;
   filters: {
     target_task: string;
     team_code: string | null;
@@ -27,7 +26,6 @@ export type BacktestHistoryResponse = {
 };
 
 export type BacktestRunResponse = {
-  repository_mode: string;
   filters: Record<string, string | number | null>;
   feature_version: {
     feature_key: string;
@@ -161,7 +159,6 @@ export type OpportunityRecord = {
 };
 
 export type OpportunityHistoryResponse = {
-  repository_mode: string;
   filters: {
     target_task: string;
     team_code: string | null;
@@ -181,7 +178,6 @@ export type OpportunityHistoryResponse = {
 };
 
 export type OpportunityListResponse = {
-  repository_mode: string;
   queue_batch_id: string | null;
   queue_materialized_at: string | null;
   queue_scope: {
@@ -198,12 +194,10 @@ export type OpportunityListResponse = {
 };
 
 export type OpportunityDetailResponse = {
-  repository_mode: string;
   opportunity: OpportunityRecord | null;
 };
 
 export type OpportunityMaterializeResponse = {
-  repository_mode: string;
   materialized_count: number;
   opportunity_count: number;
   opportunities: OpportunityRecord[];
@@ -226,7 +220,6 @@ export type ModelTrainingRun = {
 };
 
 export type ModelHistoryResponse = {
-  repository_mode: string;
   model_history: {
     overview: {
       run_count: number;
@@ -293,7 +286,6 @@ export type ScoringRunDetail = {
 };
 
 export type ScoringRunDetailResponse = {
-  repository_mode: string;
   scoring_run: ScoringRunDetail | null;
 };
 
@@ -345,16 +337,13 @@ export type ProvenanceInspectorData = {
 };
 
 export type ModelRunDetailResponse = {
-  repository_mode: string;
   model_run: ModelTrainingRun | null;
 };
 
 export type SelectionDetailResponse = {
-  repository_mode: string;
   selection: SelectionSnapshot | null;
 };
 
 export type EvaluationDetailResponse = {
-  repository_mode: string;
   evaluation_snapshot: EvaluationSnapshot | null;
 };

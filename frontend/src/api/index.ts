@@ -18,6 +18,7 @@ export {
   fetchSelectionDetail
 } from "./models";
 export {
+  fetchModelCapabilities,
   fetchModelAdminEvaluationDetail,
   fetchModelAdminEvaluationHistory,
   fetchModelAdminEvaluations,

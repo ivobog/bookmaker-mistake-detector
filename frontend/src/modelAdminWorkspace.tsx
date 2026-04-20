@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import {
+  fetchModelCapabilities,
   fetchModelAdminEvaluationDetail,
   fetchModelAdminEvaluationHistory,
   fetchModelAdminEvaluations,
@@ -34,6 +35,7 @@ import {
   SharedTrainingFilters
 } from "./modelAdminPages";
 import type {
+  ModelAdminCapabilitiesResponse,
   ModelAdminEvaluationHistory,
   ModelAdminEvaluationSnapshot,
   ModelAdminHistoryResponse,
@@ -54,18 +56,18 @@ type ModelAdminWorkspaceProps = {
 
 const defaultTrainingFilters = {
   seasonLabel: "",
-  targetTask: "spread_error_regression",
+  targetTask: "",
   teamCode: ""
 };
 
 const defaultEvaluationFilters = {
   modelFamily: "",
-  targetTask: "spread_error_regression"
+  targetTask: ""
 };
 
 const defaultSelectionFilters = {
   activeOnly: false,
-  targetTask: "spread_error_regression"
+  targetTask: ""
 };
 
 function normalizeOptionalText(value: string): string | null {
@@ -92,6 +94,7 @@ export function ModelAdminWorkspace({
   modelHistory,
   onNavigate
 }: ModelAdminWorkspaceProps) {
+  const [capabilities, setCapabilities] = useState<ModelAdminCapabilitiesResponse | null>(null);
   const [dashboardHistory, setDashboardHistory] = useState<ModelAdminHistoryResponse["model_history"] | null>(
     modelHistory
   );
@@ -123,10 +126,70 @@ export function ModelAdminWorkspace({
   const [evaluationFilters, setEvaluationFilters] = useState(defaultEvaluationFilters);
   const [selectionDraftFilters, setSelectionDraftFilters] = useState(defaultSelectionFilters);
   const [selectionFilters, setSelectionFilters] = useState(defaultSelectionFilters);
+  const resolvedDefaultTargetTask = capabilities?.ui_defaults.default_target_task ?? "";
+  const hasResolvedDefaultTargetTask = resolvedDefaultTargetTask.length > 0;
+  const taskOptions = (capabilities?.target_tasks ?? []).map((task) => ({
+    label: task.label,
+    value: task.task_key
+  }));
+  const selectedSelectionTaskCapability =
+    capabilities?.target_tasks.find((task) => task.task_key === selectionDraftFilters.targetTask) ?? null;
+  const selectionPolicyOptions =
+    selectedSelectionTaskCapability?.valid_selection_policy_names?.length
+      ? selectedSelectionTaskCapability.valid_selection_policy_names
+      : ["validation_mae_candidate_v1"];
+  const defaultSelectionPolicyName =
+    selectedSelectionTaskCapability?.default_selection_policy_name ?? selectionPolicyOptions[0];
 
   useEffect(() => {
     setDashboardHistory(modelHistory);
   }, [modelHistory]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCapabilities() {
+      try {
+        const response = await fetchModelCapabilities();
+        if (cancelled) {
+          return;
+        }
+        setCapabilities(response);
+        const nextTargetTask = response.ui_defaults.default_target_task ?? defaultTrainingFilters.targetTask;
+        const nextTrainingFilters = {
+          seasonLabel: "",
+          targetTask: nextTargetTask,
+          teamCode: ""
+        };
+        const nextEvaluationFilters = {
+          modelFamily: "",
+          targetTask: nextTargetTask
+        };
+        const nextSelectionFilters = {
+          activeOnly: false,
+          targetTask: nextTargetTask
+        };
+        setTrainingDraftFilters(nextTrainingFilters);
+        setTrainingFilters(nextTrainingFilters);
+        setEvaluationDraftFilters(nextEvaluationFilters);
+        setEvaluationFilters(nextEvaluationFilters);
+        setSelectionDraftFilters(nextSelectionFilters);
+        setSelectionFilters(nextSelectionFilters);
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(
+            loadError instanceof Error ? loadError.message : "Failed to load model capabilities."
+          );
+        }
+      }
+    }
+
+    void loadCapabilities();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function refreshDashboardState(scope?: {
     seasonLabel?: string | null;
@@ -135,7 +198,7 @@ export function ModelAdminWorkspace({
   }) {
     const normalizedScope = {
       seasonLabel: scope?.seasonLabel ?? normalizeOptionalText(trainingFilters.seasonLabel),
-      targetTask: scope?.targetTask ?? normalizeOptionalText(trainingFilters.targetTask) ?? "spread_error_regression",
+      targetTask: scope?.targetTask ?? normalizeOptionalText(trainingFilters.targetTask) ?? resolvedDefaultTargetTask,
       teamCode: scope?.teamCode ?? normalizeOptionalText(trainingFilters.teamCode)
     };
     const [nextHistory, nextSummary, nextEvaluationHistory, nextSelectionHistory] = await Promise.all([
@@ -171,7 +234,7 @@ export function ModelAdminWorkspace({
       setError(null);
       setMutationNotice(null);
       const result = await trainModels(input);
-      const nextTargetTask = input.targetTask ?? "spread_error_regression";
+      const nextTargetTask = input.targetTask ?? resolvedDefaultTargetTask;
       const nextTeamCode = input.teamCode ?? null;
       const nextSeasonLabel = input.seasonLabel ?? null;
       const nextTrainingFilters = {
@@ -235,7 +298,7 @@ export function ModelAdminWorkspace({
       setError(null);
       setMutationNotice(null);
       const result = await selectBestModel(input);
-      const nextTargetTask = input.targetTask ?? "spread_error_regression";
+      const nextTargetTask = input.targetTask ?? resolvedDefaultTargetTask;
       const nextSelectionFilters = {
         activeOnly: selectionFilters.activeOnly,
         targetTask: nextTargetTask
@@ -300,7 +363,7 @@ export function ModelAdminWorkspace({
     let cancelled = false;
 
     async function loadDashboard() {
-      if (route.name !== "models") {
+      if (route.name !== "models" || !hasResolvedDefaultTargetTask) {
         return;
       }
       try {
@@ -308,7 +371,7 @@ export function ModelAdminWorkspace({
         setError(null);
         const normalizedScope = {
           seasonLabel: normalizeOptionalText(trainingFilters.seasonLabel),
-          targetTask: normalizeOptionalText(trainingFilters.targetTask) ?? "spread_error_regression",
+          targetTask: normalizeOptionalText(trainingFilters.targetTask) ?? resolvedDefaultTargetTask,
           teamCode: normalizeOptionalText(trainingFilters.teamCode)
         };
         const [nextHistory, nextSummary, nextEvaluationHistory, nextSelectionHistory] = await Promise.all([
@@ -354,20 +417,20 @@ export function ModelAdminWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [route, trainingFilters, refreshToken]);
+  }, [hasResolvedDefaultTargetTask, route, trainingFilters, refreshToken]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadRegistry() {
-      if (route.name !== "model-registry") {
+      if (route.name !== "model-registry" || !hasResolvedDefaultTargetTask) {
         return;
       }
       try {
         setLoading(true);
         setError(null);
         const response = await fetchModelAdminRegistry({
-          targetTask: normalizeOptionalText(trainingFilters.targetTask) ?? "spread_error_regression"
+          targetTask: normalizeOptionalText(trainingFilters.targetTask) ?? resolvedDefaultTargetTask
         });
         if (cancelled) {
           return;
@@ -394,13 +457,16 @@ export function ModelAdminWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [route, trainingFilters.targetTask, refreshToken]);
+  }, [hasResolvedDefaultTargetTask, route, trainingFilters.targetTask, refreshToken]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadRuns() {
-      if (route.name !== "model-runs" && route.name !== "model-run-detail") {
+      if (
+        (route.name !== "model-runs" && route.name !== "model-run-detail") ||
+        !hasResolvedDefaultTargetTask
+      ) {
         return;
       }
       try {
@@ -408,7 +474,7 @@ export function ModelAdminWorkspace({
         setError(null);
         const normalizedScope = {
           seasonLabel: normalizeOptionalText(trainingFilters.seasonLabel),
-          targetTask: normalizeOptionalText(trainingFilters.targetTask) ?? "spread_error_regression",
+          targetTask: normalizeOptionalText(trainingFilters.targetTask) ?? resolvedDefaultTargetTask,
           teamCode: normalizeOptionalText(trainingFilters.teamCode)
         };
         const runsResponse = await fetchModelAdminRuns(normalizedScope);
@@ -441,13 +507,16 @@ export function ModelAdminWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [route, trainingFilters, refreshToken]);
+  }, [hasResolvedDefaultTargetTask, route, trainingFilters, refreshToken]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadEvaluations() {
-      if (route.name !== "model-evaluations" && route.name !== "model-evaluation-detail") {
+      if (
+        (route.name !== "model-evaluations" && route.name !== "model-evaluation-detail") ||
+        !hasResolvedDefaultTargetTask
+      ) {
         return;
       }
       try {
@@ -455,7 +524,7 @@ export function ModelAdminWorkspace({
         setError(null);
         const normalizedScope = {
           modelFamily: normalizeOptionalText(evaluationFilters.modelFamily),
-          targetTask: normalizeOptionalText(evaluationFilters.targetTask) ?? "spread_error_regression"
+          targetTask: normalizeOptionalText(evaluationFilters.targetTask) ?? resolvedDefaultTargetTask
         };
         const evaluationsResponse = await fetchModelAdminEvaluations(normalizedScope);
         if (cancelled) {
@@ -486,13 +555,16 @@ export function ModelAdminWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [route, evaluationFilters, refreshToken]);
+  }, [hasResolvedDefaultTargetTask, route, evaluationFilters, refreshToken]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadSelections() {
-      if (route.name !== "model-selections" && route.name !== "model-selection-detail") {
+      if (
+        (route.name !== "model-selections" && route.name !== "model-selection-detail") ||
+        !hasResolvedDefaultTargetTask
+      ) {
         return;
       }
       try {
@@ -500,7 +572,7 @@ export function ModelAdminWorkspace({
         setError(null);
         const normalizedScope = {
           activeOnly: selectionFilters.activeOnly,
-          targetTask: normalizeOptionalText(selectionFilters.targetTask) ?? "spread_error_regression"
+          targetTask: normalizeOptionalText(selectionFilters.targetTask) ?? resolvedDefaultTargetTask
         };
         const selectionsResponse = await fetchModelAdminSelections(normalizedScope);
         if (cancelled) {
@@ -531,7 +603,7 @@ export function ModelAdminWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [route, selectionFilters, refreshToken]);
+  }, [hasResolvedDefaultTargetTask, route, selectionFilters, refreshToken]);
 
   const selectedRegistryEntry =
     registryEntries.find((entry) => entry.id === selectedRegistryId) ?? null;
@@ -562,18 +634,22 @@ export function ModelAdminWorkspace({
           <ModelAdminActionsPanel
             busyAction={mutationAction}
             defaultSeasonLabel={trainingDraftFilters.seasonLabel}
+            defaultSelectionPolicyName={defaultSelectionPolicyName}
             defaultTargetTask={trainingDraftFilters.targetTask}
             defaultTeamCode={trainingDraftFilters.teamCode}
             enableSelect
             enableTrain
             onSelectSubmit={handleSelectMutation}
             onTrainSubmit={handleTrainMutation}
+            selectionPolicyOptions={selectionPolicyOptions}
+            targetTaskOptions={taskOptions}
           />
           <SharedTrainingFilters
             onApply={() => setTrainingFilters(trainingDraftFilters)}
             onReset={() => {
-              setTrainingDraftFilters(defaultTrainingFilters);
-              setTrainingFilters(defaultTrainingFilters);
+              const nextFilters = { ...defaultTrainingFilters, targetTask: resolvedDefaultTargetTask };
+              setTrainingDraftFilters(nextFilters);
+              setTrainingFilters(nextFilters);
             }}
             seasonLabel={trainingDraftFilters.seasonLabel}
             setSeasonLabel={(value) =>
@@ -587,6 +663,7 @@ export function ModelAdminWorkspace({
             }
             targetTask={trainingDraftFilters.targetTask}
             teamCode={trainingDraftFilters.teamCode}
+            taskOptions={taskOptions}
           />
           <ModelAdminDashboardPage
             evaluationHistory={evaluationHistory}
@@ -603,8 +680,9 @@ export function ModelAdminWorkspace({
           <SharedTrainingFilters
             onApply={() => setTrainingFilters(trainingDraftFilters)}
             onReset={() => {
-              setTrainingDraftFilters(defaultTrainingFilters);
-              setTrainingFilters(defaultTrainingFilters);
+              const nextFilters = { ...defaultTrainingFilters, targetTask: resolvedDefaultTargetTask };
+              setTrainingDraftFilters(nextFilters);
+              setTrainingFilters(nextFilters);
             }}
             seasonLabel={trainingDraftFilters.seasonLabel}
             setSeasonLabel={(value) =>
@@ -618,6 +696,7 @@ export function ModelAdminWorkspace({
             }
             targetTask={trainingDraftFilters.targetTask}
             teamCode={trainingDraftFilters.teamCode}
+            taskOptions={taskOptions}
           />
           <ModelRegistryPage
             detailContent={<ModelRegistryDetailCard entry={selectedRegistryEntry} />}
@@ -633,8 +712,9 @@ export function ModelAdminWorkspace({
           <SharedTrainingFilters
             onApply={() => setTrainingFilters(trainingDraftFilters)}
             onReset={() => {
-              setTrainingDraftFilters(defaultTrainingFilters);
-              setTrainingFilters(defaultTrainingFilters);
+              const nextFilters = { ...defaultTrainingFilters, targetTask: resolvedDefaultTargetTask };
+              setTrainingDraftFilters(nextFilters);
+              setTrainingFilters(nextFilters);
             }}
             seasonLabel={trainingDraftFilters.seasonLabel}
             setSeasonLabel={(value) =>
@@ -648,6 +728,7 @@ export function ModelAdminWorkspace({
             }
             targetTask={trainingDraftFilters.targetTask}
             teamCode={trainingDraftFilters.teamCode}
+            taskOptions={taskOptions}
           />
           <ModelRunsPage
             detailContent={<ModelAdminRunDetailCard run={runDetail} />}
@@ -664,8 +745,9 @@ export function ModelAdminWorkspace({
             modelFamily={evaluationDraftFilters.modelFamily}
             onApply={() => setEvaluationFilters(evaluationDraftFilters)}
             onReset={() => {
-              setEvaluationDraftFilters(defaultEvaluationFilters);
-              setEvaluationFilters(defaultEvaluationFilters);
+              const nextFilters = { ...defaultEvaluationFilters, targetTask: resolvedDefaultTargetTask };
+              setEvaluationDraftFilters(nextFilters);
+              setEvaluationFilters(nextFilters);
             }}
             setModelFamily={(value) =>
               setEvaluationDraftFilters((current) => ({ ...current, modelFamily: value }))
@@ -673,6 +755,7 @@ export function ModelAdminWorkspace({
             setTargetTask={(value) =>
               setEvaluationDraftFilters((current) => ({ ...current, targetTask: value }))
             }
+            taskOptions={taskOptions}
             targetTask={evaluationDraftFilters.targetTask}
           />
           <ModelEvaluationsPage
@@ -689,19 +772,23 @@ export function ModelAdminWorkspace({
           <ModelAdminActionsPanel
             busyAction={mutationAction}
             defaultSeasonLabel={trainingDraftFilters.seasonLabel}
+            defaultSelectionPolicyName={defaultSelectionPolicyName}
             defaultTargetTask={selectionDraftFilters.targetTask}
             defaultTeamCode={trainingDraftFilters.teamCode}
             enableSelect
             enableTrain={false}
             onSelectSubmit={handleSelectMutation}
             onTrainSubmit={handleTrainMutation}
+            selectionPolicyOptions={selectionPolicyOptions}
+            targetTaskOptions={taskOptions}
           />
           <SelectionFilters
             activeOnly={selectionDraftFilters.activeOnly}
             onApply={() => setSelectionFilters(selectionDraftFilters)}
             onReset={() => {
-              setSelectionDraftFilters(defaultSelectionFilters);
-              setSelectionFilters(defaultSelectionFilters);
+              const nextFilters = { ...defaultSelectionFilters, targetTask: resolvedDefaultTargetTask };
+              setSelectionDraftFilters(nextFilters);
+              setSelectionFilters(nextFilters);
             }}
             setActiveOnly={(value) =>
               setSelectionDraftFilters((current) => ({ ...current, activeOnly: value }))
@@ -709,6 +796,7 @@ export function ModelAdminWorkspace({
             setTargetTask={(value) =>
               setSelectionDraftFilters((current) => ({ ...current, targetTask: value }))
             }
+            taskOptions={taskOptions}
             targetTask={selectionDraftFilters.targetTask}
           />
           <ModelSelectionsPage

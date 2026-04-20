@@ -320,10 +320,10 @@ export default function App() {
         const [selectionDetail, evaluationDetail] = await Promise.all([
           activeOpportunity.model_selection_snapshot_id
             ? fetchSelectionDetail(activeOpportunity.model_selection_snapshot_id)
-            : Promise.resolve({ repository_mode: "in_memory", selection: null }),
+            : Promise.resolve({ selection: null }),
           activeOpportunity.model_evaluation_snapshot_id
             ? fetchEvaluationDetail(activeOpportunity.model_evaluation_snapshot_id)
-            : Promise.resolve({ repository_mode: "in_memory", evaluation_snapshot: null })
+            : Promise.resolve({ evaluation_snapshot: null })
         ]);
         if (cancelled) {
           return;
