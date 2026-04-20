@@ -425,7 +425,7 @@ export function ModelAdminWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [hasResolvedDefaultTargetTask, route, trainingFilters, refreshToken]);
+  }, [hasResolvedDefaultTargetTask, resolvedDefaultTargetTask, route, trainingFilters, refreshToken]);
 
   useEffect(() => {
     let cancelled = false;
@@ -465,7 +465,7 @@ export function ModelAdminWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [hasResolvedDefaultTargetTask, route, trainingFilters.targetTask, refreshToken]);
+  }, [hasResolvedDefaultTargetTask, resolvedDefaultTargetTask, route, trainingFilters.targetTask, refreshToken]);
 
   useEffect(() => {
     let cancelled = false;
@@ -515,7 +515,7 @@ export function ModelAdminWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [hasResolvedDefaultTargetTask, route, trainingFilters, refreshToken]);
+  }, [hasResolvedDefaultTargetTask, resolvedDefaultTargetTask, route, trainingFilters, refreshToken]);
 
   useEffect(() => {
     let cancelled = false;
@@ -563,7 +563,7 @@ export function ModelAdminWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [hasResolvedDefaultTargetTask, route, evaluationFilters, refreshToken]);
+  }, [hasResolvedDefaultTargetTask, resolvedDefaultTargetTask, route, evaluationFilters, refreshToken]);
 
   useEffect(() => {
     let cancelled = false;
@@ -611,7 +611,7 @@ export function ModelAdminWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [hasResolvedDefaultTargetTask, route, selectionFilters, refreshToken]);
+  }, [hasResolvedDefaultTargetTask, resolvedDefaultTargetTask, route, selectionFilters, refreshToken]);
 
   const selectedRegistryEntry =
     registryEntries.find((entry) => entry.id === selectedRegistryId) ?? null;

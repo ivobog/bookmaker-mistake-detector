@@ -527,7 +527,6 @@ def build_backtest_bet(
         profit_units = 0.9091
     elif result == "loss":
         profit_units = -1.0
-    edge_bucket = backtest_edge_bucket(abs(prediction_value))
     return {
         "canonical_game_id": prediction["canonical_game_id"],
         "game_date": prediction["game_date"],

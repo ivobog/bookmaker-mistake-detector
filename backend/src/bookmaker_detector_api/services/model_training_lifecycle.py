@@ -510,7 +510,9 @@ def _build_model_key(
 
 
 def _build_selection_score(run: ModelTrainingRunRecord) -> float | None:
-    validation_mae = model_training_views._float_or_none(run.metrics.get("validation", {}).get("mae"))
+    validation_mae = model_training_views._float_or_none(
+        run.metrics.get("validation", {}).get("mae")
+    )
     if validation_mae is None:
         return None
     fallback_penalty = 1000.0 if run.artifact.get("fallback_strategy") is not None else 0.0

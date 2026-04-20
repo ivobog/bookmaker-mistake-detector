@@ -8,7 +8,14 @@ from bookmaker_detector_api.services.model_records import ModelEvaluationSnapsho
 
 
 @pytest.mark.parametrize(
-    ("target_task", "prediction_value", "row", "expected_signal_strength", "expected_direction", "expected_market_edge"),
+    (
+        "target_task",
+        "prediction_value",
+        "row",
+        "expected_signal_strength",
+        "expected_direction",
+        "expected_market_edge",
+    ),
     [
         (
             "point_margin_regression",
@@ -75,7 +82,9 @@ def test_serialize_scored_prediction_uses_market_edge_signal_strength_for_raw_ta
 
     assert prediction["signal_strength"] == pytest.approx(expected_signal_strength)
     assert prediction["prediction_context"]["signal_direction"] == expected_direction
-    assert prediction["prediction_context"]["market_edge_points"] == pytest.approx(expected_market_edge)
+    assert prediction["prediction_context"]["market_edge_points"] == pytest.approx(
+        expected_market_edge
+    )
 
 
 def test_build_backtest_bet_supports_phase_a_raw_regression_targets() -> None:

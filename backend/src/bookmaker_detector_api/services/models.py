@@ -4,7 +4,6 @@ from dataclasses import asdict
 from datetime import date
 from typing import Any
 
-from bookmaker_detector_api.repositories import PhaseThreeModelingStore
 from bookmaker_detector_api.services import (
     model_backtest_runs,
     model_backtest_workflows,
@@ -46,7 +45,6 @@ from bookmaker_detector_api.services.model_market_board_store import (
     _build_model_market_board_refresh_batch,
     _build_model_market_board_scoring_batch,
     _build_model_market_board_source_run,
-    _find_model_market_board_in_memory,
     _find_model_market_board_postgres,
     _resolve_market_board_refresh_count,
     _resolve_market_board_refresh_status,
@@ -57,29 +55,17 @@ from bookmaker_detector_api.services.model_market_board_store import (
     _serialize_model_market_board_source_run,
     _summarize_market_board_refresh_history,
     _summarize_model_market_board_source_run_history,
-    list_model_market_board_cadence_batches_in_memory,
     list_model_market_board_cadence_batches_postgres,
-    list_model_market_board_refresh_batches_in_memory,
     list_model_market_board_refresh_batches_postgres,
-    list_model_market_board_refresh_events_in_memory,
     list_model_market_board_refresh_events_postgres,
-    list_model_market_board_scoring_batches_in_memory,
     list_model_market_board_scoring_batches_postgres,
-    list_model_market_board_source_runs_in_memory,
     list_model_market_board_source_runs_postgres,
-    list_model_market_boards_in_memory,
     list_model_market_boards_postgres,
-    save_model_market_board_cadence_batch_in_memory,
     save_model_market_board_cadence_batch_postgres,
-    save_model_market_board_in_memory,
     save_model_market_board_postgres,
-    save_model_market_board_refresh_batch_in_memory,
     save_model_market_board_refresh_batch_postgres,
-    save_model_market_board_refresh_event_in_memory,
     save_model_market_board_refresh_event_postgres,
-    save_model_market_board_scoring_batch_in_memory,
     save_model_market_board_scoring_batch_postgres,
-    save_model_market_board_source_run_in_memory,
     save_model_market_board_source_run_postgres,
 )
 from bookmaker_detector_api.services.model_market_board_views import (

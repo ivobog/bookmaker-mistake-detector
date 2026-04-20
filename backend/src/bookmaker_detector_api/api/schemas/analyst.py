@@ -4,6 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+
 class AnalystBacktestListFilters(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 

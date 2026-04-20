@@ -72,7 +72,9 @@ def test_build_bootstrap_postgres_ingestion_repository_enables_runtime_schema_mu
     }
 
 
-def test_build_ingestion_repository_passes_runtime_schema_policy(monkeypatch) -> None:
+def test_build_postgres_ingestion_repository_passes_runtime_schema_policy(
+    monkeypatch,
+) -> None:
     @contextmanager
     def fake_postgres_connection():
         yield "fake-connection"
@@ -92,7 +94,7 @@ def test_build_ingestion_repository_passes_runtime_schema_policy(monkeypatch) ->
         SimpleNamespace(resolved_postgres_allow_runtime_schema_mutation=False),
     )
 
-    repository, repository_context = repo_factory.build_ingestion_repository("postgres")
+    repository, repository_context = repo_factory.build_postgres_ingestion_repository()
 
     assert isinstance(repository, FakeRepository)
     assert captured == {

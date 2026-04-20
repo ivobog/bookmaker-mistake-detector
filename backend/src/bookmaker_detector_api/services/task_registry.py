@@ -121,7 +121,12 @@ def build_model_capabilities_payload(
         selection_policy_names = list(
             config.get(
                 "selection_policy_names",
-                [config.get("default_selection_policy_name", DEFAULT_REGRESSION_SELECTION_POLICY_NAME)],
+                [
+                    config.get(
+                        "default_selection_policy_name",
+                        DEFAULT_REGRESSION_SELECTION_POLICY_NAME,
+                    )
+                ],
             )
         )
         default_selection_policy_name = str(
@@ -200,7 +205,10 @@ def list_supported_model_families(
 
     supported: set[str] = set()
     for task in task_map.values():
-        supported.update(str(model_family) for model_family in task.get("supported_model_families", []))
+        supported.update(
+            str(model_family)
+            for model_family in task.get("supported_model_families", [])
+        )
     return sorted(supported)
 
 

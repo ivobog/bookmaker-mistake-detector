@@ -20,7 +20,11 @@ def test_build_evidence_recommendation_uses_task_specific_policy_profile() -> No
             },
         },
         selected_pattern={"sample_size": 6},
-        comparables=[{"similarity_score": 0.9}, {"similarity_score": 0.85}, {"similarity_score": 0.8}],
+        comparables=[
+            {"similarity_score": 0.9},
+            {"similarity_score": 0.85},
+            {"similarity_score": 0.8},
+        ],
         benchmark_rankings=[
             {
                 "baseline_name": "rolling_3_feature_baseline",

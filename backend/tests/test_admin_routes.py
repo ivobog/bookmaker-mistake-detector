@@ -124,11 +124,18 @@ def test_model_registry_endpoint_returns_postgres_contract_without_repository_mo
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(admin_model_api, "_load_model_capabilities_payload", lambda: {"target_tasks": []})
+    monkeypatch.setattr(
+        admin_model_api,
+        "_load_model_capabilities_payload",
+        lambda: {"target_tasks": []},
+    )
     monkeypatch.setattr(
         admin_model_api,
         "_resolve_target_task",
-        lambda target_task, capabilities_payload=None: (target_task or "spread_error_regression", {"target_tasks": []}),
+        lambda target_task, capabilities_payload=None: (
+            target_task or "spread_error_regression",
+            {"target_tasks": []},
+        ),
     )
     monkeypatch.setattr(admin_model_api, "_validate_model_admin_inputs", lambda **_: None)
     monkeypatch.setattr(
@@ -155,7 +162,10 @@ def test_model_registry_endpoint_returns_postgres_contract_without_repository_mo
     assert "repository_mode" not in payload
     assert payload["filters"]["target_task"] == "spread_error_regression"
     assert payload["model_registry_count"] == 1
-    assert payload["model_registry"][0]["model_key"] == "spread_error_regression_linear_feature_global"
+    assert (
+        payload["model_registry"][0]["model_key"]
+        == "spread_error_regression_linear_feature_global"
+    )
 
 
 def test_admin_diagnostics_endpoint_omits_repository_mode_from_wire_payload(
@@ -298,7 +308,11 @@ def test_model_backtest_route_defaults_to_canonical_selection_policy_name(
             },
         }
 
-    monkeypatch.setattr(admin_model_api, "run_model_backtest_postgres", _run_model_backtest_postgres)
+    monkeypatch.setattr(
+        admin_model_api,
+        "run_model_backtest_postgres",
+        _run_model_backtest_postgres,
+    )
 
     response = client.post("/api/v1/admin/models/backtests/run?target_task=point_margin_regression")
 

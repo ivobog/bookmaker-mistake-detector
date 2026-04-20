@@ -1,6 +1,5 @@
 from datetime import date
 
-from bookmaker_detector_api.demo import seed_phase_two_feature_in_memory
 from bookmaker_detector_api.services.features import (
     CanonicalGameMetricRecord,
     build_feature_comparable_cases,
@@ -12,9 +11,6 @@ from bookmaker_detector_api.services.features import (
     build_feature_training_bundle,
     build_feature_training_task_matrix,
     build_feature_training_view,
-    get_feature_analysis_artifact_catalog_in_memory,
-    get_feature_analysis_artifact_history_in_memory,
-    materialize_feature_analysis_artifacts_in_memory,
     profile_feature_dataset_rows,
     profile_feature_training_rows,
     split_feature_dataset_rows,
@@ -1150,66 +1146,6 @@ def test_build_feature_evidence_bundle_uses_task_specific_recommendation_policy(
     assert recommendation["policy_profile"]["target_task"] == "cover_classification"
     assert recommendation["policy_profile"]["policy_name"] == "classification_cover_policy_v1"
     assert recommendation["policy_profile"]["thresholds"]["review_min_pattern_sample"] == 2
-
-
-def test_materialize_feature_analysis_artifacts_persists_patterns_and_evidence() -> None:
-    repository, _, _ = seed_phase_two_feature_in_memory()
-    materialized = materialize_feature_analysis_artifacts_in_memory(
-        repository,
-        target_task="spread_error_regression",
-        team_code="LAL",
-        season_label="2024-2025",
-        dimensions=("venue", "days_rest_bucket"),
-        min_sample_size=1,
-        canonical_game_id=3,
-        comparable_limit=5,
-        train_ratio=0.5,
-        validation_ratio=0.25,
-    )
-
-    assert materialized["materialized_count"] >= 2
-    assert materialized["artifact_counts"]["pattern_summary"] >= 1
-    assert materialized["artifact_counts"]["evidence_bundle"] == 1
-    catalog = get_feature_analysis_artifact_catalog_in_memory(
-        repository,
-        target_task="spread_error_regression",
-        team_code="LAL",
-        season_label="2024-2025",
-        limit=50,
-    )
-    assert catalog["artifact_count"] >= 2
-    assert any(artifact["artifact_type"] == "pattern_summary" for artifact in catalog["artifacts"])
-    assert any(artifact["artifact_type"] == "evidence_bundle" for artifact in catalog["artifacts"])
-
-
-def test_feature_analysis_artifact_history_summarizes_evidence_statuses() -> None:
-    repository, _, _ = seed_phase_two_feature_in_memory()
-    materialize_feature_analysis_artifacts_in_memory(
-        repository,
-        target_task="spread_error_regression",
-        team_code="LAL",
-        season_label="2024-2025",
-        dimensions=("venue", "days_rest_bucket"),
-        min_sample_size=1,
-        canonical_game_id=3,
-        comparable_limit=5,
-        train_ratio=0.5,
-        validation_ratio=0.25,
-    )
-
-    history = get_feature_analysis_artifact_history_in_memory(
-        repository,
-        target_task="spread_error_regression",
-        team_code="LAL",
-        season_label="2024-2025",
-        latest_limit=10,
-    )
-
-    assert history["overview"]["artifact_count"] >= 2
-    assert history["overview"]["artifact_type_counts"]["evidence_bundle"] == 1
-    assert history["overview"]["evidence_status_counts"]["monitor_only"] == 1
-    assert history["daily_buckets"]
-    assert history["latest_evidence_artifacts"][0]["status"] == "monitor_only"
 
 
 def test_split_feature_dataset_rows_keeps_games_together_chronologically() -> None:

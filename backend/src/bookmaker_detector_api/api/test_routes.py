@@ -18,12 +18,13 @@ from bookmaker_detector_api.services.models import (
     list_model_evaluation_snapshots_postgres,
     save_model_selection_snapshot_postgres,
 )
-from bookmaker_detector_api.services.test_data_seed import (
-    seed_phase_two_feature_postgres,
-)
 from bookmaker_detector_api.services.repository_factory import (
     build_bootstrap_postgres_ingestion_repository,
 )
+from bookmaker_detector_api.services.test_data_seed import (
+    seed_phase_two_feature_postgres,
+)
+
 from .admin_model_support import _resolve_target_task, _validate_model_admin_inputs
 
 router = APIRouter(prefix="/test", tags=["test"])

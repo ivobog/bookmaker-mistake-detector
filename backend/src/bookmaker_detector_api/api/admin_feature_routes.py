@@ -15,6 +15,7 @@ from bookmaker_detector_api.services.features import (
     get_feature_training_view_postgres,
     materialize_feature_analysis_artifacts_postgres,
 )
+
 from .admin_model_support import _resolve_target_task, _validate_model_admin_inputs
 
 router = APIRouter(prefix="/admin", tags=["admin"])
