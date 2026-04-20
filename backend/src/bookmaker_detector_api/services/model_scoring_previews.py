@@ -60,7 +60,7 @@ def build_model_scoring_preview(
         target_task=target_task,
         active_snapshot=active_snapshot,
         full_dataset_rows=dataset_rows,
-        include_evidence=include_evidence,
+        include_evidence=False,
         evidence_dimensions=evidence_dimensions,
         comparable_limit=comparable_limit,
         min_pattern_sample_size=min_pattern_sample_size,
@@ -80,6 +80,18 @@ def build_model_scoring_preview(
             entry["team_code"],
         ),
     )[:limit]
+    if include_evidence and ranked_predictions:
+        ranked_predictions = attach_historical_evidence_to_predictions(
+            ranked_predictions,
+            full_dataset_rows=dataset_rows,
+            target_task=target_task,
+            evidence_dimensions=evidence_dimensions,
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            drop_null_targets=drop_null_targets,
+        )
     return {
         "active_selection": model_training_views._serialize_model_selection_snapshot(
             active_selection
@@ -154,6 +166,50 @@ def build_model_future_game_preview(
         "predictions": ranked_predictions,
         "opportunity_preview": opportunity_preview,
     }
+
+
+def attach_historical_evidence_to_predictions(
+    predictions: list[dict[str, Any]],
+    *,
+    full_dataset_rows: list[dict[str, Any]],
+    target_task: str,
+    evidence_dimensions: tuple[str, ...],
+    comparable_limit: int,
+    min_pattern_sample_size: int,
+    train_ratio: float,
+    validation_ratio: float,
+    drop_null_targets: bool,
+) -> list[dict[str, Any]]:
+    enriched_predictions: list[dict[str, Any]] = []
+    for prediction in predictions:
+        evidence_bundle = build_feature_evidence_bundle(
+            full_dataset_rows,
+            target_task=target_task,
+            dimensions=evidence_dimensions,
+            canonical_game_id=int(prediction["canonical_game_id"]),
+            team_code=str(prediction["team_code"]),
+            comparable_limit=comparable_limit,
+            min_pattern_sample_size=min_pattern_sample_size,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            drop_null_targets=drop_null_targets,
+        )
+        evidence_payload = evidence_bundle.get("evidence")
+        enriched_predictions.append(
+            {
+                **prediction,
+                "evidence": (
+                    {
+                        "summary": evidence_payload.get("summary"),
+                        "strength": evidence_payload.get("strength"),
+                        "recommendation": evidence_payload.get("recommendation"),
+                    }
+                    if evidence_payload is not None
+                    else None
+                ),
+            }
+        )
+    return enriched_predictions
 
 
 def score_dataset_rows_with_active_selection(

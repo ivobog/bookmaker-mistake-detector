@@ -35,8 +35,10 @@ export async function fetchOpportunityDetail(
 
 export async function materializeOpportunities(): Promise<OpportunityMaterializeResponse> {
   const query = await buildOpportunityQuery();
+  query.set("include_evidence", "true");
   return apiPost<OpportunityMaterializeResponse>("/api/v1/admin/models/opportunities/materialize", {
     errorPrefix: "Failed to materialize opportunities",
-    query
+    query,
+    timeoutMs: 60000
   });
 }
