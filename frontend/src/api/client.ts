@@ -12,18 +12,46 @@ async function parseJsonResponse<T>(response: Response, errorPrefix: string): Pr
   return (await response.json()) as T;
 }
 
+async function fetchWithTimeout(
+  input: string,
+  init?: RequestInit,
+  timeoutMs?: number
+): Promise<Response> {
+  if (!timeoutMs || timeoutMs <= 0) {
+    return fetch(input, init);
+  }
+
+  const controller = new AbortController();
+  const timeoutHandle = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error(`Request timed out after ${Math.round(timeoutMs / 1000)} seconds.`);
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutHandle);
+  }
+}
+
 export async function apiGet<T>(
   path: string,
-  options?: { query?: URLSearchParams; errorPrefix?: string }
+  options?: { query?: URLSearchParams; errorPrefix?: string; timeoutMs?: number }
 ): Promise<T> {
-  const response = await fetch(buildUrl(path, options?.query));
+  const response = await fetchWithTimeout(buildUrl(path, options?.query), undefined, options?.timeoutMs);
   return parseJsonResponse<T>(response, options?.errorPrefix ?? `Failed to load ${path}`);
 }
 
 export async function apiPost<T>(
   path: string,
-  options?: { query?: URLSearchParams; errorPrefix?: string }
+  options?: { query?: URLSearchParams; errorPrefix?: string; timeoutMs?: number }
 ): Promise<T> {
-  const response = await fetch(buildUrl(path, options?.query), { method: "POST" });
+  const response = await fetchWithTimeout(
+    buildUrl(path, options?.query),
+    { method: "POST" },
+    options?.timeoutMs
+  );
   return parseJsonResponse<T>(response, options?.errorPrefix ?? `Failed to post ${path}`);
 }

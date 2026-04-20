@@ -3,6 +3,8 @@ from __future__ import annotations
 from statistics import mean, median
 from typing import Any
 
+MAX_TREE_STUMP_THRESHOLDS = 25
+
 
 def train_linear_feature_model(
     *,
@@ -218,10 +220,16 @@ def candidate_tree_thresholds(
     thresholds = [
         round(float((left + right) / 2), 4) for left, right in zip(unique_values, unique_values[1:])
     ]
+    if len(thresholds) > MAX_TREE_STUMP_THRESHOLDS:
+        step = (len(thresholds) - 1) / (MAX_TREE_STUMP_THRESHOLDS - 1)
+        thresholds = [
+            thresholds[min(round(index * step), len(thresholds) - 1)]
+            for index in range(MAX_TREE_STUMP_THRESHOLDS)
+        ]
     median_threshold = round(float(median(unique_values)), 4)
     if median_threshold not in thresholds:
         thresholds.append(median_threshold)
-    return thresholds
+    return sorted(set(thresholds))
 
 
 def constant_target_mean(training_rows: list[dict[str, Any]]) -> float | None:

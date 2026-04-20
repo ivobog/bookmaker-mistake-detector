@@ -10,6 +10,8 @@ from bookmaker_detector_api.services.model_records import (
 )
 from bookmaker_detector_api.services.task_registry import normalize_selection_policy_name
 
+MAX_WALK_FORWARD_FOLDS = 100
+
 
 def run_walk_forward_backtest(
     *,
@@ -72,6 +74,16 @@ def run_walk_forward_backtest(
             ),
             "summary": summary,
         }
+
+    estimated_fold_count = len(
+        range(minimum_train_games, len(ordered_game_ids), test_window_games)
+    )
+    if estimated_fold_count > MAX_WALK_FORWARD_FOLDS:
+        raise ValueError(
+            "Requested walk-forward backtest is too large for a synchronous run: "
+            f"{estimated_fold_count} folds exceeds the limit of {MAX_WALK_FORWARD_FOLDS}. "
+            "Increase test_window_games or minimum_train_games to reduce fold count."
+        )
 
     rows_by_game: dict[int, list[dict[str, Any]]] = {}
     for row in dataset_rows:

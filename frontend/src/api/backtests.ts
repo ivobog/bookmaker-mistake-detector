@@ -18,7 +18,8 @@ export async function runBacktest(): Promise<BacktestRunResponse> {
   const query = await buildBacktestQuery();
   return apiPost<BacktestRunResponse>("/api/v1/admin/models/backtests/run", {
     errorPrefix: "Failed to run backtest",
-    query
+    query,
+    timeoutMs: 120000
   });
 }
 

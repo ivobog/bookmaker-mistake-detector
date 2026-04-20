@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from bookmaker_detector_api.api.schemas import (
     AdminBacktestHistoryFilters,
@@ -193,18 +193,21 @@ def phase_four_model_backtest_run(
         workflow_name="backtesting",
     )
     with postgres_connection() as connection:
-        result = run_model_backtest_postgres(
-            connection,
-            feature_key=feature_key,
-            target_task=resolved_target_task,
-            team_code=team_code,
-            season_label=season_label,
-            selection_policy_name=selection_policy_name,
-            minimum_train_games=minimum_train_games,
-            test_window_games=test_window_games,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-        )
+        try:
+            result = run_model_backtest_postgres(
+                connection,
+                feature_key=feature_key,
+                target_task=resolved_target_task,
+                team_code=team_code,
+                season_label=season_label,
+                selection_policy_name=selection_policy_name,
+                minimum_train_games=minimum_train_games,
+                test_window_games=test_window_games,
+                train_ratio=train_ratio,
+                validation_ratio=validation_ratio,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return {
         "filters": {
