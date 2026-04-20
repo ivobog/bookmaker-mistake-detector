@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from bookmaker_detector_api.repositories import ModelTrainingArtifactStore
 from bookmaker_detector_api.services.model_records import (
     ModelEvaluationSnapshotRecord,
     ModelRegistryRecord,
@@ -18,57 +17,6 @@ def _canonicalize_selection_policy_name(selection_policy_name: str) -> str:
         return normalize_selection_policy_name(selection_policy_name)
     except ValueError:
         return selection_policy_name
-
-
-def list_model_registry_in_memory(
-    repository: ModelTrainingArtifactStore,
-    *,
-    target_task: str | None = None,
-) -> list[ModelRegistryRecord]:
-    return [
-        ModelRegistryRecord(**entry)
-        for entry in repository.model_registries
-        if target_task is None or entry["target_task"] == target_task
-    ]
-
-
-def list_model_training_runs_in_memory(
-    repository: ModelTrainingArtifactStore,
-    *,
-    target_task: str | None = None,
-    team_code: str | None = None,
-    season_label: str | None = None,
-) -> list[ModelTrainingRunRecord]:
-    selected = [
-        ModelTrainingRunRecord(**entry)
-        for entry in repository.model_training_runs
-        if (target_task is None or entry["target_task"] == target_task)
-        and (team_code is None or entry.get("team_code") == team_code)
-        and (season_label is None or entry.get("season_label") == season_label)
-    ]
-    return sorted(
-        selected,
-        key=lambda entry: (
-            entry.completed_at or entry.created_at or datetime.min.replace(tzinfo=timezone.utc),
-            entry.id,
-        ),
-        reverse=True,
-    )
-
-
-def get_model_training_run_detail_in_memory(
-    repository: ModelTrainingArtifactStore,
-    *,
-    run_id: int,
-) -> ModelTrainingRunRecord | None:
-    return next(
-        (
-            run
-            for run in list_model_training_runs_in_memory(repository)
-            if int(run.id) == int(run_id)
-        ),
-        None,
-    )
 
 
 def list_model_registry_postgres(
@@ -185,43 +133,6 @@ def get_model_training_run_detail_postgres(
     )
 
 
-def list_model_evaluation_snapshots_in_memory(
-    repository: ModelTrainingArtifactStore,
-    *,
-    target_task: str | None = None,
-    model_family: str | None = None,
-) -> list[ModelEvaluationSnapshotRecord]:
-    selected = [
-        ModelEvaluationSnapshotRecord(**entry)
-        for entry in repository.model_evaluation_snapshots
-        if (target_task is None or entry["target_task"] == target_task)
-        and (model_family is None or entry["model_family"] == model_family)
-    ]
-    return sorted(
-        selected,
-        key=lambda entry: (
-            entry.created_at or datetime.min.replace(tzinfo=timezone.utc),
-            entry.id,
-        ),
-        reverse=True,
-    )
-
-
-def get_model_evaluation_snapshot_detail_in_memory(
-    repository: ModelTrainingArtifactStore,
-    *,
-    snapshot_id: int,
-) -> ModelEvaluationSnapshotRecord | None:
-    return next(
-        (
-            snapshot
-            for snapshot in list_model_evaluation_snapshots_in_memory(repository)
-            if int(snapshot.id) == int(snapshot_id)
-        ),
-        None,
-    )
-
-
 def list_model_evaluation_snapshots_postgres(
     connection: Any,
     *,
@@ -302,22 +213,6 @@ def get_model_evaluation_snapshot_detail_postgres(
     )
 
 
-def get_model_training_summary_in_memory(
-    repository: ModelTrainingArtifactStore,
-    *,
-    target_task: str | None = None,
-    team_code: str | None = None,
-    season_label: str | None = None,
-) -> dict[str, Any]:
-    runs = list_model_training_runs_in_memory(
-        repository,
-        target_task=target_task,
-        team_code=team_code,
-        season_label=season_label,
-    )
-    return _summarize_model_training_runs(runs)
-
-
 def get_model_training_summary_postgres(
     connection: Any,
     *,
@@ -332,23 +227,6 @@ def get_model_training_summary_postgres(
         season_label=season_label,
     )
     return _summarize_model_training_runs(runs)
-
-
-def get_model_training_history_in_memory(
-    repository: ModelTrainingArtifactStore,
-    *,
-    target_task: str | None = None,
-    team_code: str | None = None,
-    season_label: str | None = None,
-    recent_limit: int = 10,
-) -> dict[str, Any]:
-    runs = list_model_training_runs_in_memory(
-        repository,
-        target_task=target_task,
-        team_code=team_code,
-        season_label=season_label,
-    )
-    return _summarize_model_training_history(runs, recent_limit=recent_limit)
 
 
 def get_model_training_history_postgres(
@@ -368,21 +246,6 @@ def get_model_training_history_postgres(
     return _summarize_model_training_history(runs, recent_limit=recent_limit)
 
 
-def get_model_evaluation_history_in_memory(
-    repository: ModelTrainingArtifactStore,
-    *,
-    target_task: str | None = None,
-    model_family: str | None = None,
-    recent_limit: int = 10,
-) -> dict[str, Any]:
-    snapshots = list_model_evaluation_snapshots_in_memory(
-        repository,
-        target_task=target_task,
-        model_family=model_family,
-    )
-    return _summarize_model_evaluation_history(snapshots, recent_limit=recent_limit)
-
-
 def get_model_evaluation_history_postgres(
     connection: Any,
     *,
@@ -396,50 +259,6 @@ def get_model_evaluation_history_postgres(
         model_family=model_family,
     )
     return _summarize_model_evaluation_history(snapshots, recent_limit=recent_limit)
-
-
-def list_model_selection_snapshots_in_memory(
-    repository: ModelTrainingArtifactStore,
-    *,
-    target_task: str | None = None,
-    active_only: bool = False,
-) -> list[ModelSelectionSnapshotRecord]:
-    selected = [
-        ModelSelectionSnapshotRecord(
-            **{
-                **entry,
-                "selection_policy_name": _canonicalize_selection_policy_name(
-                    entry["selection_policy_name"]
-                ),
-            }
-        )
-        for entry in repository.model_selection_snapshots
-        if (target_task is None or entry["target_task"] == target_task)
-        and (not active_only or bool(entry["is_active"]))
-    ]
-    return sorted(
-        selected,
-        key=lambda entry: (
-            entry.created_at or datetime.min.replace(tzinfo=timezone.utc),
-            entry.id,
-        ),
-        reverse=True,
-    )
-
-
-def get_model_selection_snapshot_detail_in_memory(
-    repository: ModelTrainingArtifactStore,
-    *,
-    selection_id: int,
-) -> ModelSelectionSnapshotRecord | None:
-    return next(
-        (
-            selection
-            for selection in list_model_selection_snapshots_in_memory(repository)
-            if int(selection.id) == int(selection_id)
-        ),
-        None,
-    )
 
 
 def list_model_selection_snapshots_postgres(
@@ -505,19 +324,6 @@ def get_model_selection_snapshot_detail_postgres(
         ),
         None,
     )
-
-
-def get_model_selection_history_in_memory(
-    repository: ModelTrainingArtifactStore,
-    *,
-    target_task: str | None = None,
-    recent_limit: int = 10,
-) -> dict[str, Any]:
-    selections = list_model_selection_snapshots_in_memory(
-        repository,
-        target_task=target_task,
-    )
-    return _summarize_model_selection_history(selections, recent_limit=recent_limit)
 
 
 def get_model_selection_history_postgres(

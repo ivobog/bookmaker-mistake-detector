@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import asdict
-from datetime import date, datetime, timezone
+from datetime import date
 from typing import Any
 
-from bookmaker_detector_api.repositories import ModelScoringArtifactStore
 from bookmaker_detector_api.repositories.ingestion_json import _json_dumps
 from bookmaker_detector_api.services import model_training_views
 from bookmaker_detector_api.services.model_market_board_views import _serialize_model_scoring_run
@@ -76,19 +74,6 @@ def build_model_scoring_run(
         discarded_opportunity_count=int(status_counts.get("discarded", 0)),
         payload=payload,
     )
-
-
-def save_model_scoring_run_in_memory(
-    repository: ModelScoringArtifactStore,
-    scoring_run: ModelScoringRunRecord | None,
-) -> ModelScoringRunRecord | None:
-    if scoring_run is None:
-        return None
-    payload = asdict(scoring_run)
-    payload["id"] = len(repository.model_scoring_runs) + 1
-    payload["created_at"] = datetime.now(timezone.utc)
-    repository.model_scoring_runs.append(payload)
-    return ModelScoringRunRecord(**payload)
 
 
 def save_model_scoring_run_postgres(
@@ -172,39 +157,6 @@ def save_model_scoring_run_postgres(
     )
 
 
-def list_model_scoring_runs_in_memory(
-    repository: ModelScoringArtifactStore,
-    *,
-    model_market_board_id: int | None = None,
-    target_task: str | None = None,
-    team_code: str | None = None,
-    season_label: str | None = None,
-) -> list[ModelScoringRunRecord]:
-    selected = [
-        ModelScoringRunRecord(**entry)
-        for entry in repository.model_scoring_runs
-        if (
-            model_market_board_id is None
-            or entry.get("model_market_board_id") == model_market_board_id
-        )
-        if (target_task is None or entry["target_task"] == target_task)
-        and (
-            team_code is None
-            or entry["home_team_code"] == team_code
-            or entry["away_team_code"] == team_code
-        )
-        and (season_label is None or entry["season_label"] == season_label)
-    ]
-    return sorted(
-        selected,
-        key=lambda entry: (
-            entry.created_at or datetime.min.replace(tzinfo=timezone.utc),
-            entry.id,
-        ),
-        reverse=True,
-    )
-
-
 def list_model_scoring_runs_postgres(
     connection: Any,
     *,
@@ -282,22 +234,6 @@ def list_model_scoring_runs_postgres(
     ]
 
 
-def get_model_scoring_run_detail_in_memory(
-    repository: ModelScoringArtifactStore,
-    *,
-    scoring_run_id: int,
-) -> dict[str, Any] | None:
-    scoring_run = next(
-        (
-            entry
-            for entry in list_model_scoring_runs_in_memory(repository)
-            if entry.id == scoring_run_id
-        ),
-        None,
-    )
-    return _serialize_model_scoring_run(scoring_run)
-
-
 def get_model_scoring_run_detail_postgres(
     connection: Any,
     *,
@@ -312,25 +248,6 @@ def get_model_scoring_run_detail_postgres(
         None,
     )
     return _serialize_model_scoring_run(scoring_run)
-
-
-def get_model_scoring_history_in_memory(
-    repository: ModelScoringArtifactStore,
-    *,
-    model_market_board_id: int | None = None,
-    target_task: str | None = None,
-    team_code: str | None = None,
-    season_label: str | None = None,
-    recent_limit: int = 10,
-) -> dict[str, Any]:
-    scoring_runs = list_model_scoring_runs_in_memory(
-        repository,
-        model_market_board_id=model_market_board_id,
-        target_task=target_task,
-        team_code=team_code,
-        season_label=season_label,
-    )
-    return _summarize_model_scoring_history(scoring_runs, recent_limit=recent_limit)
 
 
 def get_model_scoring_history_postgres(

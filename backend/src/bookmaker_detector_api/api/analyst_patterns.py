@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from bookmaker_detector_api.api.schemas import (
     AnalystComparableFilters,
@@ -29,6 +29,15 @@ def _parse_csv_values(value: str | None) -> list[str] | None:
         return None
     parsed = [item.strip() for item in value.split(",") if item.strip()]
     return parsed or None
+
+
+def _translate_anchor_validation_error(exc: ValueError) -> None:
+    if "Comparable anchor requires team_code" not in str(exc):
+        raise exc
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=str(exc),
+    ) from exc
 
 
 @router.get("/patterns", response_model=AnalystPatternResponse)
@@ -80,19 +89,22 @@ def feature_comparables(
     )
     parsed_dimensions = _parse_csv_values(dimensions) or []
     parsed_condition_values = _parse_csv_values(condition_values)
-    with postgres_connection() as connection:
-        comparable_result = get_feature_comparable_cases_postgres(
-            connection,
-            feature_key=filters.feature_key,
-            target_task=resolved_target_task,
-            team_code=filters.team_code,
-            season_label=filters.season_label,
-            dimensions=tuple(parsed_dimensions),
-            canonical_game_id=filters.canonical_game_id,
-            condition_values=tuple(parsed_condition_values) if parsed_condition_values else None,
-            pattern_key=filters.pattern_key,
-            limit=filters.limit,
-        )
+    try:
+        with postgres_connection() as connection:
+            comparable_result = get_feature_comparable_cases_postgres(
+                connection,
+                feature_key=filters.feature_key,
+                target_task=resolved_target_task,
+                team_code=filters.team_code,
+                season_label=filters.season_label,
+                dimensions=tuple(parsed_dimensions),
+                canonical_game_id=filters.canonical_game_id,
+                condition_values=tuple(parsed_condition_values) if parsed_condition_values else None,
+                pattern_key=filters.pattern_key,
+                limit=filters.limit,
+            )
+    except ValueError as exc:
+        _translate_anchor_validation_error(exc)
 
     response_filters = filters.model_copy(
         update={
@@ -126,23 +138,26 @@ def feature_evidence(
     )
     parsed_dimensions = _parse_csv_values(dimensions) or []
     parsed_condition_values = _parse_csv_values(condition_values)
-    with postgres_connection() as connection:
-        evidence_result = get_feature_evidence_bundle_postgres(
-            connection,
-            feature_key=filters.feature_key,
-            target_task=resolved_target_task,
-            team_code=filters.team_code,
-            season_label=filters.season_label,
-            dimensions=tuple(parsed_dimensions),
-            canonical_game_id=filters.canonical_game_id,
-            condition_values=tuple(parsed_condition_values) if parsed_condition_values else None,
-            pattern_key=filters.pattern_key,
-            comparable_limit=filters.comparable_limit,
-            min_pattern_sample_size=filters.min_pattern_sample_size,
-            train_ratio=filters.train_ratio,
-            validation_ratio=filters.validation_ratio,
-            drop_null_targets=filters.drop_null_targets,
-        )
+    try:
+        with postgres_connection() as connection:
+            evidence_result = get_feature_evidence_bundle_postgres(
+                connection,
+                feature_key=filters.feature_key,
+                target_task=resolved_target_task,
+                team_code=filters.team_code,
+                season_label=filters.season_label,
+                dimensions=tuple(parsed_dimensions),
+                canonical_game_id=filters.canonical_game_id,
+                condition_values=tuple(parsed_condition_values) if parsed_condition_values else None,
+                pattern_key=filters.pattern_key,
+                comparable_limit=filters.comparable_limit,
+                min_pattern_sample_size=filters.min_pattern_sample_size,
+                train_ratio=filters.train_ratio,
+                validation_ratio=filters.validation_ratio,
+                drop_null_targets=filters.drop_null_targets,
+            )
+    except ValueError as exc:
+        _translate_anchor_validation_error(exc)
 
     response_filters = filters.model_copy(
         update={

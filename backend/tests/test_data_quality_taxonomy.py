@@ -4,7 +4,7 @@ from bookmaker_detector_api.data_quality_taxonomy import (
     normalize_issue_type_and_severity,
     severity_counts_from_issue_type_counts,
 )
-from bookmaker_detector_api.repositories import InMemoryIngestionRepository
+from tests.support.in_memory_ingestion_repository import InMemoryIngestionRepository
 
 
 def test_data_quality_taxonomy_helpers_normalize_legacy_issue_types() -> None:
@@ -33,7 +33,7 @@ def test_merge_issue_type_counts_combines_legacy_and_canonical_keys() -> None:
     assert severity_counts_from_issue_type_counts(merged_counts) == {"warning": 5, "error": 1}
 
 
-def test_in_memory_repository_normalizes_legacy_quality_issues_on_read_and_backfill() -> None:
+def test_ephemeral_repository_normalizes_legacy_quality_issues_on_read_and_backfill() -> None:
     repository = InMemoryIngestionRepository()
     repository.data_quality_issues.extend(
         [

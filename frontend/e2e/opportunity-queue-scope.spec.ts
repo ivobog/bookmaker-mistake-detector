@@ -64,7 +64,6 @@ async function stubOpportunityWorkspaceApis(page: Page, variant: QueueVariant) {
   await page.route("**/api/v1/admin/models/backtests/history*", async (route) => {
     await route.fulfill({
       json: {
-        repository_mode: "in_memory",
         model_backtest_history: {
           overview: {
             run_count: 0,
@@ -83,7 +82,6 @@ async function stubOpportunityWorkspaceApis(page: Page, variant: QueueVariant) {
   await page.route("**/api/v1/admin/models/history*", async (route) => {
     await route.fulfill({
       json: {
-        repository_mode: "in_memory",
         model_history: {
           overview: {
             run_count: 0,
@@ -99,7 +97,6 @@ async function stubOpportunityWorkspaceApis(page: Page, variant: QueueVariant) {
   await page.route("**/api/v1/admin/models/opportunities/history*", async (route) => {
     await route.fulfill({
       json: {
-        repository_mode: "in_memory",
         filters: {
           target_task: "spread_error_regression",
           team_code: variant === "scoped" ? "LAL" : null,
@@ -130,7 +127,6 @@ async function stubOpportunityWorkspaceApis(page: Page, variant: QueueVariant) {
     if (url.pathname.endsWith("/7")) {
       await route.fulfill({
         json: {
-          repository_mode: "in_memory",
           opportunity
         }
       });
@@ -138,7 +134,6 @@ async function stubOpportunityWorkspaceApis(page: Page, variant: QueueVariant) {
     }
     await route.fulfill({
       json: {
-        repository_mode: "in_memory",
         queue_batch_id: opportunity.materialization_batch_id,
         queue_materialized_at: opportunity.materialized_at,
         queue_scope: opportunity.materialization_scope,

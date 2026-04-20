@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from datetime import datetime, timezone
 from typing import Any
 
-from bookmaker_detector_api.repositories import ModelTrainingArtifactStore
 from bookmaker_detector_api.repositories.ingestion_json import _json_dumps
 from bookmaker_detector_api.services import model_training_views
 from bookmaker_detector_api.services.model_records import (
@@ -28,53 +26,6 @@ MODEL_FAMILY_CONFIGS = {
         "description": "Single-split regression stump selected by validation MAE.",
     },
 }
-
-
-def ensure_model_registry_in_memory(
-    repository: ModelTrainingArtifactStore,
-    *,
-    target_task: str,
-    model_family: str,
-    team_code: str | None,
-) -> ModelRegistryRecord:
-    model_key = _build_model_key(
-        target_task=target_task,
-        model_family=model_family,
-        team_code=team_code,
-    )
-    existing = next(
-        (entry for entry in repository.model_registries if entry["model_key"] == model_key),
-        None,
-    )
-    if existing is not None:
-        return ModelRegistryRecord(**existing)
-    config = MODEL_FAMILY_CONFIGS[model_family]
-    payload = {
-        "id": len(repository.model_registries) + 1,
-        "model_key": model_key,
-        "target_task": target_task,
-        "model_family": model_family,
-        "version_label": config["version_label"],
-        "description": config["description"],
-        "config": {"team_code_scope": team_code},
-        "created_at": datetime.now(timezone.utc),
-    }
-    repository.model_registries.append(payload)
-    return ModelRegistryRecord(**payload)
-
-
-def save_model_training_run_in_memory(
-    repository: ModelTrainingArtifactStore,
-    run: ModelTrainingRunRecord,
-) -> ModelTrainingRunRecord:
-    payload = asdict(run)
-    payload["id"] = len(repository.model_training_runs) + 1
-    payload["created_at"] = datetime.now(timezone.utc)
-    payload["completed_at"] = payload["created_at"]
-    repository.model_training_runs.append(payload)
-    saved_run = ModelTrainingRunRecord(**payload)
-    save_model_evaluation_snapshot_in_memory(repository, saved_run)
-    return saved_run
 
 
 def ensure_model_registry_postgres(
@@ -197,48 +148,6 @@ def save_model_training_run_postgres(
     return saved_run
 
 
-def promote_best_model_in_memory(
-    repository: ModelTrainingArtifactStore,
-    *,
-    target_task: str,
-    selection_policy_name: str = DEFAULT_REGRESSION_SELECTION_POLICY_NAME,
-) -> dict[str, Any]:
-    normalized_selection_policy_name = normalize_selection_policy_name(selection_policy_name)
-    snapshots = model_training_views.list_model_evaluation_snapshots_in_memory(
-        repository,
-        target_task=target_task,
-    )
-    selected_snapshot = model_training_views._select_best_evaluation_snapshot(
-        snapshots,
-        selection_policy_name=normalized_selection_policy_name,
-    )
-    if selected_snapshot is None:
-        return {
-            "selection_policy_name": normalized_selection_policy_name,
-            "selected_snapshot": None,
-            "active_selection": None,
-            "selection_count": 0,
-        }
-    selection = save_model_selection_snapshot_in_memory(
-        repository,
-        selected_snapshot,
-        selection_policy_name=normalized_selection_policy_name,
-    )
-    selections = model_training_views.list_model_selection_snapshots_in_memory(
-        repository,
-        target_task=target_task,
-        active_only=True,
-    )
-    return {
-        "selection_policy_name": normalized_selection_policy_name,
-        "selected_snapshot": model_training_views._serialize_model_evaluation_snapshot(
-            selected_snapshot
-        ),
-        "active_selection": model_training_views._serialize_model_selection_snapshot(selection),
-        "selection_count": len(selections),
-    }
-
-
 def promote_best_model_postgres(
     connection: Any,
     *,
@@ -279,17 +188,6 @@ def promote_best_model_postgres(
         "active_selection": model_training_views._serialize_model_selection_snapshot(selection),
         "selection_count": len(selections),
     }
-
-
-def save_model_evaluation_snapshot_in_memory(
-    repository: ModelTrainingArtifactStore,
-    run: ModelTrainingRunRecord,
-) -> ModelEvaluationSnapshotRecord:
-    payload = _build_model_evaluation_snapshot_payload(run)
-    payload["id"] = len(repository.model_evaluation_snapshots) + 1
-    payload["created_at"] = datetime.now(timezone.utc)
-    repository.model_evaluation_snapshots.append(payload)
-    return ModelEvaluationSnapshotRecord(**payload)
 
 
 def save_model_evaluation_snapshot_postgres(
@@ -364,40 +262,6 @@ def save_model_evaluation_snapshot_postgres(
         created_at=row[1],
         **payload,
     )
-
-
-def save_model_selection_snapshot_in_memory(
-    repository: ModelTrainingArtifactStore,
-    snapshot: ModelEvaluationSnapshotRecord,
-    *,
-    selection_policy_name: str,
-) -> ModelSelectionSnapshotRecord:
-    normalized_selection_policy_name = normalize_selection_policy_name(selection_policy_name)
-    for entry in repository.model_selection_snapshots:
-        if entry["target_task"] == snapshot.target_task:
-            entry["is_active"] = False
-    payload = {
-        "id": len(repository.model_selection_snapshots) + 1,
-        "model_evaluation_snapshot_id": snapshot.id,
-        "model_training_run_id": snapshot.model_training_run_id,
-        "model_registry_id": snapshot.model_registry_id,
-        "feature_version_id": snapshot.feature_version_id,
-        "target_task": snapshot.target_task,
-        "model_family": snapshot.model_family,
-        "selection_policy_name": normalized_selection_policy_name,
-        "rationale": {
-            "primary_metric_name": snapshot.primary_metric_name,
-            "primary_metric_direction": snapshot.primary_metric_direction,
-            "validation_metric_value": snapshot.validation_metric_value,
-            "fallback_strategy": snapshot.fallback_strategy,
-            "selection_score": snapshot.selection_score,
-            "selection_score_name": snapshot.selection_score_name,
-        },
-        "is_active": True,
-        "created_at": datetime.now(timezone.utc),
-    }
-    repository.model_selection_snapshots.append(payload)
-    return ModelSelectionSnapshotRecord(**payload)
 
 
 def save_model_selection_snapshot_postgres(

@@ -69,7 +69,7 @@ const selectionSnapshot = {
   feature_version_id: 21,
   target_task: "spread_error_regression",
   model_family: "linear_feature",
-  selection_policy_name: "validation_mae_candidate_v1",
+  selection_policy_name: "validation_regression_candidate_v1",
   rationale: {
     reason: "lowest_validation_mae",
     candidate_count: 2
@@ -171,12 +171,12 @@ const backtestRun = {
   target_task: "spread_error_regression",
   strategy_name: "candidate_threshold",
   fold_count: 1,
-  selection_policy_name: "validation_mae_candidate_v1",
+  selection_policy_name: "validation_regression_candidate_v1",
   minimum_train_games: 1,
   test_window_games: 1,
   payload: {
     target_task: "spread_error_regression",
-    selection_policy_name: "validation_mae_candidate_v1",
+    selection_policy_name: "validation_regression_candidate_v1",
     strategy_name: "candidate_threshold",
     minimum_train_games: 1,
     test_window_games: 1,
@@ -378,10 +378,117 @@ async function stubPhaseFiveApis(page: Page) {
     selections: [selectionSnapshot]
   };
 
+  await page.route("**/api/v1/admin/model-capabilities*", async (route) => {
+    await route.fulfill({
+      json: {
+        task_count: 4,
+        target_tasks: [
+          {
+            task_key: "point_margin_regression",
+            task_kind: "regression",
+            label: "Point Margin Regression",
+            description: "Predict raw point margin.",
+            market_type: "spread",
+            primary_metric_name: "mae",
+            metric_direction: "lower_is_better",
+            supported_model_families: ["linear_feature"],
+            default_selection_policy_name: "validation_regression_candidate_v1",
+            valid_selection_policy_names: ["validation_regression_candidate_v1"],
+            default_opportunity_policy_name: "spread_edge_policy_v1",
+            workflow_support: {
+              training: true,
+              selection: true,
+              scoring: true,
+              backtesting: true,
+              opportunity_materialization: true,
+              market_board: true
+            },
+            is_enabled: true,
+            config: {}
+          },
+          {
+            task_key: "spread_error_regression",
+            task_kind: "regression",
+            label: "Spread Error Regression",
+            description: "Predict spread residual error.",
+            market_type: "spread",
+            primary_metric_name: "mae",
+            metric_direction: "lower_is_better",
+            supported_model_families: ["linear_feature"],
+            default_selection_policy_name: "validation_regression_candidate_v1",
+            valid_selection_policy_names: ["validation_regression_candidate_v1"],
+            default_opportunity_policy_name: "spread_edge_policy_v1",
+            workflow_support: {
+              training: true,
+              selection: true,
+              scoring: true,
+              backtesting: true,
+              opportunity_materialization: true,
+              market_board: true
+            },
+            is_enabled: true,
+            config: {}
+          },
+          {
+            task_key: "total_error_regression",
+            task_kind: "regression",
+            label: "Total Error Regression",
+            description: "Predict total residual error.",
+            market_type: "total",
+            primary_metric_name: "mae",
+            metric_direction: "lower_is_better",
+            supported_model_families: ["linear_feature"],
+            default_selection_policy_name: "validation_regression_candidate_v1",
+            valid_selection_policy_names: ["validation_regression_candidate_v1"],
+            default_opportunity_policy_name: "totals_edge_policy_v1",
+            workflow_support: {
+              training: true,
+              selection: true,
+              scoring: true,
+              backtesting: true,
+              opportunity_materialization: true,
+              market_board: true
+            },
+            is_enabled: true,
+            config: {}
+          },
+          {
+            task_key: "total_points_regression",
+            task_kind: "regression",
+            label: "Total Points Regression",
+            description: "Predict raw total points.",
+            market_type: "total",
+            primary_metric_name: "mae",
+            metric_direction: "lower_is_better",
+            supported_model_families: ["linear_feature"],
+            default_selection_policy_name: "validation_regression_candidate_v1",
+            valid_selection_policy_names: ["validation_regression_candidate_v1"],
+            default_opportunity_policy_name: "totals_edge_policy_v1",
+            workflow_support: {
+              training: true,
+              selection: true,
+              scoring: true,
+              backtesting: true,
+              opportunity_materialization: true,
+              market_board: true
+            },
+            is_enabled: true,
+            config: {}
+          }
+        ],
+        ui_defaults: {
+          default_feature_key: "baseline_team_features_v1",
+          default_target_task: "spread_error_regression",
+          default_train_ratio: 0.7,
+          default_validation_ratio: 0.15
+        }
+      }
+    });
+  });
+
   await page.route("**/api/v1/admin/models/backtests/history*", async (route) => {
     await route.fulfill({
       json: {
-        repository_mode: "in_memory",
         filters: {
           target_task: "spread_error_regression",
           team_code: null,
@@ -407,7 +514,6 @@ async function stubPhaseFiveApis(page: Page) {
   await page.route("**/api/v1/analyst/backtests/*", async (route) => {
     await route.fulfill({
       json: {
-        repository_mode: "in_memory",
         backtest_run: backtestRun
       }
     });
@@ -416,7 +522,6 @@ async function stubPhaseFiveApis(page: Page) {
   await page.route("**/api/v1/admin/models/opportunities/history*", async (route) => {
     await route.fulfill({
       json: {
-        repository_mode: "in_memory",
         filters: {
           target_task: "spread_error_regression",
           team_code: null,
@@ -446,7 +551,6 @@ async function stubPhaseFiveApis(page: Page) {
 
     await route.fulfill({
       json: {
-        repository_mode: "in_memory",
         queue_batch_id: opportunity.materialization_batch_id,
         queue_materialized_at: opportunity.materialized_at,
         queue_scope: opportunity.materialization_scope,
@@ -461,7 +565,6 @@ async function stubPhaseFiveApis(page: Page) {
   await page.route(`**/api/v1/analyst/opportunities/${opportunityId}*`, async (route) => {
     await route.fulfill({
       json: {
-        repository_mode: "in_memory",
         opportunity
       }
     });
@@ -472,7 +575,6 @@ async function stubPhaseFiveApis(page: Page) {
     const latestRun = state.runs[0] ?? null;
     await route.fulfill({
       json: {
-        repository_mode: "in_memory",
         filters: {
           target_task: "spread_error_regression",
           team_code: null,
@@ -498,7 +600,6 @@ async function stubPhaseFiveApis(page: Page) {
     const latestRun = state.runs[0] ?? null;
     await route.fulfill({
       json: {
-        repository_mode: "in_memory",
         filters: {
           target_task: "spread_error_regression"
         },
@@ -520,7 +621,6 @@ async function stubPhaseFiveApis(page: Page) {
   await page.route("**/api/v1/admin/models/registry*", async (route) => {
     await route.fulfill({
       json: {
-        repository_mode: "in_memory",
         filters: {
           target_task: "spread_error_regression"
         },
@@ -539,7 +639,6 @@ async function stubPhaseFiveApis(page: Page) {
     modelAdminRequests.runs.push(route.request().url());
     await route.fulfill({
       json: {
-        repository_mode: "in_memory",
         filters: {
           target_task: url.searchParams.get("target_task") ?? "spread_error_regression"
         },
@@ -554,7 +653,6 @@ async function stubPhaseFiveApis(page: Page) {
     const runId = Number(route.request().url().split("/").pop()?.split("?")[0]);
     await route.fulfill({
       json: {
-        repository_mode: "in_memory",
         model_run: state.runs.find((run) => run.id === runId) ?? null
       }
     });
@@ -565,7 +663,6 @@ async function stubPhaseFiveApis(page: Page) {
     const latestEvaluation = state.evaluations[0] ?? null;
     await route.fulfill({
       json: {
-        repository_mode: "in_memory",
         filters: {
           target_task: "spread_error_regression",
           recent_limit: 8
@@ -592,7 +689,6 @@ async function stubPhaseFiveApis(page: Page) {
     modelAdminRequests.evaluations.push(route.request().url());
     await route.fulfill({
       json: {
-        repository_mode: "in_memory",
         filters: {
           target_task: url.searchParams.get("target_task") ?? "spread_error_regression"
         },
@@ -607,7 +703,6 @@ async function stubPhaseFiveApis(page: Page) {
     const nextEvaluationId = Number(route.request().url().split("/").pop()?.split("?")[0]);
     await route.fulfill({
       json: {
-        repository_mode: "in_memory",
         evaluation_snapshot: state.evaluations.find((entry) => entry.id === nextEvaluationId) ?? null
       }
     });
@@ -618,7 +713,6 @@ async function stubPhaseFiveApis(page: Page) {
     const latestSelection = state.selections[0] ?? null;
     await route.fulfill({
       json: {
-        repository_mode: "in_memory",
         filters: {
           target_task: "spread_error_regression",
           recent_limit: 8
@@ -647,7 +741,6 @@ async function stubPhaseFiveApis(page: Page) {
     const selections = activeOnly ? state.selections.filter((entry) => entry.is_active) : state.selections;
     await route.fulfill({
       json: {
-        repository_mode: "in_memory",
         filters: {
           target_task: url.searchParams.get("target_task") ?? "spread_error_regression",
           active_only: activeOnly
@@ -663,7 +756,6 @@ async function stubPhaseFiveApis(page: Page) {
     const nextSelectionId = Number(route.request().url().split("/").pop()?.split("?")[0]);
     await route.fulfill({
       json: {
-        repository_mode: "in_memory",
         selection: state.selections.find((entry) => entry.id === nextSelectionId) ?? null
       }
     });
@@ -690,7 +782,6 @@ async function stubPhaseFiveApis(page: Page) {
     state.evaluations = [trainedEvaluation, ...state.evaluations];
     await route.fulfill({
       json: {
-        repository_mode: "in_memory",
         filters: {
           target_task: trainedRun.target_task
         },
@@ -719,17 +810,16 @@ async function stubPhaseFiveApis(page: Page) {
     const promotedSelection = createSelectionSnapshot(502, selectedEvaluation, selectedRun, {
       created_at: "2026-04-19T00:12:00+00:00",
       selection_policy_name:
-        url.searchParams.get("selection_policy_name") ?? "validation_mae_candidate_v1"
+        url.searchParams.get("selection_policy_name") ?? "validation_regression_candidate_v1"
     });
     state.selections = [promotedSelection, ...state.selections.map((entry) => ({ ...entry, is_active: false }))];
     await route.fulfill({
       json: {
-        repository_mode: "in_memory",
         filters: {
           target_task: url.searchParams.get("target_task") ?? "spread_error_regression"
         },
         selection_policy_name:
-          url.searchParams.get("selection_policy_name") ?? "validation_mae_candidate_v1",
+          url.searchParams.get("selection_policy_name") ?? "validation_regression_candidate_v1",
         selected_snapshot: selectedEvaluation,
         active_selection: promotedSelection,
         selection_count: state.selections.length

@@ -1,4 +1,3 @@
-from .ingestion_in_memory_repository import InMemoryIngestionRepository
 from .ingestion_postgres_repository import PostgresIngestionRepository
 from .ingestion_types import IngestionRepository
 from .modeling_protocols import (
@@ -14,7 +13,6 @@ from .modeling_protocols import (
 
 __all__ = [
     "FeatureDatasetStore",
-    "InMemoryIngestionRepository",
     "IngestionRepository",
     "MarketBoardOperationStore",
     "ModelBacktestArtifactStore",

@@ -7,7 +7,6 @@ from bookmaker_detector_api.config import settings
 from bookmaker_detector_api.ingestion.providers import (
     TeamPageFetchResult,
 )
-from bookmaker_detector_api.repositories import InMemoryIngestionRepository
 from bookmaker_detector_api.services import initial_dataset_load as loader
 from bookmaker_detector_api.services.workflow_logging import WORKFLOW_LOGGER_NAME
 from tests.support.covers_fixtures import (
@@ -16,6 +15,7 @@ from tests.support.covers_fixtures import (
     build_fixture_backed_covers_provider,
     load_covers_fixture,
 )
+from tests.support.in_memory_ingestion_repository import InMemoryIngestionRepository
 
 
 def _workflow_events(caplog) -> list[dict[str, object]]:

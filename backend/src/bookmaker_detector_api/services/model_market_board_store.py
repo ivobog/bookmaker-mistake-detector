@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import asdict
 from datetime import date, datetime, timezone
 from typing import Any
 
-from bookmaker_detector_api.repositories import MarketBoardOperationStore
 from bookmaker_detector_api.repositories.ingestion_json import _json_dumps
 from bookmaker_detector_api.services.model_records import (
     ModelMarketBoardCadenceBatchRecord,
@@ -14,34 +12,6 @@ from bookmaker_detector_api.services.model_records import (
     ModelMarketBoardScoringBatchRecord,
     ModelMarketBoardSourceRunRecord,
 )
-
-
-def list_model_market_board_source_runs_in_memory(
-    repository: MarketBoardOperationStore,
-    *,
-    target_task: str | None = None,
-    source_name: str | None = None,
-    season_label: str | None = None,
-    recent_limit: int | None = None,
-) -> list[ModelMarketBoardSourceRunRecord]:
-    selected = [
-        ModelMarketBoardSourceRunRecord(**entry)
-        for entry in repository.model_market_board_source_runs
-        if (target_task is None or entry["target_task"] == target_task)
-        and (source_name is None or entry["source_name"] == source_name)
-        and (season_label is None or entry["season_label"] == season_label)
-    ]
-    ordered = sorted(
-        selected,
-        key=lambda entry: (
-            entry.created_at or datetime.min.replace(tzinfo=timezone.utc),
-            entry.id,
-        ),
-        reverse=True,
-    )
-    if recent_limit is None:
-        return ordered
-    return ordered[:recent_limit]
 
 
 def list_model_market_board_source_runs_postgres(
@@ -103,28 +73,6 @@ def list_model_market_board_source_runs_postgres(
     ]
 
 
-def list_model_market_boards_in_memory(
-    repository: MarketBoardOperationStore,
-    *,
-    target_task: str | None = None,
-    season_label: str | None = None,
-) -> list[ModelMarketBoardRecord]:
-    selected = [
-        ModelMarketBoardRecord(**entry)
-        for entry in repository.model_market_boards
-        if (target_task is None or entry["target_task"] == target_task)
-        and (season_label is None or entry["season_label"] == season_label)
-    ]
-    return sorted(
-        selected,
-        key=lambda entry: (
-            entry.created_at or datetime.min.replace(tzinfo=timezone.utc),
-            entry.id,
-        ),
-        reverse=True,
-    )
-
-
 def list_model_market_boards_postgres(
     connection: Any,
     *,
@@ -176,30 +124,6 @@ def list_model_market_boards_postgres(
     ]
 
 
-def list_model_market_board_refresh_events_in_memory(
-    repository: MarketBoardOperationStore,
-    *,
-    target_task: str | None = None,
-    source_name: str | None = None,
-    recent_limit: int | None = None,
-) -> list[ModelMarketBoardRefreshRecord]:
-    selected = [
-        ModelMarketBoardRefreshRecord(**entry)
-        for entry in repository.model_market_board_refresh_events
-        if (target_task is None or entry["target_task"] == target_task)
-        and (source_name is None or entry["source_name"] == source_name)
-    ]
-    sorted_events = sorted(
-        selected,
-        key=lambda entry: (
-            entry.created_at or datetime.min.replace(tzinfo=timezone.utc),
-            entry.id,
-        ),
-        reverse=True,
-    )
-    return sorted_events[:recent_limit] if recent_limit is not None else sorted_events
-
-
 def list_model_market_board_refresh_events_postgres(
     connection: Any,
     *,
@@ -249,32 +173,6 @@ def list_model_market_board_refresh_events_postgres(
         )
         for row in rows
     ]
-
-
-def list_model_market_board_refresh_batches_in_memory(
-    repository: MarketBoardOperationStore,
-    *,
-    target_task: str | None = None,
-    source_name: str | None = None,
-    recent_limit: int | None = None,
-) -> list[ModelMarketBoardRefreshBatchRecord]:
-    selected = [
-        ModelMarketBoardRefreshBatchRecord(**entry)
-        for entry in repository.model_market_board_refresh_batches
-        if (target_task is None or entry["target_task"] == target_task)
-        and (source_name is None or entry.get("source_name") == source_name)
-    ]
-    ordered = sorted(
-        selected,
-        key=lambda entry: (
-            entry.created_at or datetime.min.replace(tzinfo=timezone.utc),
-            entry.id,
-        ),
-        reverse=True,
-    )
-    if recent_limit is None:
-        return ordered
-    return ordered[:recent_limit]
 
 
 def list_model_market_board_refresh_batches_postgres(
@@ -336,32 +234,6 @@ def list_model_market_board_refresh_batches_postgres(
     ]
 
 
-def list_model_market_board_scoring_batches_in_memory(
-    repository: MarketBoardOperationStore,
-    *,
-    target_task: str | None = None,
-    source_name: str | None = None,
-    recent_limit: int | None = None,
-) -> list[ModelMarketBoardScoringBatchRecord]:
-    selected = [
-        ModelMarketBoardScoringBatchRecord(**entry)
-        for entry in repository.model_market_board_scoring_batches
-        if (target_task is None or entry["target_task"] == target_task)
-        and (source_name is None or entry.get("source_name") == source_name)
-    ]
-    ordered = sorted(
-        selected,
-        key=lambda entry: (
-            entry.created_at or datetime.min.replace(tzinfo=timezone.utc),
-            entry.id,
-        ),
-        reverse=True,
-    )
-    if recent_limit is None:
-        return ordered
-    return ordered[:recent_limit]
-
-
 def list_model_market_board_scoring_batches_postgres(
     connection: Any,
     *,
@@ -419,32 +291,6 @@ def list_model_market_board_scoring_batches_postgres(
     ]
 
 
-def list_model_market_board_cadence_batches_in_memory(
-    repository: MarketBoardOperationStore,
-    *,
-    target_task: str | None = None,
-    source_name: str | None = None,
-    recent_limit: int | None = None,
-) -> list[ModelMarketBoardCadenceBatchRecord]:
-    selected = [
-        ModelMarketBoardCadenceBatchRecord(**entry)
-        for entry in repository.model_market_board_cadence_batches
-        if (target_task is None or entry["target_task"] == target_task)
-        and (source_name is None or entry.get("source_name") == source_name)
-    ]
-    ordered = sorted(
-        selected,
-        key=lambda entry: (
-            entry.created_at or datetime.min.replace(tzinfo=timezone.utc),
-            entry.id,
-        ),
-        reverse=True,
-    )
-    if recent_limit is None:
-        return ordered
-    return ordered[:recent_limit]
-
-
 def list_model_market_board_cadence_batches_postgres(
     connection: Any,
     *,
@@ -500,18 +346,6 @@ def list_model_market_board_cadence_batches_postgres(
         )
         for row in rows
     ]
-
-
-def _find_model_market_board_in_memory(
-    repository: MarketBoardOperationStore,
-    *,
-    board_key: str,
-) -> ModelMarketBoardRecord | None:
-    match = next(
-        (entry for entry in repository.model_market_boards if entry["board_key"] == board_key),
-        None,
-    )
-    return ModelMarketBoardRecord(**match) if match is not None else None
 
 
 def _find_model_market_board_postgres(
@@ -640,34 +474,6 @@ def _build_model_market_board(
     )
 
 
-def save_model_market_board_in_memory(
-    repository: MarketBoardOperationStore,
-    board: ModelMarketBoardRecord,
-) -> ModelMarketBoardRecord:
-    payload = asdict(board)
-    existing_index = next(
-        (
-            index
-            for index, entry in enumerate(repository.model_market_boards)
-            if entry["board_key"] == board.board_key
-        ),
-        None,
-    )
-    now = datetime.now(timezone.utc)
-    if existing_index is None:
-        payload["id"] = len(repository.model_market_boards) + 1
-        payload["created_at"] = now
-        payload["updated_at"] = now
-        repository.model_market_boards.append(payload)
-        return ModelMarketBoardRecord(**payload)
-    current = repository.model_market_boards[existing_index]
-    payload["id"] = current["id"]
-    payload["created_at"] = current["created_at"]
-    payload["updated_at"] = now
-    repository.model_market_boards[existing_index] = payload
-    return ModelMarketBoardRecord(**payload)
-
-
 def save_model_market_board_postgres(
     connection: Any,
     board: ModelMarketBoardRecord,
@@ -736,17 +542,6 @@ def save_model_market_board_postgres(
         created_at=row[9],
         updated_at=row[10],
     )
-
-
-def save_model_market_board_refresh_event_in_memory(
-    repository: MarketBoardOperationStore,
-    refresh_event: ModelMarketBoardRefreshRecord,
-) -> ModelMarketBoardRefreshRecord:
-    payload = asdict(refresh_event)
-    payload["id"] = len(repository.model_market_board_refresh_events) + 1
-    payload["created_at"] = datetime.now(timezone.utc)
-    repository.model_market_board_refresh_events.append(payload)
-    return ModelMarketBoardRefreshRecord(**payload)
 
 
 def save_model_market_board_refresh_event_postgres(
@@ -1059,17 +854,6 @@ def _build_model_market_board_refresh_batch(
     )
 
 
-def save_model_market_board_refresh_batch_in_memory(
-    repository: MarketBoardOperationStore,
-    batch: ModelMarketBoardRefreshBatchRecord,
-) -> ModelMarketBoardRefreshBatchRecord:
-    payload = asdict(batch)
-    payload["id"] = len(repository.model_market_board_refresh_batches) + 1
-    payload["created_at"] = datetime.now(timezone.utc)
-    repository.model_market_board_refresh_batches.append(payload)
-    return ModelMarketBoardRefreshBatchRecord(**payload)
-
-
 def save_model_market_board_refresh_batch_postgres(
     connection: Any,
     batch: ModelMarketBoardRefreshBatchRecord,
@@ -1179,17 +963,6 @@ def _build_model_market_board_source_run(
     )
 
 
-def save_model_market_board_source_run_in_memory(
-    repository: MarketBoardOperationStore,
-    source_run: ModelMarketBoardSourceRunRecord,
-) -> ModelMarketBoardSourceRunRecord:
-    payload = asdict(source_run)
-    payload["id"] = len(repository.model_market_board_source_runs) + 1
-    payload["created_at"] = datetime.now(timezone.utc)
-    repository.model_market_board_source_runs.append(payload)
-    return ModelMarketBoardSourceRunRecord(**payload)
-
-
 def save_model_market_board_source_run_postgres(
     connection: Any,
     source_run: ModelMarketBoardSourceRunRecord,
@@ -1267,17 +1040,6 @@ def _build_model_market_board_scoring_batch(
         materialized_opportunity_count=int(result.get("materialized_opportunity_count", 0)),
         payload=payload,
     )
-
-
-def save_model_market_board_scoring_batch_in_memory(
-    repository: MarketBoardOperationStore,
-    batch: ModelMarketBoardScoringBatchRecord,
-) -> ModelMarketBoardScoringBatchRecord:
-    payload = asdict(batch)
-    payload["id"] = len(repository.model_market_board_scoring_batches) + 1
-    payload["created_at"] = datetime.now(timezone.utc)
-    repository.model_market_board_scoring_batches.append(payload)
-    return ModelMarketBoardScoringBatchRecord(**payload)
 
 
 def save_model_market_board_scoring_batch_postgres(
@@ -1359,17 +1121,6 @@ def _build_model_market_board_cadence_batch(
         materialized_opportunity_count=int(result.get("materialized_opportunity_count", 0)),
         payload=payload,
     )
-
-
-def save_model_market_board_cadence_batch_in_memory(
-    repository: MarketBoardOperationStore,
-    batch: ModelMarketBoardCadenceBatchRecord,
-) -> ModelMarketBoardCadenceBatchRecord:
-    payload = asdict(batch)
-    payload["id"] = len(repository.model_market_board_cadence_batches) + 1
-    payload["created_at"] = datetime.now(timezone.utc)
-    repository.model_market_board_cadence_batches.append(payload)
-    return ModelMarketBoardCadenceBatchRecord(**payload)
 
 
 def save_model_market_board_cadence_batch_postgres(

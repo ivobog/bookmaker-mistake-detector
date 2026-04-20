@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 import bookmaker_detector_api.main as main_module
 from bookmaker_detector_api.api import admin_diagnostics_routes as admin_diagnostics_api
 from bookmaker_detector_api.api import admin_model_routes as admin_model_api
+from bookmaker_detector_api.api import analyst_patterns as analyst_patterns_api
 from bookmaker_detector_api.api import analyst_opportunities as analyst_opportunities_api
 from bookmaker_detector_api.api import analyst_trends as analyst_trends_api
 from bookmaker_detector_api.services.model_records import (
@@ -32,6 +33,11 @@ def client(monkeypatch: pytest.MonkeyPatch):
         _fake_postgres_connection,
     )
     monkeypatch.setattr(
+        analyst_patterns_api,
+        "postgres_connection",
+        _fake_postgres_connection,
+    )
+    monkeypatch.setattr(
         analyst_trends_api,
         "postgres_connection",
         _fake_postgres_connection,
@@ -40,7 +46,7 @@ def client(monkeypatch: pytest.MonkeyPatch):
         yield test_client
 
 
-def test_model_capabilities_endpoint_returns_task_registry_payload_without_repository_mode(
+def test_model_capabilities_endpoint_returns_task_registry_payload(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -120,7 +126,7 @@ def test_model_capabilities_endpoint_returns_task_registry_payload_without_repos
     assert payload["ui_defaults"]["default_feature_key"] == "baseline_team_features_v1"
 
 
-def test_model_registry_endpoint_returns_postgres_contract_without_repository_mode(
+def test_model_registry_endpoint_returns_postgres_contract(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -168,7 +174,7 @@ def test_model_registry_endpoint_returns_postgres_contract_without_repository_mo
     )
 
 
-def test_admin_diagnostics_endpoint_omits_repository_mode_from_wire_payload(
+def test_admin_diagnostics_endpoint_uses_postgres_contract(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -176,7 +182,6 @@ def test_admin_diagnostics_endpoint_omits_repository_mode_from_wire_payload(
         admin_diagnostics_api,
         "_run_admin_diagnostics",
         lambda **kwargs: {
-            "repository_mode": "postgres",
             "filters": {"provider_name": kwargs.get("provider_name")},
             "stats": {"job_count": 3, "success_rate": 1.0},
         },
@@ -191,7 +196,7 @@ def test_admin_diagnostics_endpoint_omits_repository_mode_from_wire_payload(
     assert payload["stats"]["job_count"] == 3
 
 
-def test_analyst_opportunities_endpoint_omits_repository_mode_from_wire_payload(
+def test_analyst_opportunities_endpoint_uses_postgres_contract(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -251,7 +256,7 @@ def test_analyst_opportunities_endpoint_omits_repository_mode_from_wire_payload(
     assert payload["opportunities"][0]["team_code"] == "LAL"
 
 
-def test_analyst_trend_summary_endpoint_omits_repository_mode_from_wire_payload(
+def test_analyst_trend_summary_endpoint_uses_postgres_contract(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -275,6 +280,45 @@ def test_analyst_trend_summary_endpoint_omits_repository_mode_from_wire_payload(
     assert payload["feature_version"]["feature_key"] == "baseline_team_features_v1"
     assert payload["snapshot_count"] == 12
     assert payload["latest_perspective"]["team_code"] == "LAL"
+
+
+@pytest.mark.parametrize(
+    ("path", "service_name"),
+    [
+        ("/api/v1/analyst/comparables", "get_feature_comparable_cases_postgres"),
+        ("/api/v1/analyst/evidence", "get_feature_evidence_bundle_postgres"),
+    ],
+)
+def test_analyst_anchor_routes_return_bad_request_when_team_code_is_required(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    path: str,
+    service_name: str,
+) -> None:
+    monkeypatch.setattr(
+        analyst_patterns_api,
+        "_resolve_target_task",
+        lambda target_task, capabilities_payload=None: (
+            target_task or "spread_error_regression",
+            {"target_tasks": []},
+        ),
+    )
+    monkeypatch.setattr(analyst_patterns_api, "_validate_model_admin_inputs", lambda **_: None)
+
+    def raise_anchor_error(*args, **kwargs):
+        raise ValueError("Comparable anchor requires team_code when a game has multiple perspectives.")
+
+    monkeypatch.setattr(analyst_patterns_api, service_name, raise_anchor_error)
+
+    response = client.get(
+        f"{path}?target_task=spread_error_regression&canonical_game_id=1"
+    )
+
+    assert response.status_code == 400
+    assert (
+        response.json()["detail"]
+        == "Comparable anchor requires team_code when a game has multiple perspectives."
+    )
 
 
 def test_model_backtest_route_defaults_to_canonical_selection_policy_name(

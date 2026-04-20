@@ -1,7 +1,7 @@
 # Known Issues
 
 ## Current Status
-Phase 5 closeout is in progress. Current open items are recorded below.
+Phase 5 closeout remains in progress, but the previously open worker startup, backend validation, and Playwright smoke issues are now closed. The remaining item below is a mitigated Docker Compose reliability note.
 
 ## Tracking Guidance
 Capture issues here when they affect any of the following:
@@ -38,26 +38,26 @@ Use this format for each new item:
 ### Worker startup fails after the Postgres-only cleanup
 - Severity: `blocker`
 - Area: `worker`
-- Status: `open`
-- Summary: The Docker Compose worker exits immediately because [main.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/worker/src/bookmaker_detector_worker/main.py) still imports `bookmaker_detector_api.services.fetch_ingestion_runner` and `bookmaker_detector_api.services.fixture_ingestion_runner`, both of which were intentionally removed during the Postgres-only backend cutover.
-- Reproduction: Run `docker compose up --build` from the repo root with the current `.env`; `bookmaker-worker` exits with `ModuleNotFoundError` for the retired ingestion-runner modules.
-- Temporary mitigation: Disable the worker for manual smoke, or update the worker to stop importing and dispatching the retired runner paths before relying on a full Compose bring-up.
-- Exit criteria: `bookmaker-worker` must start cleanly with the supported job modes in the current codebase, or the Compose stack must stop advertising unsupported worker modes.
+- Status: `closed`
+- Summary: [main.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/worker/src/bookmaker_detector_worker/main.py) now uses the supported Postgres-era ingestion and fixture-loading helpers instead of importing the retired ingestion-runner modules, and the worker stays up in Docker Compose with the current stack.
+- Reproduction: Previously reproduced by running `docker compose up --build` and observing `bookmaker-worker` exit with `ModuleNotFoundError` for the removed runner modules.
+- Temporary mitigation: None required after the worker cutover. The worker now defaults to `idle` when no supported job mode is configured.
+- Exit criteria: Satisfied. `python -m py_compile worker/src/bookmaker_detector_worker/main.py` passes, and `docker compose ps -a` shows `bookmaker-worker` staying `Up` with the current stack.
 
 ### Analyst comparables and evidence return 500 when `canonical_game_id` is used without `team_code`
 - Severity: `medium`
 - Area: `backend`
-- Status: `open`
-- Summary: The live analyst comparables and evidence routes require `team_code` when a canonical game has multiple perspectives, but the current API surfaces that requirement as a 500 instead of a client-validation response.
-- Reproduction: Seed the Postgres-backed smoke dataset, then call `GET /api/v1/analyst/comparables?target_task=spread_error_regression&canonical_game_id=1` or `GET /api/v1/analyst/evidence?target_task=spread_error_regression&canonical_game_id=1` without `team_code`.
-- Temporary mitigation: Provide `team_code` alongside `canonical_game_id` for analyst comparables/evidence calls until the route or service returns a proper 4xx validation response.
-- Exit criteria: The API should either infer the correct perspective safely or return a clear 4xx validation error that explains the missing `team_code` requirement.
+- Status: `closed`
+- Summary: [analyst_patterns.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/api/analyst_patterns.py) now translates the comparable-anchor perspective error into a `400` response with a clear validation message instead of leaking it as a `500`.
+- Reproduction: Previously reproduced by calling `GET /api/v1/analyst/comparables?target_task=spread_error_regression&canonical_game_id=1` or `GET /api/v1/analyst/evidence?target_task=spread_error_regression&canonical_game_id=1` without `team_code` when the canonical game had multiple perspectives.
+- Temporary mitigation: None required after the route-level validation translation.
+- Exit criteria: Satisfied. [test_admin_routes.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/tests/test_admin_routes.py) now covers both routes and verifies they return `400` with the explicit `team_code` guidance.
 
 ### Playwright Phase 5 mutation smoke no longer matches current model-admin behavior
 - Severity: `medium`
 - Area: `frontend`
-- Status: `open`
-- Summary: `npm run test:smoke` now finishes 4/5 passing, with the remaining failure in `frontend/e2e/phase5-smoke.spec.ts` where the train mutation verification still expects an immediate redirect to `#/models/runs/302`.
-- Reproduction: Run `cmd /c npm run test:smoke` in [frontend](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend); the failing test is `Phase 5 browser smoke › runs train and select mutations with browser-level refresh verification`.
-- Temporary mitigation: Use the passing analyst/model-admin route smoke coverage for browser navigation confidence, and manually verify the train/select mutation UX until the test is aligned with the current workspace behavior.
-- Exit criteria: Either restore the intended post-mutation navigation behavior or update the Playwright assertion to match the current, intentional UX.
+- Status: `closed`
+- Summary: [phase5-smoke.spec.ts](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend/e2e/phase5-smoke.spec.ts) now matches the intentional model-admin UX by stubbing capabilities, using the canonical selection policy name, and asserting the durable post-mutation detail-route outcome instead of a transient banner.
+- Reproduction: Previously reproduced by running `cmd /c npm run test:smoke` in [frontend](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend) and observing the `runs train and select mutations with browser-level refresh verification` smoke fail while waiting for a banner that disappears during route remount.
+- Temporary mitigation: None required after the smoke realignment.
+- Exit criteria: Satisfied. `cmd /c npm run test:smoke` now completes with `5 passed`.

@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Any
 
-from bookmaker_detector_api.repositories import ModelBacktestArtifactStore
 from bookmaker_detector_api.repositories.ingestion_json import _json_dumps
 from bookmaker_detector_api.services.model_records import ModelBacktestRunRecord
 from bookmaker_detector_api.services.task_registry import normalize_selection_policy_name
@@ -15,21 +13,6 @@ def _canonicalize_selection_policy_name(selection_policy_name: str) -> str:
         return normalize_selection_policy_name(selection_policy_name)
     except ValueError:
         return selection_policy_name
-
-
-def save_model_backtest_run_in_memory(
-    repository: ModelBacktestArtifactStore,
-    backtest_run: ModelBacktestRunRecord,
-) -> ModelBacktestRunRecord:
-    payload = asdict(backtest_run)
-    payload["selection_policy_name"] = _canonicalize_selection_policy_name(
-        payload["selection_policy_name"]
-    )
-    payload["id"] = len(repository.model_backtest_runs) + 1
-    payload["created_at"] = datetime.now(timezone.utc)
-    payload["completed_at"] = payload["created_at"]
-    repository.model_backtest_runs.append(payload)
-    return ModelBacktestRunRecord(**payload)
 
 
 def save_model_backtest_run_postgres(
@@ -101,37 +84,6 @@ def save_model_backtest_run_postgres(
     )
 
 
-def list_model_backtest_runs_in_memory(
-    repository: ModelBacktestArtifactStore,
-    *,
-    target_task: str | None = None,
-    team_code: str | None = None,
-    season_label: str | None = None,
-) -> list[ModelBacktestRunRecord]:
-    selected = [
-        ModelBacktestRunRecord(
-            **{
-                **entry,
-                "selection_policy_name": _canonicalize_selection_policy_name(
-                    entry["selection_policy_name"]
-                ),
-            }
-        )
-        for entry in repository.model_backtest_runs
-        if (target_task is None or entry["target_task"] == target_task)
-        and (team_code is None or entry.get("team_code") == team_code)
-        and (season_label is None or entry.get("season_label") == season_label)
-    ]
-    return sorted(
-        selected,
-        key=lambda entry: (
-            entry.completed_at or entry.created_at or datetime.min.replace(tzinfo=timezone.utc),
-            entry.id,
-        ),
-        reverse=True,
-    )
-
-
 def list_model_backtest_runs_postgres(
     connection: Any,
     *,
@@ -197,24 +149,6 @@ def list_model_backtest_runs_postgres(
     ]
 
 
-def get_model_backtest_history_in_memory(
-    repository: ModelBacktestArtifactStore,
-    *,
-    target_task: str | None = None,
-    team_code: str | None = None,
-    season_label: str | None = None,
-    recent_limit: int = 10,
-    nested_get,
-) -> dict[str, Any]:
-    runs = list_model_backtest_runs_in_memory(
-        repository,
-        target_task=target_task,
-        team_code=team_code,
-        season_label=season_label,
-    )
-    return summarize_model_backtest_history(runs, recent_limit=recent_limit, nested_get=nested_get)
-
-
 def get_model_backtest_history_postgres(
     connection: Any,
     *,
@@ -231,22 +165,6 @@ def get_model_backtest_history_postgres(
         season_label=season_label,
     )
     return summarize_model_backtest_history(runs, recent_limit=recent_limit, nested_get=nested_get)
-
-
-def get_model_backtest_detail_in_memory(
-    repository: ModelBacktestArtifactStore,
-    *,
-    backtest_run_id: int,
-) -> dict[str, Any] | None:
-    run = next(
-        (
-            entry
-            for entry in list_model_backtest_runs_in_memory(repository)
-            if entry.id == backtest_run_id
-        ),
-        None,
-    )
-    return serialize_model_backtest_run(run)
 
 
 def get_model_backtest_detail_postgres(

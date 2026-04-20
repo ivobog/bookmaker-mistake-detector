@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from bookmaker_detector_api.repositories import ModelOpportunityStore
 from bookmaker_detector_api.repositories.ingestion_json import _json_dumps
 from bookmaker_detector_api.services import model_future_scenarios
 from bookmaker_detector_api.services.model_market_board_views import _serialize_model_opportunity
@@ -326,52 +325,6 @@ def nested_get(payload: dict[str, Any] | None, *keys: str) -> Any:
     return current
 
 
-def save_model_opportunities_in_memory(
-    repository: ModelOpportunityStore,
-    opportunities: list[ModelOpportunityRecord],
-) -> list[ModelOpportunityRecord]:
-    persisted: list[ModelOpportunityRecord] = []
-    for opportunity in opportunities:
-        now = datetime.now(timezone.utc)
-        payload = {
-            "model_scoring_run_id": opportunity.model_scoring_run_id,
-            "model_selection_snapshot_id": opportunity.model_selection_snapshot_id,
-            "model_evaluation_snapshot_id": opportunity.model_evaluation_snapshot_id,
-            "feature_version_id": opportunity.feature_version_id,
-            "target_task": opportunity.target_task,
-            "source_kind": opportunity.source_kind,
-            "scenario_key": opportunity.scenario_key,
-            "opportunity_key": opportunity.opportunity_key,
-            "team_code": opportunity.team_code,
-            "opponent_code": opportunity.opponent_code,
-            "season_label": opportunity.season_label,
-            "canonical_game_id": opportunity.canonical_game_id,
-            "game_date": opportunity.game_date,
-            "policy_name": opportunity.policy_name,
-            "status": opportunity.status,
-            "prediction_value": opportunity.prediction_value,
-            "signal_strength": opportunity.signal_strength,
-            "evidence_rating": opportunity.evidence_rating,
-            "recommendation_status": opportunity.recommendation_status,
-            "materialization_batch_id": opportunity.materialization_batch_id,
-            "materialized_at": opportunity.materialized_at,
-            "materialization_scope_team_code": opportunity.materialization_scope_team_code,
-            "materialization_scope_season_label": opportunity.materialization_scope_season_label,
-            "materialization_scope_canonical_game_id": (
-                opportunity.materialization_scope_canonical_game_id
-            ),
-            "materialization_scope_source": opportunity.materialization_scope_source,
-            "materialization_scope_key": opportunity.materialization_scope_key,
-            "payload": opportunity.payload,
-            "id": len(repository.model_opportunities) + 1,
-            "created_at": now,
-            "updated_at": now,
-        }
-        repository.model_opportunities.append(payload)
-        persisted.append(ModelOpportunityRecord(**payload))
-    return persisted
-
-
 def save_model_opportunities_postgres(
     connection: Any,
     opportunities: list[ModelOpportunityRecord],
@@ -521,50 +474,6 @@ def save_model_opportunities_postgres(
     return persisted
 
 
-def list_model_opportunities_in_memory(
-    repository: ModelOpportunityStore,
-    *,
-    target_task: str | None = None,
-    team_code: str | None = None,
-    status: str | None = None,
-    season_label: str | None = None,
-    source_kind: str | None = None,
-    scenario_key: str | None = None,
-    materialization_batch_id: str | None = None,
-    latest_batch_only: bool = False,
-) -> list[ModelOpportunityRecord]:
-    resolved_batch_id = materialization_batch_id
-    if latest_batch_only and resolved_batch_id is None:
-        batch_anchor = _resolve_latest_opportunity_batch_in_memory(
-            repository.model_opportunities,
-            target_task=target_task,
-            team_code=team_code,
-            season_label=season_label,
-        )
-        if batch_anchor is None:
-            return []
-        resolved_batch_id = str(batch_anchor["materialization_batch_id"])
-    selected = [
-        ModelOpportunityRecord(**entry)
-        for entry in repository.model_opportunities
-        if _matches_opportunity_filters(
-            entry,
-            target_task=target_task,
-            team_code=team_code,
-            status=status,
-            season_label=season_label,
-            source_kind=source_kind,
-            scenario_key=scenario_key,
-            materialization_batch_id=resolved_batch_id,
-        )
-    ]
-    return sorted(
-        _dedupe_materialized_opportunities(selected),
-        key=_opportunity_sort_key,
-        reverse=True,
-    )
-
-
 def list_model_opportunities_postgres(
     connection: Any,
     *,
@@ -689,37 +598,6 @@ def list_model_opportunities_postgres(
     return _dedupe_materialized_opportunities(opportunities)
 
 
-def get_model_opportunity_queue_in_memory(
-    repository: ModelOpportunityStore,
-    *,
-    target_task: str | None = None,
-    team_code: str | None = None,
-    status: str | None = None,
-    season_label: str | None = None,
-    source_kind: str | None = None,
-    scenario_key: str | None = None,
-) -> dict[str, Any]:
-    batch_anchor = _resolve_latest_opportunity_batch_in_memory(
-        repository.model_opportunities,
-        target_task=target_task,
-        team_code=team_code,
-        season_label=season_label,
-    )
-    if batch_anchor is None:
-        return _build_model_opportunity_queue_result(None, [])
-    opportunities = list_model_opportunities_in_memory(
-        repository,
-        target_task=target_task,
-        team_code=team_code,
-        status=status,
-        season_label=season_label,
-        source_kind=source_kind,
-        scenario_key=scenario_key,
-        materialization_batch_id=str(batch_anchor["materialization_batch_id"]),
-    )
-    return _build_model_opportunity_queue_result(batch_anchor, opportunities)
-
-
 def get_model_opportunity_queue_postgres(
     connection: Any,
     *,
@@ -751,22 +629,6 @@ def get_model_opportunity_queue_postgres(
     return _build_model_opportunity_queue_result(batch_anchor, opportunities)
 
 
-def get_model_opportunity_detail_in_memory(
-    repository: ModelOpportunityStore,
-    *,
-    opportunity_id: int,
-) -> dict[str, Any] | None:
-    opportunity = next(
-        (
-            entry
-            for entry in list_model_opportunities_in_memory(repository)
-            if entry.id == opportunity_id
-        ),
-        None,
-    )
-    return _serialize_model_opportunity(opportunity)
-
-
 def get_model_opportunity_detail_postgres(
     connection: Any,
     *,
@@ -781,27 +643,6 @@ def get_model_opportunity_detail_postgres(
         None,
     )
     return _serialize_model_opportunity(opportunity)
-
-
-def get_model_opportunity_history_in_memory(
-    repository: ModelOpportunityStore,
-    *,
-    target_task: str | None = None,
-    team_code: str | None = None,
-    season_label: str | None = None,
-    source_kind: str | None = None,
-    scenario_key: str | None = None,
-    recent_limit: int = 10,
-) -> dict[str, Any]:
-    opportunities = list_model_opportunities_in_memory(
-        repository,
-        target_task=target_task,
-        team_code=team_code,
-        season_label=season_label,
-        source_kind=source_kind,
-        scenario_key=scenario_key,
-    )
-    return summarize_model_opportunity_history(opportunities, recent_limit=recent_limit)
 
 
 def get_model_opportunity_history_postgres(
@@ -924,28 +765,6 @@ def _matches_opportunity_filters(
     ):
         return False
     return True
-
-
-def _resolve_latest_opportunity_batch_in_memory(
-    entries: list[dict[str, Any]],
-    *,
-    target_task: str | None,
-    team_code: str | None,
-    season_label: str | None,
-) -> dict[str, Any] | None:
-    candidates = [
-        entry
-        for entry in entries
-        if _matches_materialization_scope(
-            entry,
-            target_task=target_task,
-            team_code=team_code,
-            season_label=season_label,
-        )
-    ]
-    if not candidates:
-        return None
-    return max(candidates, key=_opportunity_entry_sort_key)
 
 
 def _resolve_latest_opportunity_batch_postgres(

@@ -7,11 +7,11 @@ import pytest
 from bookmaker_detector_api.fetching import FetchedPage
 from bookmaker_detector_api.ingestion.models import ParseStatus, RawGameRow
 from bookmaker_detector_api.ingestion.providers import CoversHistoricalTeamPageProvider
-from bookmaker_detector_api.repositories import InMemoryIngestionRepository
 from bookmaker_detector_api.services.ingestion_pipeline import (
     HistoricalIngestionRequest,
     ingest_historical_team_page,
 )
+from tests.support.in_memory_ingestion_repository import InMemoryIngestionRepository
 from tests.support.covers_fixtures import load_covers_fixture
 
 
@@ -19,7 +19,7 @@ def _load_fixture(provider: CoversHistoricalTeamPageProvider, fixture_name: str)
     return load_covers_fixture(fixture_name)
 
 
-def test_ingestion_pipeline_persists_fixture_run_in_memory() -> None:
+def test_ingestion_pipeline_persists_fixture_run() -> None:
     provider = CoversHistoricalTeamPageProvider()
     repository = InMemoryIngestionRepository()
     fixture_html = _load_fixture(provider, "covers_sample_team_page.html")

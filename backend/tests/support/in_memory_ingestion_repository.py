@@ -10,7 +10,7 @@ from bookmaker_detector_api.data_quality_taxonomy import (
     severity_counts_from_issue_type_counts,
 )
 from bookmaker_detector_api.ingestion.models import CanonicalGame, GameMetric, RawGameRow
-from bookmaker_detector_api.repositories.ingestion_in_memory_support import (
+from tests.support.in_memory_ingestion_support import (
     bucket_date_from_datetime,
     canonical_game_matches_scope,
     issue_matches_scope,
