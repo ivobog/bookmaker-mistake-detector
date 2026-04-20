@@ -18,6 +18,7 @@ from bookmaker_detector_api.services.features import (
     get_feature_evidence_bundle_postgres,
     get_feature_pattern_catalog_postgres,
 )
+from .admin_model_support import _resolve_target_task, _validate_model_admin_inputs
 
 router = APIRouter(prefix="/analyst", tags=["analyst"])
 
@@ -34,12 +35,17 @@ def feature_patterns(
     filters: Annotated[AnalystPatternFilters, Depends()],
     dimensions: str = Query(default="venue,days_rest_bucket"),
 ) -> AnalystPatternResponse:
+    resolved_target_task, capabilities_payload = _resolve_target_task(filters.target_task)
+    _validate_model_admin_inputs(
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
+    )
     parsed_dimensions = _parse_csv_values(dimensions) or []
     with postgres_connection() as connection:
         pattern_result = get_feature_pattern_catalog_postgres(
             connection,
             feature_key=filters.feature_key,
-            target_task=filters.target_task,
+            target_task=resolved_target_task,
             team_code=filters.team_code,
             season_label=filters.season_label,
             dimensions=tuple(parsed_dimensions),
@@ -47,7 +53,9 @@ def feature_patterns(
             limit=filters.limit,
         )
 
-    response_filters = filters.model_copy(update={"dimensions": parsed_dimensions})
+    response_filters = filters.model_copy(
+        update={"dimensions": parsed_dimensions, "target_task": resolved_target_task}
+    )
     return AnalystPatternResponse(
         filters=response_filters,
         feature_version=pattern_result.get("feature_version"),
@@ -64,13 +72,18 @@ def feature_comparables(
     dimensions: str = Query(default="venue,days_rest_bucket"),
     condition_values: str | None = Query(default=None),
 ) -> AnalystComparableResponse:
+    resolved_target_task, capabilities_payload = _resolve_target_task(filters.target_task)
+    _validate_model_admin_inputs(
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
+    )
     parsed_dimensions = _parse_csv_values(dimensions) or []
     parsed_condition_values = _parse_csv_values(condition_values)
     with postgres_connection() as connection:
         comparable_result = get_feature_comparable_cases_postgres(
             connection,
             feature_key=filters.feature_key,
-            target_task=filters.target_task,
+            target_task=resolved_target_task,
             team_code=filters.team_code,
             season_label=filters.season_label,
             dimensions=tuple(parsed_dimensions),
@@ -84,6 +97,7 @@ def feature_comparables(
         update={
             "dimensions": parsed_dimensions,
             "condition_values": parsed_condition_values,
+            "target_task": resolved_target_task,
         }
     )
     return AnalystComparableResponse(
@@ -104,13 +118,18 @@ def feature_evidence(
     dimensions: str = Query(default="venue,days_rest_bucket"),
     condition_values: str | None = Query(default=None),
 ) -> AnalystEvidenceResponse:
+    resolved_target_task, capabilities_payload = _resolve_target_task(filters.target_task)
+    _validate_model_admin_inputs(
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
+    )
     parsed_dimensions = _parse_csv_values(dimensions) or []
     parsed_condition_values = _parse_csv_values(condition_values)
     with postgres_connection() as connection:
         evidence_result = get_feature_evidence_bundle_postgres(
             connection,
             feature_key=filters.feature_key,
-            target_task=filters.target_task,
+            target_task=resolved_target_task,
             team_code=filters.team_code,
             season_label=filters.season_label,
             dimensions=tuple(parsed_dimensions),
@@ -128,6 +147,7 @@ def feature_evidence(
         update={
             "dimensions": parsed_dimensions,
             "condition_values": parsed_condition_values,
+            "target_task": resolved_target_task,
         }
     )
     return AnalystEvidenceResponse(

@@ -31,7 +31,6 @@ def normalize_data_quality_taxonomy(
             season_label=season_label,
         )
         return {
-            "repository_mode": "postgres",
             "dry_run": dry_run,
             "filters": {
                 "provider_name": provider_name,

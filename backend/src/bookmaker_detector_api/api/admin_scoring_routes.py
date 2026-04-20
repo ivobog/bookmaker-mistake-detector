@@ -27,6 +27,7 @@ from bookmaker_detector_api.services.models import (
 
 from .admin_model_support import (
     FutureSlateRequest,
+    _resolve_target_task,
     _validate_model_admin_inputs,
 )
 
@@ -63,17 +64,21 @@ def phase_three_model_score_preview(
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> AdminScoringPreviewResponse:
+    resolved_target_task, capabilities_payload = _resolve_target_task(filters.target_task)
     _validate_model_admin_inputs(
-        target_task=filters.target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         workflow_name="scoring",
     )
     dimensions = tuple(filters.dimensions or ["venue", "days_rest_bucket"])
-    filters = filters.model_copy(update={"dimensions": list(dimensions)})
+    filters = filters.model_copy(
+        update={"dimensions": list(dimensions), "target_task": resolved_target_task}
+    )
     with postgres_connection() as connection:
         scoring_preview = get_model_scoring_preview_postgres(
             connection,
             feature_key=filters.feature_key,
-            target_task=filters.target_task,
+            target_task=resolved_target_task,
             team_code=filters.team_code,
             season_label=filters.season_label,
             canonical_game_id=filters.canonical_game_id,
@@ -99,14 +104,19 @@ def phase_three_model_future_game_preview(
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> AdminFutureGamePreviewResponse:
-    resolved_target_task = filters.target_task or "spread_error_regression"
+    resolved_target_task, capabilities_payload = _resolve_target_task(filters.target_task)
     _validate_model_admin_inputs(
+        capabilities_payload=capabilities_payload,
         target_task=resolved_target_task,
         workflow_name="scoring",
     )
     dimensions = tuple(filters.dimensions or ["venue", "days_rest_bucket"])
     filters = filters.model_copy(
-        update={"dimensions": list(dimensions), "game_date": game_date.isoformat()}
+        update={
+            "dimensions": list(dimensions),
+            "game_date": game_date.isoformat(),
+            "target_task": resolved_target_task,
+        }
     )
     with postgres_connection() as connection:
         preview = get_model_future_game_preview_postgres(
@@ -136,7 +146,7 @@ def phase_three_model_future_game_preview(
 @router.post("/models/future-game-preview/materialize")
 def phase_three_model_future_game_preview_materialize(
     feature_key: str = Query(default="baseline_team_features_v1"),
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     season_label: str = Query(default="2025-2026"),
     game_date: date = Query(default=date(2026, 4, 20)),
     home_team_code: str = Query(default="LAL"),
@@ -150,15 +160,17 @@ def phase_three_model_future_game_preview_materialize(
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
     _validate_model_admin_inputs(
-        target_task=target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         workflow_name="scoring",
     )
     with postgres_connection() as connection:
         materialized = materialize_model_future_game_preview_postgres(
             connection,
             feature_key=feature_key,
-            target_task=target_task,
+            target_task=resolved_target_task,
             season_label=season_label,
             game_date=game_date,
             home_team_code=home_team_code,
@@ -176,7 +188,7 @@ def phase_three_model_future_game_preview_materialize(
     return {
         "filters": {
             "feature_key": feature_key,
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "season_label": season_label,
             "game_date": game_date,
             "home_team_code": home_team_code,
@@ -200,20 +212,23 @@ def phase_three_model_future_game_preview_runs(
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
     limit: int = Query(default=10, ge=1, le=100),
 ) -> AdminScoringRunsResponse:
+    resolved_target_task, capabilities_payload = _resolve_target_task(filters.target_task)
     _validate_model_admin_inputs(
-        target_task=filters.target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         workflow_name="scoring",
     )
     filters = filters.model_copy(
         update={
             "dimensions": list(filters.dimensions or ["venue", "days_rest_bucket"]),
             "game_date": game_date.isoformat(),
+            "target_task": resolved_target_task,
         }
     )
     with postgres_connection() as connection:
         scoring_runs = list_model_scoring_runs_postgres(
             connection,
-            target_task=filters.target_task,
+            target_task=resolved_target_task,
             team_code=filters.team_code,
             season_label=filters.season_label,
         )
@@ -233,14 +248,17 @@ def phase_three_model_future_game_preview_run_detail(
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> AdminScoringRunDetailResponse:
+    resolved_target_task, capabilities_payload = _resolve_target_task(filters.target_task)
     _validate_model_admin_inputs(
-        target_task=filters.target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         workflow_name="scoring",
     )
     filters = filters.model_copy(
         update={
             "dimensions": list(filters.dimensions or ["venue", "days_rest_bucket"]),
             "game_date": game_date.isoformat(),
+            "target_task": resolved_target_task,
         }
     )
     with postgres_connection() as connection:
@@ -263,8 +281,10 @@ def phase_three_model_future_game_preview_history(
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> AdminScoringHistoryResponse:
+    resolved_target_task, capabilities_payload = _resolve_target_task(filters.target_task)
     _validate_model_admin_inputs(
-        target_task=filters.target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         workflow_name="scoring",
     )
     filters = filters.model_copy(
@@ -272,12 +292,13 @@ def phase_three_model_future_game_preview_history(
             "dimensions": list(filters.dimensions or ["venue", "days_rest_bucket"]),
             "game_date": game_date.isoformat(),
             "recent_limit": recent_limit,
+            "target_task": resolved_target_task,
         }
     )
     with postgres_connection() as connection:
         history = get_model_scoring_history_postgres(
             connection,
-            target_task=filters.target_task,
+            target_task=resolved_target_task,
             team_code=filters.team_code,
             season_label=filters.season_label,
             recent_limit=recent_limit,
@@ -293,7 +314,7 @@ def phase_three_model_future_game_preview_history(
 def phase_three_model_future_slate_preview(
     request: FutureSlateRequest = Body(...),
     feature_key: str = Query(default="baseline_team_features_v1"),
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     include_evidence: bool = Query(default=True),
     dimensions: tuple[str, ...] = Query(default=("venue", "days_rest_bucket")),
     comparable_limit: int = Query(default=5, ge=1, le=50),
@@ -301,8 +322,10 @@ def phase_three_model_future_slate_preview(
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
     _validate_model_admin_inputs(
-        target_task=target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         workflow_name="scoring",
     )
     games = [game.model_dump() for game in request.games]
@@ -310,7 +333,7 @@ def phase_three_model_future_slate_preview(
         preview = get_model_future_slate_preview_postgres(
             connection,
             feature_key=feature_key,
-            target_task=target_task,
+            target_task=resolved_target_task,
             games=games,
             slate_label=request.slate_label,
             include_evidence=include_evidence,
@@ -324,7 +347,7 @@ def phase_three_model_future_slate_preview(
     return {
         "filters": {
             "feature_key": feature_key,
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "slate_label": request.slate_label,
             "include_evidence": include_evidence,
             "dimensions": list(dimensions),
@@ -339,7 +362,7 @@ def phase_three_model_future_slate_preview(
 def phase_three_model_future_slate_materialize(
     request: FutureSlateRequest = Body(...),
     feature_key: str = Query(default="baseline_team_features_v1"),
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     include_evidence: bool = Query(default=True),
     dimensions: tuple[str, ...] = Query(default=("venue", "days_rest_bucket")),
     comparable_limit: int = Query(default=5, ge=1, le=50),
@@ -347,8 +370,10 @@ def phase_three_model_future_slate_materialize(
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
     _validate_model_admin_inputs(
-        target_task=target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         workflow_name="scoring",
     )
     games = [game.model_dump() for game in request.games]
@@ -356,7 +381,7 @@ def phase_three_model_future_slate_materialize(
         materialized = materialize_model_future_slate_postgres(
             connection,
             feature_key=feature_key,
-            target_task=target_task,
+            target_task=resolved_target_task,
             games=games,
             slate_label=request.slate_label,
             include_evidence=include_evidence,
@@ -370,7 +395,7 @@ def phase_three_model_future_slate_materialize(
     return {
         "filters": {
             "feature_key": feature_key,
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "slate_label": request.slate_label,
             "include_evidence": include_evidence,
             "dimensions": list(dimensions),

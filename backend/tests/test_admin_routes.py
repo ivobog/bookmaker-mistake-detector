@@ -119,6 +119,11 @@ def test_model_registry_endpoint_returns_postgres_contract_without_repository_mo
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(admin_model_api, "_load_model_capabilities_payload", lambda: {"target_tasks": []})
+    monkeypatch.setattr(
+        admin_model_api,
+        "_resolve_target_task",
+        lambda target_task, capabilities_payload=None: (target_task or "spread_error_regression", {"target_tasks": []}),
+    )
     monkeypatch.setattr(admin_model_api, "_validate_model_admin_inputs", lambda **_: None)
     monkeypatch.setattr(
         admin_model_api,

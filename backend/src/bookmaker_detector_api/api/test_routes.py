@@ -24,6 +24,7 @@ from bookmaker_detector_api.services.test_data_seed import (
 from bookmaker_detector_api.services.repository_factory import (
     build_bootstrap_postgres_ingestion_repository,
 )
+from .admin_model_support import _resolve_target_task, _validate_model_admin_inputs
 
 router = APIRouter(prefix="/test", tags=["test"])
 
@@ -205,15 +206,21 @@ def materialize_baseline_features() -> dict[str, object]:
 
 @router.post("/activate-selection")
 def activate_selection(
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     model_family: str = Query(default="tree_stump"),
     selection_policy_name: str = Query(default="test_forced_selection_v1"),
 ) -> dict[str, object]:
     _assert_test_helpers_enabled()
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
+    _validate_model_admin_inputs(
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
+        model_family=model_family,
+    )
     with postgres_connection() as connection:
         snapshots = list_model_evaluation_snapshots_postgres(
             connection,
-            target_task=target_task,
+            target_task=resolved_target_task,
             model_family=model_family,
         )
         if not snapshots:
@@ -221,7 +228,7 @@ def activate_selection(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=(
                     "No evaluation snapshot is available for the requested selection activation "
-                    f"target_task={target_task}, model_family={model_family}."
+                    f"target_task={resolved_target_task}, model_family={model_family}."
                 ),
             )
         snapshot = snapshots[0]

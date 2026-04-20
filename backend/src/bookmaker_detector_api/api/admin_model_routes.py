@@ -50,6 +50,7 @@ from bookmaker_detector_api.services.models import (
 )
 from .admin_model_support import (
     _load_model_capabilities_payload,
+    _resolve_target_task,
     _validate_model_admin_inputs,
 )
 
@@ -135,21 +136,22 @@ def model_capabilities() -> AdminModelCapabilitiesResponse:
 @router.post("/models/train")
 def phase_three_model_train(
     feature_key: str = Query(default="baseline_team_features_v1"),
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     team_code: str | None = Query(default=None),
     season_label: str | None = Query(default=None),
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
     _validate_model_admin_inputs(
-        capabilities_payload=_load_model_capabilities_payload(),
-        target_task=target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
     )
     with postgres_connection() as connection:
         training_result = train_phase_three_models_postgres(
             connection,
             feature_key=feature_key,
-            target_task=target_task,
+            target_task=resolved_target_task,
             team_code=team_code,
             season_label=season_label,
             train_ratio=train_ratio,
@@ -159,7 +161,7 @@ def phase_three_model_train(
     return {
         "filters": {
             "feature_key": feature_key,
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "team_code": team_code,
             "season_label": season_label,
             "train_ratio": train_ratio,
@@ -172,7 +174,7 @@ def phase_three_model_train(
 @router.post("/models/backtests/run")
 def phase_four_model_backtest_run(
     feature_key: str = Query(default="baseline_team_features_v1"),
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     team_code: str | None = Query(default=None),
     season_label: str | None = Query(default=None),
     selection_policy_name: str = Query(default="validation_mae_candidate_v1"),
@@ -181,9 +183,10 @@ def phase_four_model_backtest_run(
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
     _validate_model_admin_inputs(
-        capabilities_payload=_load_model_capabilities_payload(),
-        target_task=target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         selection_policy_name=selection_policy_name,
         workflow_name="backtesting",
     )
@@ -191,7 +194,7 @@ def phase_four_model_backtest_run(
         result = run_model_backtest_postgres(
             connection,
             feature_key=feature_key,
-            target_task=target_task,
+            target_task=resolved_target_task,
             team_code=team_code,
             season_label=season_label,
             selection_policy_name=selection_policy_name,
@@ -204,7 +207,7 @@ def phase_four_model_backtest_run(
     return {
         "filters": {
             "feature_key": feature_key,
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "team_code": team_code,
             "season_label": season_label,
             "selection_policy_name": selection_policy_name,
@@ -221,14 +224,16 @@ def phase_four_model_backtest_run(
 def phase_four_model_backtest_history(
     filters: Annotated[AdminBacktestHistoryFilters, Depends()],
 ) -> AdminBacktestHistoryResponse:
+    resolved_target_task, capabilities_payload = _resolve_target_task(filters.target_task)
     _validate_model_admin_inputs(
-        capabilities_payload=_load_model_capabilities_payload(),
-        target_task=filters.target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
     )
+    filters = filters.model_copy(update={"target_task": resolved_target_task})
     with postgres_connection() as connection:
         history = get_model_backtest_history_postgres(
             connection,
-            target_task=filters.target_task,
+            target_task=resolved_target_task,
             team_code=filters.team_code,
             season_label=filters.season_label,
             recent_limit=filters.recent_limit,
@@ -244,14 +249,16 @@ def phase_four_model_backtest_history(
 def phase_three_model_registry(
     filters: Annotated[AdminModelRegistryFilters, Depends()],
 ) -> AdminModelRegistryResponse:
+    resolved_target_task, capabilities_payload = _resolve_target_task(filters.target_task)
     _validate_model_admin_inputs(
-        capabilities_payload=_load_model_capabilities_payload(),
-        target_task=filters.target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
     )
+    filters = filters.model_copy(update={"target_task": resolved_target_task})
     with postgres_connection() as connection:
         registries = list_model_registry_postgres(
             connection,
-            target_task=filters.target_task,
+            target_task=resolved_target_task,
         )
 
     return AdminModelRegistryResponse(
@@ -265,14 +272,16 @@ def phase_three_model_registry(
 def phase_three_model_runs(
     filters: Annotated[AdminModelRunsFilters, Depends()],
 ) -> AdminModelRunsResponse:
+    resolved_target_task, capabilities_payload = _resolve_target_task(filters.target_task)
     _validate_model_admin_inputs(
-        capabilities_payload=_load_model_capabilities_payload(),
-        target_task=filters.target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
     )
+    filters = filters.model_copy(update={"target_task": resolved_target_task})
     with postgres_connection() as connection:
         runs = list_model_training_runs_postgres(
             connection,
-            target_task=filters.target_task,
+            target_task=resolved_target_task,
             team_code=filters.team_code,
             season_label=filters.season_label,
         )
@@ -300,14 +309,16 @@ def phase_three_model_run_detail(
 def phase_three_model_summary(
     filters: Annotated[AdminModelSummaryFilters, Depends()],
 ) -> AdminModelSummaryResponse:
+    resolved_target_task, capabilities_payload = _resolve_target_task(filters.target_task)
     _validate_model_admin_inputs(
-        capabilities_payload=_load_model_capabilities_payload(),
-        target_task=filters.target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
     )
+    filters = filters.model_copy(update={"target_task": resolved_target_task})
     with postgres_connection() as connection:
         summary = get_model_training_summary_postgres(
             connection,
-            target_task=filters.target_task,
+            target_task=resolved_target_task,
             team_code=filters.team_code,
             season_label=filters.season_label,
         )
@@ -322,14 +333,16 @@ def phase_three_model_summary(
 def phase_three_model_history(
     filters: Annotated[AdminModelHistoryFilters, Depends()],
 ) -> AdminModelHistoryResponse:
+    resolved_target_task, capabilities_payload = _resolve_target_task(filters.target_task)
     _validate_model_admin_inputs(
-        capabilities_payload=_load_model_capabilities_payload(),
-        target_task=filters.target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
     )
+    filters = filters.model_copy(update={"target_task": resolved_target_task})
     with postgres_connection() as connection:
         history = get_model_training_history_postgres(
             connection,
-            target_task=filters.target_task,
+            target_task=resolved_target_task,
             team_code=filters.team_code,
             season_label=filters.season_label,
             recent_limit=filters.recent_limit,
@@ -345,15 +358,17 @@ def phase_three_model_history(
 def phase_three_model_evaluations(
     filters: Annotated[AdminModelEvaluationsFilters, Depends()],
 ) -> AdminModelEvaluationsResponse:
+    resolved_target_task, capabilities_payload = _resolve_target_task(filters.target_task)
     _validate_model_admin_inputs(
-        capabilities_payload=_load_model_capabilities_payload(),
-        target_task=filters.target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         model_family=filters.model_family,
     )
+    filters = filters.model_copy(update={"target_task": resolved_target_task})
     with postgres_connection() as connection:
         snapshots = list_model_evaluation_snapshots_postgres(
             connection,
-            target_task=filters.target_task,
+            target_task=resolved_target_task,
             model_family=filters.model_family,
         )
 
@@ -368,15 +383,17 @@ def phase_three_model_evaluations(
 def phase_three_model_evaluation_history(
     filters: Annotated[AdminEvaluationHistoryFilters, Depends()],
 ) -> AdminEvaluationHistoryResponse:
+    resolved_target_task, capabilities_payload = _resolve_target_task(filters.target_task)
     _validate_model_admin_inputs(
-        capabilities_payload=_load_model_capabilities_payload(),
-        target_task=filters.target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         model_family=filters.model_family,
     )
+    filters = filters.model_copy(update={"target_task": resolved_target_task})
     with postgres_connection() as connection:
         history = get_model_evaluation_history_postgres(
             connection,
-            target_task=filters.target_task,
+            target_task=resolved_target_task,
             model_family=filters.model_family,
             recent_limit=filters.recent_limit,
         )
@@ -407,29 +424,30 @@ def phase_three_model_evaluation_detail(
 @router.post("/models/select")
 def phase_three_model_select(
     feature_key: str = Query(default="baseline_team_features_v1"),
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     team_code: str | None = Query(default=None),
     season_label: str | None = Query(default=None),
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
     selection_policy_name: str = Query(default="validation_mae_candidate_v1"),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
     _validate_model_admin_inputs(
-        capabilities_payload=_load_model_capabilities_payload(),
-        target_task=target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         selection_policy_name=selection_policy_name,
     )
     with postgres_connection() as connection:
         selection_result = promote_best_model_postgres(
             connection,
-            target_task=target_task,
+            target_task=resolved_target_task,
             selection_policy_name=selection_policy_name,
         )
 
     return {
         "filters": {
             "feature_key": feature_key,
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "team_code": team_code,
             "season_label": season_label,
             "selection_policy_name": selection_policy_name,
@@ -442,14 +460,16 @@ def phase_three_model_select(
 def phase_three_model_selections(
     filters: Annotated[AdminModelSelectionsFilters, Depends()],
 ) -> AdminModelSelectionsResponse:
+    resolved_target_task, capabilities_payload = _resolve_target_task(filters.target_task)
     _validate_model_admin_inputs(
-        capabilities_payload=_load_model_capabilities_payload(),
-        target_task=filters.target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
     )
+    filters = filters.model_copy(update={"target_task": resolved_target_task})
     with postgres_connection() as connection:
         selections = list_model_selection_snapshots_postgres(
             connection,
-            target_task=filters.target_task,
+            target_task=resolved_target_task,
             active_only=filters.active_only,
         )
 
@@ -464,14 +484,16 @@ def phase_three_model_selections(
 def phase_three_model_selection_history(
     filters: Annotated[AdminSelectionHistoryFilters, Depends()],
 ) -> AdminSelectionHistoryResponse:
+    resolved_target_task, capabilities_payload = _resolve_target_task(filters.target_task)
     _validate_model_admin_inputs(
-        capabilities_payload=_load_model_capabilities_payload(),
-        target_task=filters.target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
     )
+    filters = filters.model_copy(update={"target_task": resolved_target_task})
     with postgres_connection() as connection:
         history = get_model_selection_history_postgres(
             connection,
-            target_task=filters.target_task,
+            target_task=resolved_target_task,
             recent_limit=filters.recent_limit,
         )
 

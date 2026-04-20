@@ -15,6 +15,7 @@ from bookmaker_detector_api.services.features import (
     get_feature_training_view_postgres,
     materialize_feature_analysis_artifacts_postgres,
 )
+from .admin_model_support import _resolve_target_task, _validate_model_admin_inputs
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -106,7 +107,7 @@ def feature_dataset_profile(
 @router.post("/features/analysis/materialize")
 def materialize_feature_analysis(
     feature_key: str = Query(default="baseline_team_features_v1"),
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     team_code: str | None = Query(default=None),
     season_label: str | None = Query(default=None),
     dimensions: str = Query(default="venue,days_rest_bucket"),
@@ -119,6 +120,11 @@ def materialize_feature_analysis(
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
     drop_null_targets: bool = Query(default=True),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
+    _validate_model_admin_inputs(
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
+    )
     parsed_dimensions = tuple(
         dimension.strip() for dimension in dimensions.split(",") if dimension.strip()
     )
@@ -131,7 +137,7 @@ def materialize_feature_analysis(
         materialize_result = materialize_feature_analysis_artifacts_postgres(
             connection,
             feature_key=feature_key,
-            target_task=target_task,
+            target_task=resolved_target_task,
             team_code=team_code,
             season_label=season_label,
             dimensions=parsed_dimensions,
@@ -148,7 +154,7 @@ def materialize_feature_analysis(
     return {
         "filters": {
             "feature_key": feature_key,
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "team_code": team_code,
             "season_label": season_label,
             "dimensions": list(parsed_dimensions),
@@ -171,7 +177,7 @@ def materialize_feature_analysis(
 def feature_analysis_artifacts(
     feature_key: str = Query(default="baseline_team_features_v1"),
     artifact_type: str | None = Query(default=None),
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     team_code: str | None = Query(default=None),
     season_label: str | None = Query(default=None),
     dimensions: str = Query(default="venue,days_rest_bucket"),
@@ -186,6 +192,11 @@ def feature_analysis_artifacts(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
+    _validate_model_admin_inputs(
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
+    )
     parsed_dimensions = tuple(
         dimension.strip() for dimension in dimensions.split(",") if dimension.strip()
     )
@@ -199,7 +210,7 @@ def feature_analysis_artifacts(
             connection,
             feature_key=feature_key,
             artifact_type=artifact_type,
-            target_task=target_task,
+            target_task=resolved_target_task,
             team_code=team_code,
             season_label=season_label,
             limit=limit,
@@ -210,7 +221,7 @@ def feature_analysis_artifacts(
         "filters": {
             "feature_key": feature_key,
             "artifact_type": artifact_type,
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "team_code": team_code,
             "season_label": season_label,
             "dimensions": list(parsed_dimensions),
@@ -235,7 +246,7 @@ def feature_analysis_artifacts(
 def feature_analysis_history(
     feature_key: str = Query(default="baseline_team_features_v1"),
     artifact_type: str | None = Query(default=None),
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     team_code: str | None = Query(default=None),
     season_label: str | None = Query(default=None),
     dimensions: str = Query(default="venue,days_rest_bucket"),
@@ -249,6 +260,11 @@ def feature_analysis_history(
     drop_null_targets: bool = Query(default=True),
     latest_limit: int = Query(default=20, ge=1, le=100),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
+    _validate_model_admin_inputs(
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
+    )
     parsed_dimensions = tuple(
         dimension.strip() for dimension in dimensions.split(",") if dimension.strip()
     )
@@ -262,7 +278,7 @@ def feature_analysis_history(
             connection,
             feature_key=feature_key,
             artifact_type=artifact_type,
-            target_task=target_task,
+            target_task=resolved_target_task,
             team_code=team_code,
             season_label=season_label,
             latest_limit=latest_limit,
@@ -272,7 +288,7 @@ def feature_analysis_history(
         "filters": {
             "feature_key": feature_key,
             "artifact_type": artifact_type,
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "team_code": team_code,
             "season_label": season_label,
             "dimensions": list(parsed_dimensions),
@@ -328,18 +344,23 @@ def feature_dataset_splits(
 @router.get("/features/dataset/training-view")
 def feature_dataset_training_view(
     feature_key: str = Query(default="baseline_team_features_v1"),
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     team_code: str | None = Query(default=None),
     season_label: str | None = Query(default=None),
     drop_null_targets: bool = Query(default=True),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
+    _validate_model_admin_inputs(
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
+    )
     with postgres_connection() as connection:
         training_view = get_feature_training_view_postgres(
             connection,
             feature_key=feature_key,
-            target_task=target_task,
+            target_task=resolved_target_task,
             team_code=team_code,
             season_label=season_label,
             drop_null_targets=drop_null_targets,
@@ -350,7 +371,7 @@ def feature_dataset_training_view(
     return {
         "filters": {
             "feature_key": feature_key,
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "team_code": team_code,
             "season_label": season_label,
             "drop_null_targets": drop_null_targets,
@@ -364,16 +385,21 @@ def feature_dataset_training_view(
 @router.get("/features/dataset/training-manifest")
 def feature_dataset_training_manifest(
     feature_key: str = Query(default="baseline_team_features_v1"),
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     team_code: str | None = Query(default=None),
     season_label: str | None = Query(default=None),
     drop_null_targets: bool = Query(default=True),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
+    _validate_model_admin_inputs(
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
+    )
     with postgres_connection() as connection:
         training_manifest = get_feature_training_manifest_postgres(
             connection,
             feature_key=feature_key,
-            target_task=target_task,
+            target_task=resolved_target_task,
             team_code=team_code,
             season_label=season_label,
             drop_null_targets=drop_null_targets,
@@ -382,7 +408,7 @@ def feature_dataset_training_manifest(
     return {
         "filters": {
             "feature_key": feature_key,
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "team_code": team_code,
             "season_label": season_label,
             "drop_null_targets": drop_null_targets,
@@ -394,7 +420,7 @@ def feature_dataset_training_manifest(
 @router.get("/features/dataset/training-bundle")
 def feature_dataset_training_bundle(
     feature_key: str = Query(default="baseline_team_features_v1"),
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     team_code: str | None = Query(default=None),
     season_label: str | None = Query(default=None),
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
@@ -402,11 +428,16 @@ def feature_dataset_training_bundle(
     drop_null_targets: bool = Query(default=True),
     preview_limit: int = Query(default=5, ge=1, le=20),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
+    _validate_model_admin_inputs(
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
+    )
     with postgres_connection() as connection:
         training_bundle = get_feature_training_bundle_postgres(
             connection,
             feature_key=feature_key,
-            target_task=target_task,
+            target_task=resolved_target_task,
             team_code=team_code,
             season_label=season_label,
             train_ratio=train_ratio,
@@ -418,7 +449,7 @@ def feature_dataset_training_bundle(
     return {
         "filters": {
             "feature_key": feature_key,
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "team_code": team_code,
             "season_label": season_label,
             "train_ratio": train_ratio,
@@ -433,18 +464,23 @@ def feature_dataset_training_bundle(
 @router.get("/features/dataset/training-benchmark")
 def feature_dataset_training_benchmark(
     feature_key: str = Query(default="baseline_team_features_v1"),
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     team_code: str | None = Query(default=None),
     season_label: str | None = Query(default=None),
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
     drop_null_targets: bool = Query(default=True),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
+    _validate_model_admin_inputs(
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
+    )
     with postgres_connection() as connection:
         training_benchmark = get_feature_training_benchmark_postgres(
             connection,
             feature_key=feature_key,
-            target_task=target_task,
+            target_task=resolved_target_task,
             team_code=team_code,
             season_label=season_label,
             train_ratio=train_ratio,
@@ -455,7 +491,7 @@ def feature_dataset_training_benchmark(
     return {
         "filters": {
             "feature_key": feature_key,
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "team_code": team_code,
             "season_label": season_label,
             "train_ratio": train_ratio,

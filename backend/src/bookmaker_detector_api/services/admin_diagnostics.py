@@ -16,7 +16,6 @@ def _utc_today() -> date:
 def _collect_admin_diagnostics(
     *,
     repository: IngestionRepository,
-    repository_mode: str,
     job_limit: int = 20,
     retrieval_limit: int = 20,
     job_offset: int = 0,
@@ -126,7 +125,6 @@ def _collect_admin_diagnostics(
     )
 
     return {
-        "repository_mode": repository_mode,
         "filters": {
             "provider_name": provider_name,
             "team_code": team_code,
@@ -202,7 +200,6 @@ def get_admin_diagnostics_postgres(
     try:
         return _collect_admin_diagnostics(
             repository=repository,
-            repository_mode="postgres",
             **kwargs,
         )
     finally:

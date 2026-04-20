@@ -26,6 +26,7 @@ from bookmaker_detector_api.services.models import (
 
 from .admin_model_support import (
     FutureSlateRequest,
+    _resolve_target_task,
     _validate_model_admin_inputs,
 )
 
@@ -39,7 +40,7 @@ def phase_three_model_market_board_sources() -> dict[str, object]:
 
 @router.post("/models/market-board/refresh")
 def phase_three_model_market_board_refresh(
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     source_name: str = Query(default="demo_daily_lines_v1"),
     season_label: str = Query(default="2025-2026"),
     game_date: date = Query(default=date(2026, 4, 20)),
@@ -47,14 +48,16 @@ def phase_three_model_market_board_refresh(
     game_count: int | None = Query(default=None, ge=1, le=20),
     source_path: str | None = Query(default=None),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
     _validate_model_admin_inputs(
-        target_task=target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         workflow_name="market_board",
     )
     with postgres_connection() as connection:
         result = refresh_model_market_board_postgres(
             connection,
-            target_task=target_task,
+            target_task=resolved_target_task,
             source_name=source_name,
             season_label=season_label,
             game_date=game_date,
@@ -65,7 +68,7 @@ def phase_three_model_market_board_refresh(
 
     return {
         "filters": {
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "source_name": source_name,
             "season_label": season_label,
             "game_date": game_date,
@@ -79,7 +82,7 @@ def phase_three_model_market_board_refresh(
 
 @router.get("/models/market-board/history")
 def phase_three_model_market_board_history(
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     source_name: str = Query(default="demo_daily_lines_v1"),
     season_label: str = Query(default="2025-2026"),
     game_date: date = Query(default=date(2026, 4, 20)),
@@ -88,21 +91,23 @@ def phase_three_model_market_board_history(
     source_path: str | None = Query(default=None),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
     _validate_model_admin_inputs(
-        target_task=target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         workflow_name="market_board",
     )
     with postgres_connection() as connection:
         history = get_model_market_board_refresh_history_postgres(
             connection,
-            target_task=target_task,
+            target_task=resolved_target_task,
             source_name=source_name,
             recent_limit=recent_limit,
         )
 
     return {
         "filters": {
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "source_name": source_name,
             "season_label": season_label,
             "game_date": game_date,
@@ -117,7 +122,7 @@ def phase_three_model_market_board_history(
 
 @router.get("/models/market-board/source-runs")
 def phase_three_model_market_board_source_runs(
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     source_name: str | None = Query(default="demo_daily_lines_v1"),
     season_label: str = Query(default="2025-2026"),
     game_date: date = Query(default=date(2026, 4, 20)),
@@ -126,14 +131,16 @@ def phase_three_model_market_board_source_runs(
     source_path: str | None = Query(default=None),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
     _validate_model_admin_inputs(
-        target_task=target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         workflow_name="market_board",
     )
     with postgres_connection() as connection:
         history = get_model_market_board_source_run_history_postgres(
             connection,
-            target_task=target_task,
+            target_task=resolved_target_task,
             source_name=source_name,
             season_label=season_label,
             recent_limit=recent_limit,
@@ -141,7 +148,7 @@ def phase_three_model_market_board_source_runs(
 
     return {
         "filters": {
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "source_name": source_name,
             "season_label": season_label,
             "game_date": game_date,
@@ -156,7 +163,7 @@ def phase_three_model_market_board_source_runs(
 
 @router.get("/models/market-board/refresh-queue")
 def phase_three_model_market_board_refresh_queue(
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     source_name: str | None = Query(default="demo_daily_lines_v1"),
     season_label: str = Query(default="2025-2026"),
     game_date: date = Query(default=date(2026, 4, 20)),
@@ -166,14 +173,16 @@ def phase_three_model_market_board_refresh_queue(
     pending_only: bool = Query(default=False),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
     _validate_model_admin_inputs(
-        target_task=target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         workflow_name="market_board",
     )
     with postgres_connection() as connection:
         queue = get_model_market_board_refresh_queue_postgres(
             connection,
-            target_task=target_task,
+            target_task=resolved_target_task,
             season_label=season_label,
             source_name=source_name,
             freshness_status=freshness_status,
@@ -183,7 +192,7 @@ def phase_three_model_market_board_refresh_queue(
 
     return {
         "filters": {
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "source_name": source_name,
             "season_label": season_label,
             "game_date": game_date,
@@ -199,7 +208,7 @@ def phase_three_model_market_board_refresh_queue(
 
 @router.get("/models/market-board/queue")
 def phase_three_model_market_board_queue(
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     source_name: str | None = Query(default="demo_daily_lines_v1"),
     season_label: str = Query(default="2025-2026"),
     game_date: date = Query(default=date(2026, 4, 20)),
@@ -209,14 +218,16 @@ def phase_three_model_market_board_queue(
     pending_only: bool = Query(default=False),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
     _validate_model_admin_inputs(
-        target_task=target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         workflow_name="market_board",
     )
     with postgres_connection() as connection:
         queue = get_model_market_board_scoring_queue_postgres(
             connection,
-            target_task=target_task,
+            target_task=resolved_target_task,
             season_label=season_label,
             source_name=source_name,
             freshness_status=freshness_status,
@@ -226,7 +237,7 @@ def phase_three_model_market_board_queue(
 
     return {
         "filters": {
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "source_name": source_name,
             "season_label": season_label,
             "game_date": game_date,
@@ -242,7 +253,7 @@ def phase_three_model_market_board_queue(
 
 @router.post("/models/market-board/orchestrate-refresh")
 def phase_three_model_market_board_orchestrate_refresh(
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     source_name: str | None = Query(default="demo_daily_lines_v1"),
     season_label: str = Query(default="2025-2026"),
     game_date: date = Query(default=date(2026, 4, 20)),
@@ -252,14 +263,16 @@ def phase_three_model_market_board_orchestrate_refresh(
     pending_only: bool = Query(default=True),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
     _validate_model_admin_inputs(
-        target_task=target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         workflow_name="market_board",
     )
     with postgres_connection() as connection:
         result = orchestrate_model_market_board_refresh_postgres(
             connection,
-            target_task=target_task,
+            target_task=resolved_target_task,
             season_label=season_label,
             source_name=source_name,
             freshness_status=freshness_status,
@@ -269,7 +282,7 @@ def phase_three_model_market_board_orchestrate_refresh(
 
     return {
         "filters": {
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "source_name": source_name,
             "season_label": season_label,
             "game_date": game_date,
@@ -285,7 +298,7 @@ def phase_three_model_market_board_orchestrate_refresh(
 
 @router.post("/models/market-board/orchestrate-score")
 def phase_three_model_market_board_orchestrate_score(
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     source_name: str | None = Query(default="demo_daily_lines_v1"),
     season_label: str = Query(default="2025-2026"),
     game_date: date = Query(default=date(2026, 4, 20)),
@@ -302,15 +315,17 @@ def phase_three_model_market_board_orchestrate_score(
     pending_only: bool = Query(default=True),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
     _validate_model_admin_inputs(
-        target_task=target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         workflow_name="market_board",
     )
     with postgres_connection() as connection:
         result = orchestrate_model_market_board_scoring_postgres(
             connection,
             feature_key=feature_key,
-            target_task=target_task,
+            target_task=resolved_target_task,
             season_label=season_label,
             source_name=source_name,
             freshness_status=freshness_status,
@@ -326,7 +341,7 @@ def phase_three_model_market_board_orchestrate_score(
 
     return {
         "filters": {
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "source_name": source_name,
             "season_label": season_label,
             "game_date": game_date,
@@ -349,7 +364,7 @@ def phase_three_model_market_board_orchestrate_score(
 
 @router.post("/models/market-board/orchestrate-cadence")
 def phase_three_model_market_board_orchestrate_cadence(
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     source_name: str | None = Query(default="demo_daily_lines_v1"),
     season_label: str = Query(default="2025-2026"),
     game_date: date = Query(default=date(2026, 4, 20)),
@@ -368,15 +383,17 @@ def phase_three_model_market_board_orchestrate_cadence(
     scoring_pending_only: bool = Query(default=True),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
     _validate_model_admin_inputs(
-        target_task=target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         workflow_name="market_board",
     )
     with postgres_connection() as connection:
         result = orchestrate_model_market_board_cadence_postgres(
             connection,
             feature_key=feature_key,
-            target_task=target_task,
+            target_task=resolved_target_task,
             season_label=season_label,
             source_name=source_name,
             refresh_freshness_status=refresh_freshness_status,
@@ -394,7 +411,7 @@ def phase_three_model_market_board_orchestrate_cadence(
 
     return {
         "filters": {
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "source_name": source_name,
             "season_label": season_label,
             "game_date": game_date,
@@ -419,7 +436,7 @@ def phase_three_model_market_board_orchestrate_cadence(
 
 @router.get("/models/market-board/refresh-orchestration-history")
 def phase_three_model_market_board_refresh_orchestration_history(
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     source_name: str | None = Query(default="demo_daily_lines_v1"),
     season_label: str = Query(default="2025-2026"),
     game_date: date = Query(default=date(2026, 4, 20)),
@@ -429,21 +446,23 @@ def phase_three_model_market_board_refresh_orchestration_history(
     pending_only: bool = Query(default=False),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
     _validate_model_admin_inputs(
-        target_task=target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         workflow_name="market_board",
     )
     with postgres_connection() as connection:
         history = get_model_market_board_refresh_batch_history_postgres(
             connection,
-            target_task=target_task,
+            target_task=resolved_target_task,
             source_name=source_name,
             recent_limit=recent_limit,
         )
 
     return {
         "filters": {
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "source_name": source_name,
             "season_label": season_label,
             "game_date": game_date,
@@ -459,7 +478,7 @@ def phase_three_model_market_board_refresh_orchestration_history(
 
 @router.get("/models/market-board/cadence-history")
 def phase_three_model_market_board_cadence_history(
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     source_name: str | None = Query(default="demo_daily_lines_v1"),
     season_label: str = Query(default="2025-2026"),
     game_date: date = Query(default=date(2026, 4, 20)),
@@ -474,21 +493,23 @@ def phase_three_model_market_board_cadence_history(
     scoring_pending_only: bool = Query(default=True),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
     _validate_model_admin_inputs(
-        target_task=target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         workflow_name="market_board",
     )
     with postgres_connection() as connection:
         history = get_model_market_board_cadence_batch_history_postgres(
             connection,
-            target_task=target_task,
+            target_task=resolved_target_task,
             source_name=source_name,
             recent_limit=recent_limit,
         )
 
     return {
         "filters": {
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "source_name": source_name,
             "season_label": season_label,
             "game_date": game_date,
@@ -509,7 +530,7 @@ def phase_three_model_market_board_cadence_history(
 
 @router.get("/models/market-board/orchestration-history")
 def phase_three_model_market_board_orchestration_history(
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     source_name: str | None = Query(default="demo_daily_lines_v1"),
     season_label: str = Query(default="2025-2026"),
     game_date: date = Query(default=date(2026, 4, 20)),
@@ -522,21 +543,23 @@ def phase_three_model_market_board_orchestration_history(
     pending_only: bool = Query(default=True),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
     _validate_model_admin_inputs(
-        target_task=target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         workflow_name="market_board",
     )
     with postgres_connection() as connection:
         history = get_model_market_board_scoring_batch_history_postgres(
             connection,
-            target_task=target_task,
+            target_task=resolved_target_task,
             source_name=source_name,
             recent_limit=recent_limit,
         )
 
     return {
         "filters": {
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "source_name": source_name,
             "season_label": season_label,
             "game_date": game_date,
@@ -555,7 +578,7 @@ def phase_three_model_market_board_orchestration_history(
 
 @router.get("/models/market-board/cadence")
 def phase_three_model_market_board_cadence(
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     source_name: str | None = Query(default="demo_daily_lines_v1"),
     season_label: str = Query(default="2025-2026"),
     game_date: date = Query(default=date(2026, 4, 20)),
@@ -568,14 +591,16 @@ def phase_three_model_market_board_cadence(
     pending_only: bool = Query(default=True),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
     _validate_model_admin_inputs(
-        target_task=target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         workflow_name="market_board",
     )
     with postgres_connection() as connection:
         dashboard = get_model_market_board_cadence_dashboard_postgres(
             connection,
-            target_task=target_task,
+            target_task=resolved_target_task,
             season_label=season_label,
             source_name=source_name,
             recent_limit=recent_limit,
@@ -583,7 +608,7 @@ def phase_three_model_market_board_cadence(
 
     return {
         "filters": {
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "source_name": source_name,
             "season_label": season_label,
             "game_date": game_date,
@@ -603,24 +628,26 @@ def phase_three_model_market_board_cadence(
 @router.post("/models/market-board/materialize")
 def phase_three_model_market_board_materialize(
     request: FutureSlateRequest = Body(...),
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
     _validate_model_admin_inputs(
-        target_task=target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         workflow_name="market_board",
     )
     games = [game.model_dump() for game in request.games]
     with postgres_connection() as connection:
         board_result = materialize_model_market_board_postgres(
             connection,
-            target_task=target_task,
+            target_task=resolved_target_task,
             games=games,
             slate_label=request.slate_label,
         )
 
     return {
         "filters": {
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "slate_label": request.slate_label,
         },
         **board_result,
@@ -662,7 +689,7 @@ def phase_three_model_market_boards(
 @router.get("/models/market-board/{board_id}")
 def phase_three_model_market_board_detail(
     board_id: int,
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     season_label: str = Query(default="2025-2026"),
     slate_label: str | None = Query(default="demo-market-board"),
     game_date: date = Query(default=date(2026, 4, 20)),
@@ -671,8 +698,10 @@ def phase_three_model_market_board_detail(
     home_spread_line: float | None = Query(default=None),
     total_line: float | None = Query(default=None),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
     _validate_model_admin_inputs(
-        target_task=target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         workflow_name="market_board",
     )
     with postgres_connection() as connection:
@@ -680,7 +709,7 @@ def phase_three_model_market_board_detail(
 
     return {
         "filters": {
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "season_label": season_label,
         },
         "board": board,
@@ -690,7 +719,7 @@ def phase_three_model_market_board_detail(
 @router.get("/models/market-board/{board_id}/operations")
 def phase_three_model_market_board_operations(
     board_id: int,
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     source_name: str | None = Query(default="demo_daily_lines_v1"),
     season_label: str = Query(default="2025-2026"),
     game_date: date = Query(default=date(2026, 4, 20)),
@@ -703,8 +732,10 @@ def phase_three_model_market_board_operations(
     pending_only: bool = Query(default=True),
     recent_limit: int = Query(default=5, ge=1, le=20),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
     _validate_model_admin_inputs(
-        target_task=target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         workflow_name="market_board",
     )
     with postgres_connection() as connection:
@@ -716,7 +747,7 @@ def phase_three_model_market_board_operations(
 
     return {
         "filters": {
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "source_name": source_name,
             "season_label": season_label,
             "game_date": game_date,
@@ -736,7 +767,7 @@ def phase_three_model_market_board_operations(
 @router.post("/models/market-board/{board_id}/score")
 def phase_three_model_market_board_score(
     board_id: int,
-    target_task: str = Query(default="spread_error_regression"),
+    target_task: str | None = Query(default=None),
     season_label: str = Query(default="2025-2026"),
     slate_label: str | None = Query(default="demo-market-board"),
     game_date: date = Query(default=date(2026, 4, 20)),
@@ -752,8 +783,10 @@ def phase_three_model_market_board_score(
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> dict[str, object]:
+    resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
     _validate_model_admin_inputs(
-        target_task=target_task,
+        capabilities_payload=capabilities_payload,
+        target_task=resolved_target_task,
         workflow_name="market_board",
     )
     with postgres_connection() as connection:
@@ -772,7 +805,7 @@ def phase_three_model_market_board_score(
     return {
         "filters": {
             "board_id": board_id,
-            "target_task": target_task,
+            "target_task": resolved_target_task,
             "season_label": season_label,
             "slate_label": slate_label,
             "feature_key": feature_key,

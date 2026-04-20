@@ -131,7 +131,7 @@ class AnalystPatternFilters(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
     feature_key: str = "baseline_team_features_v1"
-    target_task: str = "spread_error_regression"
+    target_task: str | None = None
     team_code: str | None = None
     season_label: str | None = None
     dimensions: list[str] | None = None
@@ -154,7 +154,7 @@ class AnalystComparableFilters(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
     feature_key: str = "baseline_team_features_v1"
-    target_task: str = "spread_error_regression"
+    target_task: str | None = None
     team_code: str | None = None
     season_label: str | None = None
     dimensions: list[str] | None = None
@@ -181,7 +181,7 @@ class AnalystEvidenceFilters(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
     feature_key: str = "baseline_team_features_v1"
-    target_task: str = "spread_error_regression"
+    target_task: str | None = None
     team_code: str | None = None
     season_label: str | None = None
     dimensions: list[str] | None = None

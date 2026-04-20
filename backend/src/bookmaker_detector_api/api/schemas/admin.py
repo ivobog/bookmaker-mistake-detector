@@ -26,7 +26,7 @@ class AdminModelRunsFilters(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
     feature_key: str = "baseline_team_features_v1"
-    target_task: str | None = "spread_error_regression"
+    target_task: str | None = None
     team_code: str | None = None
     season_label: str | None = None
 
@@ -45,7 +45,7 @@ class AdminModelSummaryFilters(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
     feature_key: str = "baseline_team_features_v1"
-    target_task: str | None = "spread_error_regression"
+    target_task: str | None = None
     team_code: str | None = None
     season_label: str | None = None
 
@@ -54,7 +54,7 @@ class AdminModelEvaluationsFilters(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
     feature_key: str = "baseline_team_features_v1"
-    target_task: str | None = "spread_error_regression"
+    target_task: str | None = None
     model_family: str | None = None
     team_code: str | None = None
     season_label: str | None = None
@@ -75,7 +75,7 @@ class AdminModelSelectionsFilters(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
     feature_key: str = "baseline_team_features_v1"
-    target_task: str | None = "spread_error_regression"
+    target_task: str | None = None
     team_code: str | None = None
     season_label: str | None = None
     active_only: bool = False
@@ -95,7 +95,7 @@ class AdminScoringPreviewFilters(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
     feature_key: str = "baseline_team_features_v1"
-    target_task: str = "spread_error_regression"
+    target_task: str | None = None
     team_code: str | None = None
     season_label: str | None = None
     canonical_game_id: int | None = None
@@ -110,7 +110,7 @@ class AdminFutureGamePreviewFilters(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
     feature_key: str = "baseline_team_features_v1"
-    target_task: str | None = "spread_error_regression"
+    target_task: str | None = None
     season_label: str = "2025-2026"
     game_date: str = "2026-04-20"
     team_code: str | None = None

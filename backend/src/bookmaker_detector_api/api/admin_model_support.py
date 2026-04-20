@@ -33,6 +33,23 @@ def _load_model_capabilities_payload() -> dict[str, object]:
         return get_model_capabilities_postgres(connection)
 
 
+def _resolve_target_task(
+    target_task: str | None = None,
+    *,
+    capabilities_payload: dict[str, object] | None = None,
+) -> tuple[str, dict[str, object]]:
+    resolved_payload = capabilities_payload or _load_model_capabilities_payload()
+    resolved_target_task = target_task or (
+        resolved_payload.get("ui_defaults", {}) or {}
+    ).get("default_target_task")
+    if not resolved_target_task:
+        raise HTTPException(
+            status_code=500,
+            detail="No default target_task is configured in model capabilities.",
+        )
+    return str(resolved_target_task), resolved_payload
+
+
 def _validate_model_admin_inputs(
     *,
     capabilities_payload: dict[str, object] | None = None,
