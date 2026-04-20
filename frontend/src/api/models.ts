@@ -69,10 +69,10 @@ export async function fetchScoringRunDetail(
   const scenarioDefaults = resolveScenarioDefaults();
   const query = await buildSharedTrainingQuery();
   const defaultTargetTask = await resolveDefaultTargetTask();
-  query.set(
-    "target_task",
-    String(readNested(scenario, "target_task") ?? defaultTargetTask)
-  );
+  const resolvedTargetTask = readNested(scenario, "target_task") ?? defaultTargetTask;
+  if (resolvedTargetTask !== undefined && resolvedTargetTask !== null && String(resolvedTargetTask).trim()) {
+    query.set("target_task", String(resolvedTargetTask));
+  }
   query.set(
     "season_label",
     requireScenarioValue(scenario, "season_label", scenarioDefaults.seasonLabel, "season label")

@@ -358,25 +358,27 @@ def build_prediction_context(
                 round(float(market_edge_points), 4) if market_edge_points is not None else None
             ),
         }
-    market_edge_points = _resolve_market_edge_points(
-        target_task=target_task,
-        prediction_value=prediction_value,
-        row=row,
-    )
-    if market_edge_points is None:
-        signal_direction = "higher_total" if prediction_value > 0 else "lower_total"
-    else:
-        signal_direction = "over_edge" if market_edge_points > 0 else "under_edge"
-    if (market_edge_points if market_edge_points is not None else prediction_value) == 0:
-        signal_direction = "neutral"
-    return {
-        "target_type": "total_points",
-        "signal_direction": signal_direction,
-        "predicted_total_points": round(float(prediction_value), 4),
-        "market_edge_points": (
-            round(float(market_edge_points), 4) if market_edge_points is not None else None
-        ),
-    }
+    if target_task == "total_points_regression":
+        market_edge_points = _resolve_market_edge_points(
+            target_task=target_task,
+            prediction_value=prediction_value,
+            row=row,
+        )
+        if market_edge_points is None:
+            signal_direction = "higher_total" if prediction_value > 0 else "lower_total"
+        else:
+            signal_direction = "over_edge" if market_edge_points > 0 else "under_edge"
+        if (market_edge_points if market_edge_points is not None else prediction_value) == 0:
+            signal_direction = "neutral"
+        return {
+            "target_type": "total_points",
+            "signal_direction": signal_direction,
+            "predicted_total_points": round(float(prediction_value), 4),
+            "market_edge_points": (
+                round(float(market_edge_points), 4) if market_edge_points is not None else None
+            ),
+        }
+    raise ValueError(f"Unsupported scoring prediction context target_task: {target_task}")
 
 
 def _resolve_market_edge_points(
@@ -385,6 +387,10 @@ def _resolve_market_edge_points(
     prediction_value: float,
     row: dict[str, Any],
 ) -> float | None:
+    if target_task == "spread_error_regression":
+        return float(prediction_value)
+    if target_task == "total_error_regression":
+        return float(prediction_value)
     if target_task == "point_margin_regression":
         team_spread_line = model_training_views._float_or_none(row.get("team_spread_line"))
         if team_spread_line is None:
@@ -395,7 +401,7 @@ def _resolve_market_edge_points(
         if total_line is None:
             return None
         return float(prediction_value) - float(total_line)
-    return float(prediction_value)
+    raise ValueError(f"Unsupported scoring market-edge target_task: {target_task}")
 
 
 def predict_row_from_snapshot(

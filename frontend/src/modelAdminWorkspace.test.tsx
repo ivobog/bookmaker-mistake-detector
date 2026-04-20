@@ -67,8 +67,11 @@ beforeEach(() => {
         primary_metric_name: "mae",
         metric_direction: "lower_is_better",
         supported_model_families: ["linear_feature", "tree_stump"],
-        default_selection_policy_name: "validation_mae_candidate_v1",
-        valid_selection_policy_names: ["validation_mae_candidate_v1"],
+        default_selection_policy_name: "validation_regression_candidate_v1",
+        valid_selection_policy_names: [
+          "validation_regression_candidate_v1",
+          "validation_mae_candidate_v1"
+        ],
         default_opportunity_policy_name: "spread_signal_v1",
         workflow_support: { training: true, selection: true, scoring: true },
         is_enabled: true,
@@ -83,8 +86,11 @@ beforeEach(() => {
         primary_metric_name: "mae",
         metric_direction: "lower_is_better",
         supported_model_families: ["linear_feature"],
-        default_selection_policy_name: "validation_mae_candidate_v1",
-        valid_selection_policy_names: ["validation_mae_candidate_v1"],
+        default_selection_policy_name: "validation_regression_candidate_v1",
+        valid_selection_policy_names: [
+          "validation_regression_candidate_v1",
+          "validation_mae_candidate_v1"
+        ],
         default_opportunity_policy_name: "totals_signal_v1",
         workflow_support: { training: true, selection: true, scoring: true },
         is_enabled: true,
@@ -210,7 +216,7 @@ beforeEach(() => {
     filters: {
       target_task: "spread_error_regression"
     },
-    selection_policy_name: "validation_mae_candidate_v1",
+    selection_policy_name: "validation_regression_candidate_v1",
     selected_snapshot: null,
     active_selection: null,
     selection_count: 0
@@ -460,7 +466,7 @@ describe("ModelAdminWorkspace", () => {
       filters: {
         target_task: "spread_error_regression"
       },
-      selection_policy_name: "validation_mae_candidate_v1",
+      selection_policy_name: "validation_regression_candidate_v1",
       selected_snapshot: null,
       active_selection: {
         id: 501,
@@ -470,7 +476,7 @@ describe("ModelAdminWorkspace", () => {
         feature_version_id: 21,
         target_task: "spread_error_regression",
         model_family: "linear_feature",
-        selection_policy_name: "validation_mae_candidate_v1",
+        selection_policy_name: "validation_regression_candidate_v1",
         rationale: {
           reason: "lowest_validation_mae"
         },
@@ -494,7 +500,7 @@ describe("ModelAdminWorkspace", () => {
           feature_version_id: 21,
           target_task: "spread_error_regression",
           model_family: "linear_feature",
-          selection_policy_name: "validation_mae_candidate_v1",
+          selection_policy_name: "validation_regression_candidate_v1",
           rationale: {
             reason: "lowest_validation_mae"
           },
@@ -512,7 +518,7 @@ describe("ModelAdminWorkspace", () => {
         feature_version_id: 21,
         target_task: "spread_error_regression",
         model_family: "linear_feature",
-        selection_policy_name: "validation_mae_candidate_v1",
+        selection_policy_name: "validation_regression_candidate_v1",
         rationale: {
           reason: "lowest_validation_mae"
         },
@@ -534,7 +540,7 @@ describe("ModelAdminWorkspace", () => {
     fireEvent.click(screen.getByRole("button", { name: "Promote best model" }));
 
     await screen.findByText(
-      "Promotion completed using validation_mae_candidate_v1. The active selection is now updated."
+      "Promotion completed using validation_regression_candidate_v1. The active selection is now updated."
     );
     expect(screen.getByRole("button", { name: "Open selection detail" })).not.toBeNull();
     await waitFor(() =>
@@ -614,7 +620,7 @@ describe("ModelAdminWorkspace", () => {
         feature_version_id: 21,
         target_task: "spread_error_regression",
         model_family: "linear_feature",
-        selection_policy_name: "validation_mae_candidate_v1",
+        selection_policy_name: "validation_regression_candidate_v1",
         rationale: {
           reason: "lowest_validation_mae"
         },
@@ -637,7 +643,7 @@ describe("ModelAdminWorkspace", () => {
           feature_version_id: 21,
           target_task: "spread_error_regression",
           model_family: "linear_feature",
-          selection_policy_name: "validation_mae_candidate_v1",
+          selection_policy_name: "validation_regression_candidate_v1",
           rationale: {
             reason: "lowest_validation_mae"
           },

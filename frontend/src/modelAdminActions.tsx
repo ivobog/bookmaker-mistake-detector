@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { resolveCanonicalSelectionPolicyName } from "./api/defaults";
 import {
   buildSelectionMutationInput,
   buildTrainingMutationInput
@@ -28,7 +29,7 @@ type ActionPanelProps = {
 export function ModelAdminActionsPanel({
   busyAction,
   defaultSeasonLabel,
-  defaultSelectionPolicyName = "validation_mae_candidate_v1",
+  defaultSelectionPolicyName = resolveCanonicalSelectionPolicyName(),
   defaultTargetTask,
   defaultTeamCode,
   enableSelect,

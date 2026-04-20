@@ -90,11 +90,11 @@ describe("buildSelectionMutationInput", () => {
   it("trims values before submit", () => {
     expect(
       buildSelectionMutationInput({
-        selectionPolicyName: " validation_mae_candidate_v1 ",
+        selectionPolicyName: " validation_regression_candidate_v1 ",
         targetTask: " spread_error_regression "
       })
     ).toEqual({
-      selectionPolicyName: "validation_mae_candidate_v1",
+      selectionPolicyName: "validation_regression_candidate_v1",
       targetTask: "spread_error_regression"
     });
   });
@@ -102,7 +102,7 @@ describe("buildSelectionMutationInput", () => {
   it("rejects missing target task or selection policy", () => {
     expect(() =>
       buildSelectionMutationInput({
-        selectionPolicyName: "validation_mae_candidate_v1",
+        selectionPolicyName: "validation_regression_candidate_v1",
         targetTask: " "
       })
     ).toThrow("Target task is required.");

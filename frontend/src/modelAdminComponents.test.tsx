@@ -260,7 +260,7 @@ describe("Model Admin detail cards", () => {
           feature_version_id: 21,
           target_task: "spread_error_regression",
           model_family: "linear_feature",
-          selection_policy_name: "validation_mae_candidate_v1",
+          selection_policy_name: "validation_regression_candidate_v1",
           rationale: {
             reason: "lowest_validation_mae",
             candidate_count: 2
@@ -273,7 +273,7 @@ describe("Model Admin detail cards", () => {
 
     expect(screen.getByRole("heading", { name: "Selection #501" })).not.toBeNull();
     expect(screen.getByText("Rationale payload")).not.toBeNull();
-    expect(screen.getByText("Policy: validation_mae_candidate_v1")).not.toBeNull();
+    expect(screen.getByText("Policy: validation_regression_candidate_v1")).not.toBeNull();
     expect(screen.getByText("Active: true")).not.toBeNull();
     expect(screen.getByText(/lowest_validation_mae/)).not.toBeNull();
     expect(screen.getByRole("link", { name: "Open related run" }).getAttribute("href")).toBe(

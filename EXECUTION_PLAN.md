@@ -22,13 +22,13 @@ Deliver an implementation branch that:
 
 ## 3. Current-State Findings
 Observed in the repository on April 20, 2026:
-- [config.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/config.py) still exposes `api_repository_mode` and `use_postgres_stable_read_mode`
-- [repository_factory.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/repository_factory.py) still builds both `PostgresIngestionRepository` and `InMemoryIngestionRepository`
-- [admin_demo_routes.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/api/admin_demo_routes.py) is still mounted in the runtime API package
-- [models.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/models.py), [model_training_lifecycle.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/model_training_lifecycle.py), [model_training_views.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/model_training_views.py), [model_opportunities.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/model_opportunities.py), and [features.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/features.py) still contain large in-memory workflow surfaces
-- [frontend/src/api/mode.ts](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend/src/api/mode.ts) still defines `FrontendAppMode`, `appendDemoScope(...)`, and a default target task of `spread_error_regression`
-- [frontend/src/modelAdminWorkspace.tsx](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend/src/modelAdminWorkspace.tsx) still hardcodes `spread_error_regression` across dashboard, evaluation, and selection defaults
-- backend and frontend tests still assert `repository_mode: "in_memory"` and spread-centric defaults, so the test suite will need coordinated contract updates
+- backend runtime is Postgres-only across the active admin and analyst route surfaces, and the demo router/mode flags are removed from runtime code
+- the capability registry is live through [task_registry.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/task_registry.py) and `GET /api/v1/admin/model-capabilities`
+- Phase A regression tasks now share task-aware training, selection, scoring, opportunity, and backtest semantics, including raw-value tasks that score against market edge rather than raw magnitude alone
+- selection-policy handling now defaults and normalizes to `validation_regression_candidate_v1` while still accepting `validation_mae_candidate_v1` as a temporary compatibility alias
+- [frontend/src/api/defaults.ts](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend/src/api/defaults.ts) has replaced the old mode-based client plumbing, and model-admin task/policy controls now resolve from backend capabilities
+- frontend model-admin forms and tests now use canonical capability-driven defaults instead of legacy spread-only or alias-only assumptions
+- the main remaining work is Phase 5 regression and release hardening rather than Phase 1 to Phase 4 cutover work
 
 ## 4. Delivery Strategy
 Execute the SDD in six controlled phases:
@@ -41,6 +41,14 @@ Execute the SDD in six controlled phases:
 
 Critical path:
 `task registry foundation -> persisted-only backend cutover -> task-aware selection/scoring normalization -> frontend capability adoption -> end-to-end regression`
+
+Current execution status:
+- `Phase 0`: complete
+- `Phase 1`: complete
+- `Phase 2`: complete
+- `Phase 3`: complete
+- `Phase 4`: complete
+- `Phase 5`: pending
 
 ## 5. Workstreams
 

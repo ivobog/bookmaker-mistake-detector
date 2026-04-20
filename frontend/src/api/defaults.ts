@@ -4,9 +4,10 @@ import { apiGet } from "./client";
 type NumericString = `${number}`;
 
 const configuredDefaultTargetTask = import.meta.env.VITE_DEFAULT_TARGET_TASK?.trim() || null;
-const lastResortTargetTask = "spread_error_regression";
-let cachedDefaultTargetTask: string | null = configuredDefaultTargetTask;
-let defaultTargetTaskPromise: Promise<string> | null = null;
+const canonicalSelectionPolicyName = "validation_regression_candidate_v1";
+let cachedDefaultTargetTask: string | null | undefined =
+  configuredDefaultTargetTask === null ? undefined : configuredDefaultTargetTask;
+let defaultTargetTaskPromise: Promise<string | null> | null = null;
 
 export const sharedTrainingDefaults = {
   trainRatio: (import.meta.env.VITE_DEFAULT_TRAIN_RATIO ?? "0.7") as NumericString,
@@ -25,8 +26,8 @@ const scenarioDefaults = {
   awayTeamCode: import.meta.env.VITE_DEFAULT_AWAY_TEAM_CODE ?? null
 };
 
-export async function resolveDefaultTargetTask(): Promise<string> {
-  if (cachedDefaultTargetTask) {
+export async function resolveDefaultTargetTask(): Promise<string | null> {
+  if (cachedDefaultTargetTask !== undefined) {
     return cachedDefaultTargetTask;
   }
   if (!defaultTargetTaskPromise) {
@@ -35,11 +36,14 @@ export async function resolveDefaultTargetTask(): Promise<string> {
     })
       .then((response) => {
         const resolvedTargetTask =
-          response.ui_defaults.default_target_task || response.target_tasks[0]?.task_key || lastResortTargetTask;
+          response.ui_defaults.default_target_task ?? response.target_tasks[0]?.task_key ?? null;
         cachedDefaultTargetTask = resolvedTargetTask;
         return resolvedTargetTask;
       })
-      .catch(() => lastResortTargetTask)
+      .catch(() => {
+        cachedDefaultTargetTask = null;
+        return null;
+      })
       .finally(() => {
         defaultTargetTaskPromise = null;
       });
@@ -49,11 +53,14 @@ export async function resolveDefaultTargetTask(): Promise<string> {
 
 export async function buildSharedTrainingQuery(): Promise<URLSearchParams> {
   const targetTask = await resolveDefaultTargetTask();
-  return new URLSearchParams({
-    target_task: targetTask,
+  const query = new URLSearchParams({
     train_ratio: sharedTrainingDefaults.trainRatio,
     validation_ratio: sharedTrainingDefaults.validationRatio
   });
+  if (targetTask) {
+    query.set("target_task", targetTask);
+  }
+  return query;
 }
 
 export async function buildBacktestQuery(): Promise<URLSearchParams> {
@@ -92,4 +99,8 @@ export function resolveScenarioDefaults(): {
   awayTeamCode: string | null;
 } {
   return scenarioDefaults;
+}
+
+export function resolveCanonicalSelectionPolicyName(): string {
+  return canonicalSelectionPolicyName;
 }

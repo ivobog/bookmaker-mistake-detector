@@ -16,6 +16,7 @@ import {
   selectBestModel,
   trainModels
 } from "./api";
+import { resolveCanonicalSelectionPolicyName } from "./api/defaults";
 import type { AppRoute } from "./appTypes";
 import { ModelAdminActionsPanel } from "./modelAdminActions";
 import {
@@ -134,12 +135,18 @@ export function ModelAdminWorkspace({
   }));
   const selectedSelectionTaskCapability =
     capabilities?.target_tasks.find((task) => task.task_key === selectionDraftFilters.targetTask) ?? null;
+  const defaultTaskCapability =
+    capabilities?.target_tasks.find((task) => task.task_key === resolvedDefaultTargetTask) ?? null;
   const selectionPolicyOptions =
     selectedSelectionTaskCapability?.valid_selection_policy_names?.length
       ? selectedSelectionTaskCapability.valid_selection_policy_names
-      : ["validation_mae_candidate_v1"];
+      : defaultTaskCapability?.valid_selection_policy_names?.length
+        ? defaultTaskCapability.valid_selection_policy_names
+        : [resolveCanonicalSelectionPolicyName()];
   const defaultSelectionPolicyName =
-    selectedSelectionTaskCapability?.default_selection_policy_name ?? selectionPolicyOptions[0];
+    selectedSelectionTaskCapability?.default_selection_policy_name ??
+    defaultTaskCapability?.default_selection_policy_name ??
+    selectionPolicyOptions[0];
 
   useEffect(() => {
     setDashboardHistory(modelHistory);
@@ -155,7 +162,8 @@ export function ModelAdminWorkspace({
           return;
         }
         setCapabilities(response);
-        const nextTargetTask = response.ui_defaults.default_target_task ?? defaultTrainingFilters.targetTask;
+        const nextTargetTask =
+          response.ui_defaults.default_target_task ?? response.target_tasks[0]?.task_key ?? defaultTrainingFilters.targetTask;
         const nextTrainingFilters = {
           seasonLabel: "",
           targetTask: nextTargetTask,

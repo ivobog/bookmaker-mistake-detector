@@ -159,3 +159,12 @@ def test_run_walk_forward_backtest_accepts_all_phase_a_regression_targets() -> N
 
     assert result["record"].target_task == "point_margin_regression"
     assert result["summary"]["strategy_name"] == "point_margin_regression_walk_forward_v1"
+
+
+def test_build_prediction_context_rejects_unsupported_target_task() -> None:
+    with pytest.raises(ValueError, match="Unsupported scoring prediction context target_task"):
+        model_scoring_previews.build_prediction_context(
+            target_task="cover_classification",
+            prediction_value=0.42,
+            row={},
+        )
