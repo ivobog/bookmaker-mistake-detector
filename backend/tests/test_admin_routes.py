@@ -59,8 +59,11 @@ def test_model_capabilities_endpoint_returns_task_registry_payload_without_repos
                     "primary_metric_name": "mae",
                     "metric_direction": "lower_is_better",
                     "supported_model_families": ["linear_feature", "tree_stump"],
-                    "default_selection_policy_name": "validation_mae_candidate_v1",
-                    "valid_selection_policy_names": ["validation_mae_candidate_v1"],
+                    "default_selection_policy_name": "validation_regression_candidate_v1",
+                    "valid_selection_policy_names": [
+                        "validation_regression_candidate_v1",
+                        "validation_mae_candidate_v1",
+                    ],
                     "default_opportunity_policy_name": "spread_signal_v1",
                     "workflow_support": {
                         "training": True,
@@ -81,14 +84,17 @@ def test_model_capabilities_endpoint_returns_task_registry_payload_without_repos
                     "primary_metric_name": "mae",
                     "metric_direction": "lower_is_better",
                     "supported_model_families": ["linear_feature"],
-                    "default_selection_policy_name": "validation_mae_candidate_v1",
-                    "valid_selection_policy_names": ["validation_mae_candidate_v1"],
+                    "default_selection_policy_name": "validation_regression_candidate_v1",
+                    "valid_selection_policy_names": [
+                        "validation_regression_candidate_v1",
+                        "validation_mae_candidate_v1",
+                    ],
                     "default_opportunity_policy_name": "totals_signal_v1",
                     "workflow_support": {
                         "training": True,
                         "selection": True,
                         "scoring": True,
-                        "backtesting": False,
+                        "backtesting": True,
                         "opportunity_materialization": True,
                     },
                     "is_enabled": True,
@@ -259,3 +265,45 @@ def test_analyst_trend_summary_endpoint_omits_repository_mode_from_wire_payload(
     assert payload["feature_version"]["feature_key"] == "baseline_team_features_v1"
     assert payload["snapshot_count"] == 12
     assert payload["latest_perspective"]["team_code"] == "LAL"
+
+
+def test_model_backtest_route_defaults_to_canonical_selection_policy_name(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        admin_model_api,
+        "_resolve_target_task",
+        lambda target_task, capabilities_payload=None: (
+            target_task or "point_margin_regression",
+            {"target_tasks": []},
+        ),
+    )
+    monkeypatch.setattr(admin_model_api, "_validate_model_admin_inputs", lambda **_: None)
+    captured: dict[str, object] = {}
+
+    def _run_model_backtest_postgres(connection, **kwargs):
+        captured.update(kwargs)
+        return {
+            "feature_version": {"feature_key": kwargs["feature_key"]},
+            "backtest_run": {"id": 1},
+            "summary": {
+                "target_task": kwargs["target_task"],
+                "selection_policy_name": kwargs["selection_policy_name"],
+                "fold_count": 0,
+                "strategy_results": {
+                    "candidate_threshold": {"bet_count": 0},
+                    "review_threshold": {"bet_count": 0},
+                },
+            },
+        }
+
+    monkeypatch.setattr(admin_model_api, "run_model_backtest_postgres", _run_model_backtest_postgres)
+
+    response = client.post("/api/v1/admin/models/backtests/run?target_task=point_margin_regression")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert captured["selection_policy_name"] == "validation_regression_candidate_v1"
+    assert payload["filters"]["selection_policy_name"] == "validation_regression_candidate_v1"
+    assert payload["summary"]["selection_policy_name"] == "validation_regression_candidate_v1"

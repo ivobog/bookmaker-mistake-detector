@@ -13,6 +13,13 @@ from bookmaker_detector_api.services.model_records import (
 from bookmaker_detector_api.services.task_registry import normalize_selection_policy_name
 
 
+def _canonicalize_selection_policy_name(selection_policy_name: str) -> str:
+    try:
+        return normalize_selection_policy_name(selection_policy_name)
+    except ValueError:
+        return selection_policy_name
+
+
 def list_model_registry_in_memory(
     repository: ModelTrainingArtifactStore,
     *,
@@ -398,7 +405,14 @@ def list_model_selection_snapshots_in_memory(
     active_only: bool = False,
 ) -> list[ModelSelectionSnapshotRecord]:
     selected = [
-        ModelSelectionSnapshotRecord(**entry)
+        ModelSelectionSnapshotRecord(
+            **{
+                **entry,
+                "selection_policy_name": _canonicalize_selection_policy_name(
+                    entry["selection_policy_name"]
+                ),
+            }
+        )
         for entry in repository.model_selection_snapshots
         if (target_task is None or entry["target_task"] == target_task)
         and (not active_only or bool(entry["is_active"]))
@@ -469,7 +483,7 @@ def list_model_selection_snapshots_postgres(
             feature_version_id=int(row[4]),
             target_task=row[5],
             model_family=row[6],
-            selection_policy_name=row[7],
+            selection_policy_name=_canonicalize_selection_policy_name(row[7]),
             rationale=row[8],
             is_active=bool(row[9]),
             created_at=row[10],
@@ -775,7 +789,9 @@ def _serialize_model_selection_snapshot(
         "feature_version_id": selection.feature_version_id,
         "target_task": selection.target_task,
         "model_family": selection.model_family,
-        "selection_policy_name": selection.selection_policy_name,
+        "selection_policy_name": _canonicalize_selection_policy_name(
+            selection.selection_policy_name
+        ),
         "rationale": selection.rationale,
         "is_active": selection.is_active,
         "created_at": selection.created_at.isoformat() if selection.created_at else None,

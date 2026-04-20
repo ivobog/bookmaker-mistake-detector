@@ -247,6 +247,14 @@ def serialize_scored_prediction(
     selected_feature_value = (
         get_row_feature_value(row, selected_feature) if selected_feature is not None else None
     )
+    prediction_context = build_prediction_context(
+        target_task=target_task,
+        prediction_value=prediction_value,
+        row=row,
+    )
+    market_edge_points = model_training_views._float_or_none(
+        prediction_context.get("market_edge_points")
+    )
     return {
         "canonical_game_id": int(row["canonical_game_id"]),
         "season_label": row["season_label"],
@@ -255,11 +263,11 @@ def serialize_scored_prediction(
         "opponent_code": row["opponent_code"],
         "venue": row["venue"],
         "prediction_value": round(float(prediction_value), 4),
-        "signal_strength": round(abs(float(prediction_value)), 4),
-        "prediction_context": build_prediction_context(
-            target_task=target_task,
-            prediction_value=prediction_value,
+        "signal_strength": round(
+            abs(market_edge_points if market_edge_points is not None else float(prediction_value)),
+            4,
         ),
+        "prediction_context": prediction_context,
         "actual_target_value": actual_target_value,
         "realized_residual": realized_residual,
         "selected_feature_value": model_training_views._float_or_none(selected_feature_value),
@@ -306,6 +314,7 @@ def build_prediction_context(
     *,
     target_task: str,
     prediction_value: float,
+    row: dict[str, Any],
 ) -> dict[str, Any]:
     if target_task == "spread_error_regression":
         signal_direction = "team_cover_edge" if prediction_value > 0 else "opponent_cover_edge"
@@ -326,24 +335,67 @@ def build_prediction_context(
             "market_edge_points": round(float(prediction_value), 4),
         }
     if target_task == "point_margin_regression":
-        signal_direction = (
-            "team_margin_advantage" if prediction_value > 0 else "opponent_margin_advantage"
+        market_edge_points = _resolve_market_edge_points(
+            target_task=target_task,
+            prediction_value=prediction_value,
+            row=row,
         )
-        if prediction_value == 0:
+        if market_edge_points is None:
+            signal_direction = (
+                "team_margin_advantage" if prediction_value > 0 else "opponent_margin_advantage"
+            )
+        else:
+            signal_direction = (
+                "team_cover_edge" if market_edge_points > 0 else "opponent_cover_edge"
+            )
+        if (market_edge_points if market_edge_points is not None else prediction_value) == 0:
             signal_direction = "neutral"
         return {
             "target_type": "point_margin",
             "signal_direction": signal_direction,
             "predicted_margin": round(float(prediction_value), 4),
+            "market_edge_points": (
+                round(float(market_edge_points), 4) if market_edge_points is not None else None
+            ),
         }
-    signal_direction = "higher_total" if prediction_value > 0 else "lower_total"
-    if prediction_value == 0:
+    market_edge_points = _resolve_market_edge_points(
+        target_task=target_task,
+        prediction_value=prediction_value,
+        row=row,
+    )
+    if market_edge_points is None:
+        signal_direction = "higher_total" if prediction_value > 0 else "lower_total"
+    else:
+        signal_direction = "over_edge" if market_edge_points > 0 else "under_edge"
+    if (market_edge_points if market_edge_points is not None else prediction_value) == 0:
         signal_direction = "neutral"
     return {
         "target_type": "total_points",
         "signal_direction": signal_direction,
         "predicted_total_points": round(float(prediction_value), 4),
+        "market_edge_points": (
+            round(float(market_edge_points), 4) if market_edge_points is not None else None
+        ),
     }
+
+
+def _resolve_market_edge_points(
+    *,
+    target_task: str,
+    prediction_value: float,
+    row: dict[str, Any],
+) -> float | None:
+    if target_task == "point_margin_regression":
+        team_spread_line = model_training_views._float_or_none(row.get("team_spread_line"))
+        if team_spread_line is None:
+            return None
+        return float(prediction_value) + float(team_spread_line)
+    if target_task == "total_points_regression":
+        total_line = model_training_views._float_or_none(row.get("total_line"))
+        if total_line is None:
+            return None
+        return float(prediction_value) - float(total_line)
+    return float(prediction_value)
 
 
 def predict_row_from_snapshot(

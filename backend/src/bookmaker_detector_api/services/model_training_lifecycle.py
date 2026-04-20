@@ -15,6 +15,7 @@ from bookmaker_detector_api.services.model_records import (
 )
 from bookmaker_detector_api.services.task_registry import (
     DEFAULT_REGRESSION_SELECTION_POLICY_NAME,
+    normalize_selection_policy_name,
 )
 
 MODEL_FAMILY_CONFIGS = {
@@ -200,19 +201,20 @@ def promote_best_model_in_memory(
     repository: ModelTrainingArtifactStore,
     *,
     target_task: str,
-    selection_policy_name: str = "validation_mae_candidate_v1",
+    selection_policy_name: str = DEFAULT_REGRESSION_SELECTION_POLICY_NAME,
 ) -> dict[str, Any]:
+    normalized_selection_policy_name = normalize_selection_policy_name(selection_policy_name)
     snapshots = model_training_views.list_model_evaluation_snapshots_in_memory(
         repository,
         target_task=target_task,
     )
     selected_snapshot = model_training_views._select_best_evaluation_snapshot(
         snapshots,
-        selection_policy_name=selection_policy_name,
+        selection_policy_name=normalized_selection_policy_name,
     )
     if selected_snapshot is None:
         return {
-            "selection_policy_name": selection_policy_name,
+            "selection_policy_name": normalized_selection_policy_name,
             "selected_snapshot": None,
             "active_selection": None,
             "selection_count": 0,
@@ -220,7 +222,7 @@ def promote_best_model_in_memory(
     selection = save_model_selection_snapshot_in_memory(
         repository,
         selected_snapshot,
-        selection_policy_name=selection_policy_name,
+        selection_policy_name=normalized_selection_policy_name,
     )
     selections = model_training_views.list_model_selection_snapshots_in_memory(
         repository,
@@ -228,7 +230,7 @@ def promote_best_model_in_memory(
         active_only=True,
     )
     return {
-        "selection_policy_name": selection_policy_name,
+        "selection_policy_name": normalized_selection_policy_name,
         "selected_snapshot": model_training_views._serialize_model_evaluation_snapshot(
             selected_snapshot
         ),
@@ -241,19 +243,20 @@ def promote_best_model_postgres(
     connection: Any,
     *,
     target_task: str,
-    selection_policy_name: str = "validation_mae_candidate_v1",
+    selection_policy_name: str = DEFAULT_REGRESSION_SELECTION_POLICY_NAME,
 ) -> dict[str, Any]:
+    normalized_selection_policy_name = normalize_selection_policy_name(selection_policy_name)
     snapshots = model_training_views.list_model_evaluation_snapshots_postgres(
         connection,
         target_task=target_task,
     )
     selected_snapshot = model_training_views._select_best_evaluation_snapshot(
         snapshots,
-        selection_policy_name=selection_policy_name,
+        selection_policy_name=normalized_selection_policy_name,
     )
     if selected_snapshot is None:
         return {
-            "selection_policy_name": selection_policy_name,
+            "selection_policy_name": normalized_selection_policy_name,
             "selected_snapshot": None,
             "active_selection": None,
             "selection_count": 0,
@@ -261,7 +264,7 @@ def promote_best_model_postgres(
     selection = save_model_selection_snapshot_postgres(
         connection,
         selected_snapshot,
-        selection_policy_name=selection_policy_name,
+        selection_policy_name=normalized_selection_policy_name,
     )
     selections = model_training_views.list_model_selection_snapshots_postgres(
         connection,
@@ -269,7 +272,7 @@ def promote_best_model_postgres(
         active_only=True,
     )
     return {
-        "selection_policy_name": selection_policy_name,
+        "selection_policy_name": normalized_selection_policy_name,
         "selected_snapshot": model_training_views._serialize_model_evaluation_snapshot(
             selected_snapshot
         ),
@@ -369,6 +372,7 @@ def save_model_selection_snapshot_in_memory(
     *,
     selection_policy_name: str,
 ) -> ModelSelectionSnapshotRecord:
+    normalized_selection_policy_name = normalize_selection_policy_name(selection_policy_name)
     for entry in repository.model_selection_snapshots:
         if entry["target_task"] == snapshot.target_task:
             entry["is_active"] = False
@@ -380,7 +384,7 @@ def save_model_selection_snapshot_in_memory(
         "feature_version_id": snapshot.feature_version_id,
         "target_task": snapshot.target_task,
         "model_family": snapshot.model_family,
-        "selection_policy_name": selection_policy_name,
+        "selection_policy_name": normalized_selection_policy_name,
         "rationale": {
             "primary_metric_name": snapshot.primary_metric_name,
             "primary_metric_direction": snapshot.primary_metric_direction,
@@ -402,6 +406,7 @@ def save_model_selection_snapshot_postgres(
     *,
     selection_policy_name: str,
 ) -> ModelSelectionSnapshotRecord:
+    normalized_selection_policy_name = normalize_selection_policy_name(selection_policy_name)
     rationale = {
         "primary_metric_name": snapshot.primary_metric_name,
         "primary_metric_direction": snapshot.primary_metric_direction,
@@ -438,7 +443,7 @@ def save_model_selection_snapshot_postgres(
                 snapshot.feature_version_id,
                 snapshot.target_task,
                 snapshot.model_family,
-                selection_policy_name,
+                normalized_selection_policy_name,
                 _json_dumps(rationale),
             ),
         )
@@ -452,7 +457,7 @@ def save_model_selection_snapshot_postgres(
         feature_version_id=snapshot.feature_version_id,
         target_task=snapshot.target_task,
         model_family=snapshot.model_family,
-        selection_policy_name=selection_policy_name,
+        selection_policy_name=normalized_selection_policy_name,
         rationale=rationale,
         is_active=True,
         created_at=row[1],

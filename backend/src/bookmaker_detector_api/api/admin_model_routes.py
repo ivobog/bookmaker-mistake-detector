@@ -48,6 +48,7 @@ from bookmaker_detector_api.services.models import (
     run_model_backtest_postgres,
     train_phase_three_models_postgres,
 )
+from bookmaker_detector_api.services.task_registry import DEFAULT_REGRESSION_SELECTION_POLICY_NAME
 from .admin_model_support import (
     _load_model_capabilities_payload,
     _resolve_target_task,
@@ -177,7 +178,7 @@ def phase_four_model_backtest_run(
     target_task: str | None = Query(default=None),
     team_code: str | None = Query(default=None),
     season_label: str | None = Query(default=None),
-    selection_policy_name: str = Query(default="validation_mae_candidate_v1"),
+    selection_policy_name: str = Query(default=DEFAULT_REGRESSION_SELECTION_POLICY_NAME),
     minimum_train_games: int = Query(default=1, ge=1),
     test_window_games: int = Query(default=1, ge=1),
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
@@ -429,7 +430,7 @@ def phase_three_model_select(
     season_label: str | None = Query(default=None),
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
-    selection_policy_name: str = Query(default="validation_mae_candidate_v1"),
+    selection_policy_name: str = Query(default=DEFAULT_REGRESSION_SELECTION_POLICY_NAME),
 ) -> dict[str, object]:
     resolved_target_task, capabilities_payload = _resolve_target_task(target_task)
     _validate_model_admin_inputs(

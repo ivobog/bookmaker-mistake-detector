@@ -98,6 +98,7 @@ from bookmaker_detector_api.services.model_records import (
     ModelSelectionSnapshotRecord,
     ModelTrainingRunRecord,
 )
+from bookmaker_detector_api.services.task_registry import DEFAULT_REGRESSION_SELECTION_POLICY_NAME
 from bookmaker_detector_api.services.workflow_logging import start_workflow_span
 
 list_model_market_board_sources = _list_model_market_board_sources
@@ -392,7 +393,7 @@ def promote_best_model_postgres(
     connection: Any,
     *,
     target_task: str,
-    selection_policy_name: str = "validation_mae_candidate_v1",
+    selection_policy_name: str = DEFAULT_REGRESSION_SELECTION_POLICY_NAME,
 ) -> dict[str, Any]:
     span = start_workflow_span(
         workflow_name="model_training.promote",
@@ -1655,7 +1656,7 @@ def run_model_backtest_postgres(
     target_task: str,
     team_code: str | None = None,
     season_label: str | None = None,
-    selection_policy_name: str = "validation_mae_candidate_v1",
+    selection_policy_name: str = DEFAULT_REGRESSION_SELECTION_POLICY_NAME,
     minimum_train_games: int = 1,
     test_window_games: int = 1,
     train_ratio: float = 0.7,

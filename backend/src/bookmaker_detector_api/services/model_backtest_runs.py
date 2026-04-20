@@ -7,6 +7,14 @@ from typing import Any
 from bookmaker_detector_api.repositories import ModelBacktestArtifactStore
 from bookmaker_detector_api.repositories.ingestion_json import _json_dumps
 from bookmaker_detector_api.services.model_records import ModelBacktestRunRecord
+from bookmaker_detector_api.services.task_registry import normalize_selection_policy_name
+
+
+def _canonicalize_selection_policy_name(selection_policy_name: str) -> str:
+    try:
+        return normalize_selection_policy_name(selection_policy_name)
+    except ValueError:
+        return selection_policy_name
 
 
 def save_model_backtest_run_in_memory(
@@ -14,6 +22,9 @@ def save_model_backtest_run_in_memory(
     backtest_run: ModelBacktestRunRecord,
 ) -> ModelBacktestRunRecord:
     payload = asdict(backtest_run)
+    payload["selection_policy_name"] = _canonicalize_selection_policy_name(
+        payload["selection_policy_name"]
+    )
     payload["id"] = len(repository.model_backtest_runs) + 1
     payload["created_at"] = datetime.now(timezone.utc)
     payload["completed_at"] = payload["created_at"]
@@ -25,6 +36,9 @@ def save_model_backtest_run_postgres(
     connection: Any,
     backtest_run: ModelBacktestRunRecord,
 ) -> ModelBacktestRunRecord:
+    canonical_selection_policy_name = _canonicalize_selection_policy_name(
+        backtest_run.selection_policy_name
+    )
     with connection.cursor() as cursor:
         cursor.execute(
             """
@@ -55,7 +69,7 @@ def save_model_backtest_run_postgres(
                 backtest_run.team_code or "",
                 backtest_run.season_label or "",
                 backtest_run.status,
-                backtest_run.selection_policy_name,
+                canonical_selection_policy_name,
                 backtest_run.strategy_name,
                 backtest_run.minimum_train_games,
                 backtest_run.test_window_games,
@@ -74,7 +88,7 @@ def save_model_backtest_run_postgres(
         team_code=backtest_run.team_code,
         season_label=backtest_run.season_label,
         status=backtest_run.status,
-        selection_policy_name=backtest_run.selection_policy_name,
+        selection_policy_name=canonical_selection_policy_name,
         strategy_name=backtest_run.strategy_name,
         minimum_train_games=backtest_run.minimum_train_games,
         test_window_games=backtest_run.test_window_games,
@@ -95,7 +109,14 @@ def list_model_backtest_runs_in_memory(
     season_label: str | None = None,
 ) -> list[ModelBacktestRunRecord]:
     selected = [
-        ModelBacktestRunRecord(**entry)
+        ModelBacktestRunRecord(
+            **{
+                **entry,
+                "selection_policy_name": _canonicalize_selection_policy_name(
+                    entry["selection_policy_name"]
+                ),
+            }
+        )
         for entry in repository.model_backtest_runs
         if (target_task is None or entry["target_task"] == target_task)
         and (team_code is None or entry.get("team_code") == team_code)
@@ -161,7 +182,7 @@ def list_model_backtest_runs_postgres(
             team_code=row[3] or None,
             season_label=row[4] or None,
             status=row[5],
-            selection_policy_name=row[6],
+            selection_policy_name=_canonicalize_selection_policy_name(row[6]),
             strategy_name=row[7],
             minimum_train_games=int(row[8]),
             test_window_games=int(row[9]),
@@ -256,7 +277,9 @@ def serialize_model_backtest_run(
         "team_code": backtest_run.team_code,
         "season_label": backtest_run.season_label,
         "status": backtest_run.status,
-        "selection_policy_name": backtest_run.selection_policy_name,
+        "selection_policy_name": _canonicalize_selection_policy_name(
+            backtest_run.selection_policy_name
+        ),
         "strategy_name": backtest_run.strategy_name,
         "minimum_train_games": backtest_run.minimum_train_games,
         "test_window_games": backtest_run.test_window_games,

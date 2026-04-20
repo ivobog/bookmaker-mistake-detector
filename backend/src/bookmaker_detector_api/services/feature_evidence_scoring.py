@@ -58,10 +58,9 @@ def build_evidence_recommendation(
     benchmark_rankings: list[dict[str, Any]],
     evidence_recommendation_policies: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
-    policy = evidence_recommendation_policies.get(
-        target_task,
-        evidence_recommendation_policies["spread_error_regression"],
-    )
+    policy = evidence_recommendation_policies.get(target_task)
+    if policy is None:
+        raise ValueError(f"Unsupported evidence recommendation target_task: {target_task}")
     overall_score = float(evidence_strength["overall_score"])
     warnings = list(evidence_strength["warnings"])
     pattern_sample_size = int(selected_pattern.get("sample_size", 0)) if selected_pattern else 0

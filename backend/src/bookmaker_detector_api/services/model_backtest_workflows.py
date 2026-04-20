@@ -8,6 +8,7 @@ from bookmaker_detector_api.services.model_records import (
     ModelBacktestRunRecord,
     ModelEvaluationSnapshotRecord,
 )
+from bookmaker_detector_api.services.task_registry import normalize_selection_policy_name
 
 
 def run_walk_forward_backtest(
@@ -30,16 +31,22 @@ def run_walk_forward_backtest(
     select_best_evaluation_snapshot: Callable[..., ModelEvaluationSnapshotRecord | None],
     score_dataset_rows_with_active_selection: Callable[..., list[dict[str, Any]]],
 ) -> dict[str, Any]:
-    if target_task not in {"spread_error_regression", "total_error_regression"}:
+    normalized_selection_policy_name = normalize_selection_policy_name(selection_policy_name)
+    if target_task not in {
+        "spread_error_regression",
+        "total_error_regression",
+        "point_margin_regression",
+        "total_points_regression",
+    }:
         raise ValueError(
-            "Phase 4 walk-forward backtesting currently supports spread and total regression "
-            f"targets only: {target_task}"
+            "Walk-forward backtesting currently supports the Phase A regression targets only: "
+            f"{target_task}"
         )
     ordered_game_ids = ordered_dataset_game_ids(dataset_rows)
     if len(ordered_game_ids) <= minimum_train_games:
         summary = empty_backtest_summary(
             target_task=target_task,
-            selection_policy_name=selection_policy_name,
+            selection_policy_name=normalized_selection_policy_name,
             strategy_name=backtest_strategy_name(target_task),
             minimum_train_games=minimum_train_games,
             test_window_games=test_window_games,
@@ -54,7 +61,7 @@ def run_walk_forward_backtest(
                 team_code=team_code,
                 season_label=season_label,
                 status="COMPLETED",
-                selection_policy_name=selection_policy_name,
+                selection_policy_name=normalized_selection_policy_name,
                 strategy_name=backtest_strategy_name(target_task),
                 minimum_train_games=minimum_train_games,
                 test_window_games=test_window_games,
@@ -90,7 +97,7 @@ def run_walk_forward_backtest(
             dataset_rows=train_dataset_rows,
             feature_version=feature_version,
             target_task=target_task,
-            selection_policy_name=selection_policy_name,
+            selection_policy_name=normalized_selection_policy_name,
             train_ratio=train_ratio,
             validation_ratio=validation_ratio,
             partition_feature_dataset_rows=partition_feature_dataset_rows,
@@ -128,7 +135,7 @@ def run_walk_forward_backtest(
 
     summary = summarize_walk_forward_backtest(
         target_task=target_task,
-        selection_policy_name=selection_policy_name,
+        selection_policy_name=normalized_selection_policy_name,
         minimum_train_games=minimum_train_games,
         test_window_games=test_window_games,
         dataset_row_count=len(dataset_rows),
@@ -143,7 +150,7 @@ def run_walk_forward_backtest(
         team_code=team_code,
         season_label=season_label,
         status="COMPLETED",
-        selection_policy_name=selection_policy_name,
+        selection_policy_name=normalized_selection_policy_name,
         strategy_name=summary["strategy_name"],
         minimum_train_games=minimum_train_games,
         test_window_games=test_window_games,
@@ -454,6 +461,14 @@ def build_backtest_bet(
     actual_target_value = float_or_none(prediction.get("actual_target_value"))
     if actual_target_value is None:
         return None
+    market_context = prediction.get("market_context")
+    team_spread_line = None
+    total_line = None
+    if isinstance(market_context, dict):
+        team_spread_line = float_or_none(market_context.get("team_spread_line"))
+        total_line = float_or_none(market_context.get("total_line"))
+    predicted_edge = prediction_value
+    actual_edge = actual_target_value
     if target_task == "spread_error_regression":
         edge_direction = "team_cover_edge" if prediction_value > 0 else "opponent_cover_edge"
         if actual_target_value == 0:
@@ -475,6 +490,36 @@ def build_backtest_bet(
             result = "win" if actual_target_value < 0 else "loss"
         else:
             return None
+    elif target_task == "point_margin_regression":
+        if team_spread_line is None:
+            return None
+        predicted_edge = prediction_value + float(team_spread_line)
+        actual_edge = actual_target_value + float(team_spread_line)
+        if actual_edge == 0:
+            result = "push"
+        elif predicted_edge > 0:
+            edge_direction = "team_cover_edge"
+            result = "win" if actual_edge > 0 else "loss"
+        elif predicted_edge < 0:
+            edge_direction = "opponent_cover_edge"
+            result = "win" if actual_edge < 0 else "loss"
+        else:
+            return None
+    elif target_task == "total_points_regression":
+        if total_line is None:
+            return None
+        predicted_edge = prediction_value - float(total_line)
+        actual_edge = actual_target_value - float(total_line)
+        if actual_edge == 0:
+            result = "push"
+        elif predicted_edge > 0:
+            edge_direction = "over_edge"
+            result = "win" if actual_edge > 0 else "loss"
+        elif predicted_edge < 0:
+            edge_direction = "under_edge"
+            result = "win" if actual_edge < 0 else "loss"
+        else:
+            return None
     else:
         return None
     profit_units = 0.0
@@ -491,11 +536,12 @@ def build_backtest_bet(
         "strategy_name": strategy_name,
         "threshold": threshold,
         "edge_direction": edge_direction,
-        "signal_strength": round(abs(prediction_value), 4),
+        "signal_strength": round(abs(predicted_edge), 4),
         "prediction_value": round(prediction_value, 4),
+        "market_edge_points": round(predicted_edge, 4),
         "result": result,
         "profit_units": round(profit_units, 4),
-        "edge_bucket": edge_bucket,
+        "edge_bucket": backtest_edge_bucket(abs(predicted_edge)),
     }
 
 

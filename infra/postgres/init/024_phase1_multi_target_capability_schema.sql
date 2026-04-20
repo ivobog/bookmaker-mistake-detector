@@ -121,7 +121,7 @@ VALUES
                 "scoring": true,
                 "opportunity_materialization": true,
                 "market_board": true,
-                "backtesting": false
+                "backtesting": true
             }
         }'::jsonb
     ),
@@ -147,7 +147,7 @@ VALUES
                 "scoring": true,
                 "opportunity_materialization": true,
                 "market_board": true,
-                "backtesting": false
+                "backtesting": true
             }
         }'::jsonb
     )
