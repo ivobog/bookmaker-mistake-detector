@@ -16,9 +16,8 @@ from bookmaker_detector_api.services.workflow_logging import (
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    if settings.use_postgres_stable_read_mode:
-        with postgres_connection():
-            pass
+    with postgres_connection():
+        pass
     yield
 
 

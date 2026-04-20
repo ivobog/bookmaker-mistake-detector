@@ -12,23 +12,14 @@ from bookmaker_detector_api.api.schemas import (
     AnalystPatternFilters,
     AnalystPatternResponse,
 )
-from bookmaker_detector_api.config import settings
 from bookmaker_detector_api.db.postgres import postgres_connection
 from bookmaker_detector_api.services.features import (
-    get_feature_comparable_cases_in_memory,
     get_feature_comparable_cases_postgres,
-    get_feature_evidence_bundle_in_memory,
     get_feature_evidence_bundle_postgres,
-    get_feature_pattern_catalog_in_memory,
     get_feature_pattern_catalog_postgres,
 )
-from bookmaker_detector_api.services.repository_factory import build_in_memory_feature_dataset_store
 
 router = APIRouter(prefix="/analyst", tags=["analyst"])
-
-
-def _use_postgres_analyst_mode() -> bool:
-    return settings.use_postgres_stable_read_mode
 
 
 def _parse_csv_values(value: str | None) -> list[str] | None:
@@ -44,23 +35,9 @@ def feature_patterns(
     dimensions: str = Query(default="venue,days_rest_bucket"),
 ) -> AnalystPatternResponse:
     parsed_dimensions = _parse_csv_values(dimensions) or []
-    if _use_postgres_analyst_mode():
-        with postgres_connection() as connection:
-            pattern_result = get_feature_pattern_catalog_postgres(
-                connection,
-                feature_key=filters.feature_key,
-                target_task=filters.target_task,
-                team_code=filters.team_code,
-                season_label=filters.season_label,
-                dimensions=tuple(parsed_dimensions),
-                min_sample_size=filters.min_sample_size,
-                limit=filters.limit,
-            )
-        repository_mode = "postgres"
-    else:
-        repository = build_in_memory_feature_dataset_store()
-        pattern_result = get_feature_pattern_catalog_in_memory(
-            repository,
+    with postgres_connection() as connection:
+        pattern_result = get_feature_pattern_catalog_postgres(
+            connection,
             feature_key=filters.feature_key,
             target_task=filters.target_task,
             team_code=filters.team_code,
@@ -69,11 +46,10 @@ def feature_patterns(
             min_sample_size=filters.min_sample_size,
             limit=filters.limit,
         )
-        repository_mode = "in_memory"
 
     response_filters = filters.model_copy(update={"dimensions": parsed_dimensions})
     return AnalystPatternResponse(
-        repository_mode=repository_mode,
+        repository_mode="postgres",
         filters=response_filters,
         feature_version=pattern_result.get("feature_version"),
         row_count=int(pattern_result.get("row_count", 0)),
@@ -91,27 +67,9 @@ def feature_comparables(
 ) -> AnalystComparableResponse:
     parsed_dimensions = _parse_csv_values(dimensions) or []
     parsed_condition_values = _parse_csv_values(condition_values)
-    if _use_postgres_analyst_mode():
-        with postgres_connection() as connection:
-            comparable_result = get_feature_comparable_cases_postgres(
-                connection,
-                feature_key=filters.feature_key,
-                target_task=filters.target_task,
-                team_code=filters.team_code,
-                season_label=filters.season_label,
-                dimensions=tuple(parsed_dimensions),
-                canonical_game_id=filters.canonical_game_id,
-                condition_values=tuple(parsed_condition_values)
-                if parsed_condition_values
-                else None,
-                pattern_key=filters.pattern_key,
-                limit=filters.limit,
-            )
-        repository_mode = "postgres"
-    else:
-        repository = build_in_memory_feature_dataset_store()
-        comparable_result = get_feature_comparable_cases_in_memory(
-            repository,
+    with postgres_connection() as connection:
+        comparable_result = get_feature_comparable_cases_postgres(
+            connection,
             feature_key=filters.feature_key,
             target_task=filters.target_task,
             team_code=filters.team_code,
@@ -122,7 +80,6 @@ def feature_comparables(
             pattern_key=filters.pattern_key,
             limit=filters.limit,
         )
-        repository_mode = "in_memory"
 
     response_filters = filters.model_copy(
         update={
@@ -131,7 +88,7 @@ def feature_comparables(
         }
     )
     return AnalystComparableResponse(
-        repository_mode=repository_mode,
+        repository_mode="postgres",
         filters=response_filters,
         feature_version=comparable_result.get("feature_version"),
         row_count=int(comparable_result.get("row_count", 0)),
@@ -151,31 +108,9 @@ def feature_evidence(
 ) -> AnalystEvidenceResponse:
     parsed_dimensions = _parse_csv_values(dimensions) or []
     parsed_condition_values = _parse_csv_values(condition_values)
-    if _use_postgres_analyst_mode():
-        with postgres_connection() as connection:
-            evidence_result = get_feature_evidence_bundle_postgres(
-                connection,
-                feature_key=filters.feature_key,
-                target_task=filters.target_task,
-                team_code=filters.team_code,
-                season_label=filters.season_label,
-                dimensions=tuple(parsed_dimensions),
-                canonical_game_id=filters.canonical_game_id,
-                condition_values=tuple(parsed_condition_values)
-                if parsed_condition_values
-                else None,
-                pattern_key=filters.pattern_key,
-                comparable_limit=filters.comparable_limit,
-                min_pattern_sample_size=filters.min_pattern_sample_size,
-                train_ratio=filters.train_ratio,
-                validation_ratio=filters.validation_ratio,
-                drop_null_targets=filters.drop_null_targets,
-            )
-        repository_mode = "postgres"
-    else:
-        repository = build_in_memory_feature_dataset_store()
-        evidence_result = get_feature_evidence_bundle_in_memory(
-            repository,
+    with postgres_connection() as connection:
+        evidence_result = get_feature_evidence_bundle_postgres(
+            connection,
             feature_key=filters.feature_key,
             target_task=filters.target_task,
             team_code=filters.team_code,
@@ -190,7 +125,6 @@ def feature_evidence(
             validation_ratio=filters.validation_ratio,
             drop_null_targets=filters.drop_null_targets,
         )
-        repository_mode = "in_memory"
 
     response_filters = filters.model_copy(
         update={
@@ -199,7 +133,7 @@ def feature_evidence(
         }
     )
     return AnalystEvidenceResponse(
-        repository_mode=repository_mode,
+        repository_mode="postgres",
         filters=response_filters,
         feature_version=evidence_result.get("feature_version"),
         row_count=int(evidence_result.get("row_count", 0)),

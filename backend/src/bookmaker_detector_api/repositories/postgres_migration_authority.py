@@ -103,6 +103,11 @@ BOOTSTRAP_SQL_CHAIN: tuple[BootstrapSqlFile, ...] = (
         "infra/postgres/init/023_phase3_opportunity_materialization_batch_schema.sql",
         "opportunity materialization provenance",
     ),
+    BootstrapSqlFile(
+        24,
+        "infra/postgres/init/024_phase1_multi_target_capability_schema.sql",
+        "task capability and evaluation ranking foundation",
+    ),
 )
 
 

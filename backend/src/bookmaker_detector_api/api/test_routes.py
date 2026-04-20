@@ -6,7 +6,6 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from bookmaker_detector_api.config import settings
 from bookmaker_detector_api.db.postgres import postgres_connection
-from bookmaker_detector_api.demo import seed_phase_two_feature_postgres
 from bookmaker_detector_api.ingestion.providers import CoversHistoricalTeamPageProvider
 from bookmaker_detector_api.services.features import (
     materialize_baseline_feature_snapshots_for_postgres,
@@ -18,6 +17,9 @@ from bookmaker_detector_api.services.ingestion_pipeline import (
 from bookmaker_detector_api.services.models import (
     list_model_evaluation_snapshots_postgres,
     save_model_selection_snapshot_postgres,
+)
+from bookmaker_detector_api.services.test_data_seed import (
+    seed_phase_two_feature_postgres,
 )
 from bookmaker_detector_api.services.repository_factory import (
     build_bootstrap_postgres_ingestion_repository,

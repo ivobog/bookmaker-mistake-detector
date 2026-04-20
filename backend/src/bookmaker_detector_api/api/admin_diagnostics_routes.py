@@ -2,9 +2,8 @@ from datetime import date
 
 from fastapi import APIRouter, Query
 
-from bookmaker_detector_api.config import settings
 from bookmaker_detector_api.services.admin_diagnostics import (
-    get_admin_diagnostics,
+    get_admin_diagnostics_postgres,
     resolve_started_window,
 )
 from bookmaker_detector_api.services.data_quality_maintenance import (
@@ -14,14 +13,8 @@ from bookmaker_detector_api.services.data_quality_maintenance import (
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
-def _use_postgres_stable_read_mode() -> bool:
-    return settings.use_postgres_stable_read_mode
-
-
-def _run_admin_diagnostics_stable_read(**kwargs) -> dict[str, object]:
-    if _use_postgres_stable_read_mode():
-        return get_admin_diagnostics(repository_mode="postgres", seed_demo=False, **kwargs)
-    return get_admin_diagnostics(repository_mode="in_memory", seed_demo=True, **kwargs)
+def _run_admin_diagnostics(**kwargs) -> dict[str, object]:
+    return get_admin_diagnostics_postgres(**kwargs)
 
 
 @router.get("/jobs/recent")
@@ -40,7 +33,7 @@ def recent_job_runs(
         started_from=started_from,
         started_to=started_to,
     )
-    diagnostics = _run_admin_diagnostics_stable_read(
+    diagnostics = _run_admin_diagnostics(
         job_limit=limit,
         job_offset=offset,
         retrieval_limit=20,
@@ -69,7 +62,7 @@ def recent_ingestion_issues(
     season_label: str | None = Query(default=None),
     run_label: str | None = Query(default=None),
 ) -> dict[str, object]:
-    diagnostics = _run_admin_diagnostics_stable_read(
+    diagnostics = _run_admin_diagnostics(
         job_limit=20,
         retrieval_limit=limit,
         retrieval_offset=offset,
@@ -97,7 +90,7 @@ def recent_data_quality_issues(
     season_label: str | None = Query(default=None),
     run_label: str | None = Query(default=None),
 ) -> dict[str, object]:
-    diagnostics = _run_admin_diagnostics_stable_read(
+    diagnostics = _run_admin_diagnostics(
         quality_issue_limit=limit,
         quality_issue_offset=offset,
         quality_issue_severity=severity,
@@ -121,7 +114,7 @@ def ingestion_stats(
     season_label: str | None = Query(default=None),
     run_label: str | None = Query(default=None),
 ) -> dict[str, object]:
-    diagnostics = _run_admin_diagnostics_stable_read(
+    diagnostics = _run_admin_diagnostics(
         provider_name=provider_name,
         team_code=team_code,
         season_label=season_label,
@@ -149,7 +142,7 @@ def compare_validation_runs(
         started_from=started_from,
         started_to=started_to,
     )
-    diagnostics = _run_admin_diagnostics_stable_read(
+    diagnostics = _run_admin_diagnostics(
         provider_name=provider_name,
         team_code=team_code,
         season_label=season_label,
@@ -183,7 +176,7 @@ def ingestion_trends(
         started_to=started_to,
         days=days,
     )
-    diagnostics = _run_admin_diagnostics_stable_read(
+    diagnostics = _run_admin_diagnostics(
         provider_name=provider_name,
         team_code=team_code,
         season_label=season_label,
@@ -216,7 +209,7 @@ def retrieval_trends(
         started_to=started_to,
         days=days,
     )
-    diagnostics = _run_admin_diagnostics_stable_read(
+    diagnostics = _run_admin_diagnostics(
         provider_name=provider_name,
         team_code=team_code,
         season_label=season_label,
@@ -247,7 +240,7 @@ def ingestion_quality_trends(
         started_to=started_to,
         days=days,
     )
-    diagnostics = _run_admin_diagnostics_stable_read(
+    diagnostics = _run_admin_diagnostics(
         provider_name=provider_name,
         team_code=team_code,
         season_label=season_label,
@@ -269,9 +262,7 @@ def normalize_data_quality_issue_taxonomy_endpoint(
     season_label: str | None = Query(default=None),
     dry_run: bool = Query(default=True),
 ) -> dict[str, object]:
-    repository_mode = "postgres" if _use_postgres_stable_read_mode() else "in_memory"
     return normalize_data_quality_taxonomy(
-        repository_mode=repository_mode,
         provider_name=provider_name,
         team_code=team_code,
         season_label=season_label,

@@ -26,6 +26,8 @@ REQUIRED_POSTGRES_TABLES = (
     "model_training_run",
     "model_evaluation_snapshot",
     "model_selection_snapshot",
+    "target_task_definition",
+    "model_family_capability",
     "model_opportunity",
     "model_scoring_run",
     "model_market_board",

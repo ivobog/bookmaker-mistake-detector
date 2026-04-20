@@ -2,7 +2,6 @@ from fastapi import APIRouter
 
 from bookmaker_detector_api.config import settings
 
-from .admin_demo_routes import router as admin_demo_router
 from .admin_diagnostics_routes import router as admin_diagnostics_router
 from .admin_feature_routes import router as admin_feature_router
 from .admin_market_board_routes import router as admin_market_board_router
@@ -22,7 +21,6 @@ api_router.include_router(analyst_backtests_router)
 api_router.include_router(analyst_opportunities_router)
 api_router.include_router(analyst_patterns_router)
 api_router.include_router(analyst_trends_router)
-api_router.include_router(admin_demo_router)
 api_router.include_router(admin_diagnostics_router)
 api_router.include_router(admin_feature_router)
 api_router.include_router(admin_market_board_router)

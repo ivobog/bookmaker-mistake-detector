@@ -2,29 +2,21 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from datetime import date, datetime, timedelta, timezone
-from pathlib import Path
-from tempfile import mkdtemp
 
-from bookmaker_detector_api.config import settings
-from bookmaker_detector_api.ingestion.models import ParseStatus, RawGameRow
-from bookmaker_detector_api.repositories import IngestionRepository, InMemoryIngestionRepository
-from bookmaker_detector_api.services.fetch_ingestion_runner import run_fetch_and_ingest
-from bookmaker_detector_api.services.ingestion_pipeline import (
-    HistoricalIngestionRequest,
-    ingest_historical_team_page,
+from bookmaker_detector_api.repositories import IngestionRepository
+from bookmaker_detector_api.services.repository_factory import (
+    build_postgres_ingestion_repository,
 )
-from bookmaker_detector_api.services.repository_factory import build_ingestion_repository
 
 
 def _utc_today() -> date:
     return datetime.now(timezone.utc).date()
 
 
-def get_admin_diagnostics(
+def _collect_admin_diagnostics(
     *,
+    repository: IngestionRepository,
     repository_mode: str,
-    seed_demo: bool,
-    repository_override: IngestionRepository | None = None,
     job_limit: int = 20,
     retrieval_limit: int = 20,
     job_offset: int = 0,
@@ -44,331 +36,177 @@ def get_admin_diagnostics(
     started_from: datetime | None = None,
     started_to: datetime | None = None,
 ) -> dict[str, object]:
-    if repository_override is not None:
-        repository = repository_override
-        repository_context = None
-    else:
-        repository, repository_context = build_ingestion_repository(repository_mode)
-    try:
-        if seed_demo:
-            _seed_in_memory_demo_data(repository)
+    matching_job_runs = _list_all_matching_job_runs(
+        repository=repository,
+        job_status=job_status,
+        provider_name=provider_name,
+        team_code=team_code,
+        season_label=season_label,
+        run_label=run_label,
+        started_from=started_from,
+        started_to=started_to,
+    )
+    job_runs = repository.list_job_runs(
+        limit=job_limit,
+        offset=job_offset,
+        status=job_status,
+        provider_name=provider_name,
+        team_code=team_code,
+        season_label=season_label,
+        run_label=run_label,
+        started_from=started_from,
+        started_to=started_to,
+    )
+    retrievals = repository.list_page_retrievals(
+        limit=retrieval_limit,
+        offset=retrieval_offset,
+        status=retrieval_status,
+        provider_name=provider_name,
+        team_code=team_code,
+        season_label=season_label,
+        run_label=run_label,
+    )
+    quality_issues = repository.list_data_quality_issues(
+        limit=quality_issue_limit,
+        offset=quality_issue_offset,
+        severity=quality_issue_severity,
+        issue_type=quality_issue_type,
+        provider_name=provider_name,
+        team_code=team_code,
+        season_label=season_label,
+        run_label=run_label,
+    )
+    trend_job_runs = repository.list_job_runs(
+        limit=trend_limit,
+        offset=0,
+        status=job_status,
+        provider_name=provider_name,
+        team_code=team_code,
+        season_label=season_label,
+        run_label=run_label,
+        started_from=started_from,
+        started_to=started_to,
+    )
+    validation_compare_runs = repository.list_job_runs(
+        limit=validation_compare_limit,
+        offset=0,
+        status=job_status,
+        provider_name=provider_name,
+        team_code=team_code,
+        season_label=season_label,
+        run_label=run_label,
+        started_from=started_from,
+        started_to=started_to,
+    )
+    trend_daily_summaries = repository.list_job_run_daily_summaries(
+        status=job_status,
+        provider_name=provider_name,
+        team_code=team_code,
+        season_label=season_label,
+        run_label=run_label,
+        started_from=started_from,
+        started_to=started_to,
+    )
+    retrieval_trend_daily_summaries = repository.list_page_retrieval_daily_summaries(
+        status=retrieval_status,
+        provider_name=provider_name,
+        team_code=team_code,
+        season_label=season_label,
+        run_label=run_label,
+        retrieved_from=started_from,
+        retrieved_to=started_to,
+    )
+    quality_trend_daily_summaries = repository.list_job_run_quality_daily_summaries(
+        provider_name=provider_name,
+        team_code=team_code,
+        season_label=season_label,
+        run_label=run_label,
+        started_from=started_from,
+        started_to=started_to,
+    )
 
-        matching_job_runs = _list_all_matching_job_runs(
-            repository=repository,
-            job_status=job_status,
-            provider_name=provider_name,
-            team_code=team_code,
-            season_label=season_label,
-            run_label=run_label,
-            started_from=started_from,
-            started_to=started_to,
-        )
-        job_runs = repository.list_job_runs(
-            limit=job_limit,
-            offset=job_offset,
-            status=job_status,
-            provider_name=provider_name,
-            team_code=team_code,
-            season_label=season_label,
-            run_label=run_label,
-            started_from=started_from,
-            started_to=started_to,
-        )
-        retrievals = repository.list_page_retrievals(
-            limit=retrieval_limit,
-            offset=retrieval_offset,
-            status=retrieval_status,
-            provider_name=provider_name,
-            team_code=team_code,
-            season_label=season_label,
-            run_label=run_label,
-        )
-        quality_issues = repository.list_data_quality_issues(
-            limit=quality_issue_limit,
-            offset=quality_issue_offset,
-            severity=quality_issue_severity,
-            issue_type=quality_issue_type,
-            provider_name=provider_name,
-            team_code=team_code,
-            season_label=season_label,
-            run_label=run_label,
-        )
-        trend_job_runs = repository.list_job_runs(
-            limit=trend_limit,
-            offset=0,
-            status=job_status,
-            provider_name=provider_name,
-            team_code=team_code,
-            season_label=season_label,
-            run_label=run_label,
-            started_from=started_from,
-            started_to=started_to,
-        )
-        validation_compare_runs = repository.list_job_runs(
-            limit=validation_compare_limit,
-            offset=0,
-            status=job_status,
-            provider_name=provider_name,
-            team_code=team_code,
-            season_label=season_label,
-            run_label=run_label,
-            started_from=started_from,
-            started_to=started_to,
-        )
-        trend_daily_summaries = repository.list_job_run_daily_summaries(
-            status=job_status,
-            provider_name=provider_name,
-            team_code=team_code,
-            season_label=season_label,
-            run_label=run_label,
-            started_from=started_from,
-            started_to=started_to,
-        )
-        retrieval_trend_daily_summaries = repository.list_page_retrieval_daily_summaries(
-            status=retrieval_status,
-            provider_name=provider_name,
-            team_code=team_code,
-            season_label=season_label,
-            run_label=run_label,
-            retrieved_from=started_from,
-            retrieved_to=started_to,
-        )
-        quality_trend_daily_summaries = repository.list_job_run_quality_daily_summaries(
-            provider_name=provider_name,
-            team_code=team_code,
-            season_label=season_label,
-            run_label=run_label,
-            started_from=started_from,
-            started_to=started_to,
-        )
-
-        return {
-            "repository_mode": repository_mode,
-            "filters": {
-                "provider_name": provider_name,
-                "team_code": team_code,
-                "season_label": season_label,
-                "run_label": run_label,
-                "job_status": job_status,
-                "started_from": started_from,
-                "started_to": started_to,
-                "retrieval_status": retrieval_status,
-                "quality_issue_severity": quality_issue_severity,
-                "quality_issue_type": quality_issue_type,
-            },
-            "job_runs": [asdict(job_run) for job_run in job_runs],
-            "page_retrievals": [asdict(retrieval) for retrieval in retrievals],
-            "data_quality_issues": [asdict(issue) for issue in quality_issues],
-            "stats": {
-                "parse_status_counts": repository.get_parse_status_counts(
-                    provider_name=provider_name,
-                    team_code=team_code,
-                    season_label=season_label,
-                    run_label=run_label,
-                ),
-                "reconciliation_status_counts": repository.get_reconciliation_status_counts(
-                    provider_name=provider_name,
-                    team_code=team_code,
-                    season_label=season_label,
-                    run_label=run_label,
-                ),
-                "data_quality_issue_type_counts": repository.get_data_quality_issue_type_counts(
-                    provider_name=provider_name,
-                    team_code=team_code,
-                    season_label=season_label,
-                    run_label=run_label,
-                ),
-                "data_quality_issue_severity_counts": (
-                    repository.get_data_quality_issue_severity_counts(
-                        provider_name=provider_name,
-                        team_code=team_code,
-                        season_label=season_label,
-                        run_label=run_label,
-                    )
-                ),
-                "parser_provenance_counts": _aggregate_parser_provenance_counts(
-                    [_build_recent_run_summary(job_run) for job_run in matching_job_runs]
-                ),
-                "diagnostic_counts": _aggregate_diagnostic_counts(
-                    [_build_recent_run_summary(job_run) for job_run in matching_job_runs]
-                ),
-            },
-            "trends": _build_run_trends(
-                trend_job_runs=trend_job_runs,
-                trend_daily_summaries=trend_daily_summaries,
-                all_matching_runs=[
-                    _build_recent_run_summary(job_run) for job_run in matching_job_runs
-                ],
-            ),
-            "validation_run_comparison": _build_validation_run_comparison(
-                validation_compare_runs,
+    return {
+        "repository_mode": repository_mode,
+        "filters": {
+            "provider_name": provider_name,
+            "team_code": team_code,
+            "season_label": season_label,
+            "run_label": run_label,
+            "job_status": job_status,
+            "started_from": started_from,
+            "started_to": started_to,
+            "retrieval_status": retrieval_status,
+            "quality_issue_severity": quality_issue_severity,
+            "quality_issue_type": quality_issue_type,
+        },
+        "job_runs": [asdict(job_run) for job_run in job_runs],
+        "page_retrievals": [asdict(retrieval) for retrieval in retrievals],
+        "data_quality_issues": [asdict(issue) for issue in quality_issues],
+        "stats": {
+            "parse_status_counts": repository.get_parse_status_counts(
+                provider_name=provider_name,
+                team_code=team_code,
+                season_label=season_label,
                 run_label=run_label,
             ),
-            "retrieval_trends": _build_retrieval_trends(retrieval_trend_daily_summaries),
-            "quality_trends": _build_quality_trends(
-                quality_trend_daily_summaries,
-                recent_runs=[_build_recent_run_summary(job_run) for job_run in matching_job_runs],
+            "reconciliation_status_counts": repository.get_reconciliation_status_counts(
+                provider_name=provider_name,
+                team_code=team_code,
+                season_label=season_label,
+                run_label=run_label,
             ),
-        }
-    finally:
-        if repository_context is not None:
-            repository_context.__exit__(None, None, None)
+            "data_quality_issue_type_counts": repository.get_data_quality_issue_type_counts(
+                provider_name=provider_name,
+                team_code=team_code,
+                season_label=season_label,
+                run_label=run_label,
+            ),
+            "data_quality_issue_severity_counts": (
+                repository.get_data_quality_issue_severity_counts(
+                    provider_name=provider_name,
+                    team_code=team_code,
+                    season_label=season_label,
+                    run_label=run_label,
+                )
+            ),
+            "parser_provenance_counts": _aggregate_parser_provenance_counts(
+                [_build_recent_run_summary(job_run) for job_run in matching_job_runs]
+            ),
+            "diagnostic_counts": _aggregate_diagnostic_counts(
+                [_build_recent_run_summary(job_run) for job_run in matching_job_runs]
+            ),
+        },
+        "trends": _build_run_trends(
+            trend_job_runs=trend_job_runs,
+            trend_daily_summaries=trend_daily_summaries,
+            all_matching_runs=[
+                _build_recent_run_summary(job_run) for job_run in matching_job_runs
+            ],
+        ),
+        "validation_run_comparison": _build_validation_run_comparison(
+            validation_compare_runs,
+            run_label=run_label,
+        ),
+        "retrieval_trends": _build_retrieval_trends(retrieval_trend_daily_summaries),
+        "quality_trends": _build_quality_trends(
+            quality_trend_daily_summaries,
+            recent_runs=[_build_recent_run_summary(job_run) for job_run in matching_job_runs],
+        ),
+    }
 
 
-def _seed_in_memory_demo_data(repository: IngestionRepository) -> None:
-    if not isinstance(repository, InMemoryIngestionRepository):
-        return
-
-    fixture_dir = (Path(__file__).resolve().parents[1] / "fixtures").resolve()
-    fixture_path = (fixture_dir / "covers_sample_team_page.html").resolve()
-    alt_scope_fixture_path = (fixture_dir / "covers_team_page_nyk_2023_2024.html").resolve()
-    artifact_root = Path(mkdtemp(prefix="admin-diagnostics-seed-"))
-    original_payload_dir = settings.raw_payload_dir
-    original_parser_snapshot_dir = settings.parser_snapshot_dir
-    settings.raw_payload_dir = str(artifact_root / "raw-payloads")
-    settings.parser_snapshot_dir = str(artifact_root / "parser-output")
+def get_admin_diagnostics_postgres(
+    **kwargs,
+) -> dict[str, object]:
+    repository, repository_context = build_postgres_ingestion_repository()
     try:
-        run_fetch_and_ingest(
-            repository_mode="in_memory",
-            team_code="LAL",
-            season_label="2024-2025",
-            source_url=fixture_path.as_uri(),
-            requested_by="admin-diagnostics-seed-success",
-            persist_payload=True,
-            repository_override=repository,
+        return _collect_admin_diagnostics(
+            repository=repository,
+            repository_mode="postgres",
+            **kwargs,
         )
     finally:
-        settings.raw_payload_dir = original_payload_dir
-        settings.parser_snapshot_dir = original_parser_snapshot_dir
-    _shift_latest_in_memory_run(repository, days_ago=3)
-    run_fetch_and_ingest(
-        repository_mode="in_memory",
-        team_code="NYK",
-        season_label="2023-2024",
-        source_url=alt_scope_fixture_path.as_uri(),
-        requested_by="admin-diagnostics-seed-alt-scope",
-        persist_payload=False,
-        repository_override=repository,
-    )
-    _shift_latest_in_memory_run(repository, days_ago=2)
-    _seed_invalid_parse_demo(repository)
-    _seed_canonical_conflict_demo(repository)
-
-
-def _seed_invalid_parse_demo(repository: IngestionRepository) -> None:
-    class InvalidParseProvider:
-        provider_name = "covers"
-
-        def parse_team_page(self, **kwargs) -> list[RawGameRow]:
-            return [
-                RawGameRow(
-                    provider_name="covers",
-                    team_code="LAL",
-                    season_label="2024-2025",
-                    source_url="https://example.com/covers/lal/invalid-parse",
-                    source_section="Regular Season",
-                    source_row_index=1,
-                    game_date=date(2024, 11, 7),
-                    opponent_code="BOS",
-                    is_away=False,
-                    result_flag="W",
-                    team_score=0,
-                    opponent_score=0,
-                    ats_result=None,
-                    ats_line=None,
-                    ou_result=None,
-                    total_line=None,
-                    parse_status=ParseStatus.INVALID,
-                    warnings=["parse.invalid_score_format"],
-                )
-            ]
-
-    ingest_historical_team_page(
-        request=HistoricalIngestionRequest(
-            provider_name="covers",
-            team_code="LAL",
-            season_label="2024-2025",
-            source_url="https://example.com/covers/lal/invalid-parse",
-            requested_by="admin-diagnostics-seed-invalid-parse",
-            html="<html></html>",
-        ),
-        provider=InvalidParseProvider(),
-        repository=repository,
-    )
-    _shift_latest_in_memory_run(repository, days_ago=1)
-
-
-def _seed_canonical_conflict_demo(repository: IngestionRepository) -> None:
-    class ConflictProvider:
-        provider_name = "covers"
-
-        def parse_team_page(self, **kwargs) -> list[RawGameRow]:
-            return [
-                RawGameRow(
-                    provider_name="covers",
-                    team_code="LAL",
-                    season_label="2024-2025",
-                    source_url="https://example.com/covers/lal/conflict",
-                    source_section="Regular Season",
-                    source_row_index=1,
-                    game_date=date(2024, 11, 8),
-                    opponent_code="BOS",
-                    is_away=False,
-                    result_flag="W",
-                    team_score=112,
-                    opponent_score=104,
-                    ats_result="W",
-                    ats_line=-3.5,
-                    ou_result="O",
-                    total_line=214.5,
-                    parse_status=ParseStatus.VALID,
-                ),
-                RawGameRow(
-                    provider_name="covers",
-                    team_code="BOS",
-                    season_label="2024-2025",
-                    source_url="https://example.com/covers/bos/conflict",
-                    source_section="Regular Season",
-                    source_row_index=2,
-                    game_date=date(2024, 11, 8),
-                    opponent_code="@LAL",
-                    is_away=True,
-                    result_flag="L",
-                    team_score=103,
-                    opponent_score=112,
-                    ats_result="L",
-                    ats_line=3.5,
-                    ou_result="O",
-                    total_line=214.5,
-                    parse_status=ParseStatus.VALID,
-                ),
-            ]
-
-    ingest_historical_team_page(
-        request=HistoricalIngestionRequest(
-            provider_name="covers",
-            team_code="LAL",
-            season_label="2024-2025",
-            source_url="https://example.com/covers/lal/conflict",
-            requested_by="admin-diagnostics-seed-conflict",
-            html="<html></html>",
-        ),
-        provider=ConflictProvider(),
-        repository=repository,
-    )
-    missing_path = (
-        Path(__file__).resolve().parents[1] / "fixtures" / "missing_team_page.html"
-    ).resolve()
-    run_fetch_and_ingest(
-        repository_mode="in_memory",
-        team_code="LAL",
-        season_label="2024-2025",
-        source_url=missing_path.as_uri(),
-        requested_by="admin-diagnostics-seed-failure",
-        persist_payload=False,
-        repository_override=repository,
-    )
-    _shift_latest_in_memory_run(repository, days_ago=0)
+        repository_context.__exit__(None, None, None)
 
 
 def _build_run_trends(
@@ -809,28 +647,3 @@ def resolve_started_window(
             tzinfo=timezone.utc,
         )
     return start_datetime, end_datetime
-
-
-def _shift_latest_in_memory_run(repository: IngestionRepository, *, days_ago: int) -> None:
-    if not isinstance(repository, InMemoryIngestionRepository):
-        return
-    target_started_at = datetime.now(timezone.utc) - timedelta(days=days_ago)
-    if repository.job_runs:
-        repository.job_runs[-1]["started_at"] = target_started_at
-        repository.job_runs[-1]["completed_at"] = target_started_at + timedelta(seconds=5)
-    if repository.job_run_reporting_snapshots:
-        repository.job_run_reporting_snapshots[-1]["started_at"] = target_started_at
-        repository.job_run_reporting_snapshots[-1]["completed_at"] = target_started_at + timedelta(
-            seconds=5
-        )
-    if repository.page_retrievals:
-        repository.page_retrievals[-1]["retrieved_at"] = target_started_at + timedelta(seconds=1)
-    if repository.page_retrieval_reporting_snapshots:
-        repository.page_retrieval_reporting_snapshots[-1]["retrieved_at"] = (
-            target_started_at + timedelta(seconds=1)
-        )
-    if repository.job_run_quality_snapshots:
-        repository.job_run_quality_snapshots[-1]["started_at"] = target_started_at
-        repository.job_run_quality_snapshots[-1]["completed_at"] = target_started_at + timedelta(
-            seconds=5
-        )

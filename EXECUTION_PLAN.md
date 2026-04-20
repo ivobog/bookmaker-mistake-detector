@@ -2,277 +2,376 @@
 
 ## 1. Planning Basis
 This execution plan is based on:
-- `C:\Users\Ivica\Downloads\bookmaker_mistake_detector_srs_v_2_clean.md`
-- `C:\Users\Ivica\Downloads\bookmaker_mistake_detector_sdd_v_2_clean.md`
+- `C:\Users\Ivica\Downloads\bookmaker_mistake_detector_sdd_postgres_only_multi_target.md`
 
-This version replaces the older phase-status plan in the repository. The current planning target is not "finish Phase 5 polish." It is to bring the repository into the clean release baseline described by the new SRS/SDD.
+Planning date:
+- `2026-04-20`
+
+This plan replaces the older broad cleanup plan in the repository. The active delivery target is now the SDD-defined cutover to:
+- one PostgreSQL-backed runtime path
+- no frontend or backend demo execution mode in runtime flows
+- explicit multi-target model/task capabilities across training, selection, scoring, backtesting, and opportunity generation
 
 ## 2. Goal
-Deliver a clean release candidate that:
-- preserves the existing NBA ingestion, analytics, modeling, opportunity, and backtest capabilities
-- separates analyst, admin, and development concerns
-- removes demo-driven behavior from stable runtime contracts
-- removes runtime schema creation from normal production paths
-- decomposes oversized modules into maintainable service and repository boundaries
-- leaves the repository looking like a product system rather than an accumulated workshop state
+Deliver an implementation branch that:
+- removes runtime `in_memory` vs `postgres` branching from business workflows
+- removes runtime demo behavior from the frontend and API surface
+- introduces an explicit task/capability model for Phase A regression targets
+- generalizes model evaluation and selection away from a hidden MAE-only global rule
+- keeps the current product surface usable while making target-task behavior explicit and extensible
 
 ## 3. Current-State Findings
-Observed repository shape on April 17, 2026:
-- the API currently mounts only health and one large admin router under `/api/v1`
-- `backend/src/bookmaker_detector_api/api/admin_routes.py` is extremely large and currently mixes stable admin APIs, demo endpoints, orchestration helpers, and mutation-heavy workflows
-- `backend/src/bookmaker_detector_api/repositories/ingestion.py` is oversized and carries multiple persistence concerns in one file
-- `backend/src/bookmaker_detector_api/services/models.py` contains runtime schema creation helpers such as `ensure_model_tables(...)`, which conflicts with the migration-owned schema rule in the SDD
-- the root `README.md` still behaves like a long validation journal and endpoint inventory rather than a concise portable entry point
-- the repo already has strong functional coverage across ingestion, features, models, backtests, frontend, and runbooks, so the highest-value work is now structural cleanup and production hardening rather than net-new MVP capability
+Observed in the repository on April 20, 2026:
+- [config.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/config.py) still exposes `api_repository_mode` and `use_postgres_stable_read_mode`
+- [repository_factory.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/repository_factory.py) still builds both `PostgresIngestionRepository` and `InMemoryIngestionRepository`
+- [admin_demo_routes.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/api/admin_demo_routes.py) is still mounted in the runtime API package
+- [models.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/models.py), [model_training_lifecycle.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/model_training_lifecycle.py), [model_training_views.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/model_training_views.py), [model_opportunities.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/model_opportunities.py), and [features.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/features.py) still contain large in-memory workflow surfaces
+- [frontend/src/api/mode.ts](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend/src/api/mode.ts) still defines `FrontendAppMode`, `appendDemoScope(...)`, and a default target task of `spread_error_regression`
+- [frontend/src/modelAdminWorkspace.tsx](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend/src/modelAdminWorkspace.tsx) still hardcodes `spread_error_regression` across dashboard, evaluation, and selection defaults
+- backend and frontend tests still assert `repository_mode: "in_memory"` and spread-centric defaults, so the test suite will need coordinated contract updates
 
 ## 4. Delivery Strategy
-Execute the work in five tracks:
-- `Track A: API surface cleanup`
-- `Track B: persistence and schema cleanup`
-- `Track C: service decomposition and orchestration cleanup`
-- `Track D: documentation and repo cleanup`
-- `Track E: regression, acceptance, and release hardening`
+Execute the SDD in six controlled phases:
+- `Phase 0: inventory and acceptance baseline`
+- `Phase 1: schema and capability foundation`
+- `Phase 2: backend persisted-only cutover`
+- `Phase 3: task-aware modeling lifecycle refactor`
+- `Phase 4: frontend task-aware cutover`
+- `Phase 5: regression, migration, and release gate`
 
 Critical path:
-`route separation -> side-effect removal -> schema ownership cleanup -> repository decomposition -> regression and acceptance`
+`task registry foundation -> persisted-only backend cutover -> task-aware selection/scoring normalization -> frontend capability adoption -> end-to-end regression`
 
-## 5. Execution Phases
+## 5. Workstreams
 
-### Phase 1: Baseline and Gap Closure
+### Workstream A: Schema and capability model
 Objective:
-- freeze the clean-release scope and convert the SRS/SDD into a concrete backlog
+- establish one source of truth for target tasks and supported model families
+
+Primary files and areas:
+- migrations and SQL init assets under the backend persistence layer
+- [model_records.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/model_records.py)
+- [model_training_lifecycle.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/model_training_lifecycle.py)
+- [model_training_views.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/model_training_views.py)
 
 Tasks:
-- inventory all current routes and classify each as `analyst`, `admin`, `dev-only`, or `delete`
-- inventory query parameters that trigger seeding, auto-training, auto-selection, auto-materialization, auto-refresh, or other hidden mutations
-- inventory every runtime DDL entry point
-- inventory large modules and map them to target package boundaries from the SDD
-- crosswalk current tests and docs against SRS acceptance criteria
-
-Deliverables:
-- route inventory
-- cleanup backlog with priorities
-- acceptance checklist mapped to real code areas
+- add `target_task_definition`
+- add `model_family_capability`
+- extend evaluation snapshot persistence with `primary_metric_direction`, `selection_score`, and `selection_score_name`
+- backfill the four Phase A tasks:
+  - `spread_error_regression`
+  - `total_error_regression`
+  - `point_margin_regression`
+  - `total_points_regression`
+- backfill model-family capability rows for current regression families:
+  - `linear_feature`
+  - `tree_stump`
 
 Exit criteria:
-- every public endpoint and major module has an explicit keep/move/remove decision
-- the team has a ranked backlog instead of a general cleanup intention
+- the backend can resolve enabled tasks and valid task/model combinations without hidden constants alone
+- evaluation snapshots can represent generalized ranking metadata
 
-### Phase 2: API Surface Separation
+### Workstream B: Postgres-only runtime cutover
 Objective:
-- reshape the runtime surface so stable product behavior is explicit and narrow
+- remove runtime storage-mode branching from the API and service entry points
+
+Primary files and areas:
+- [config.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/config.py)
+- [api/__init__.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/api/__init__.py)
+- [admin_model_routes.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/api/admin_model_routes.py)
+- [admin_scoring_routes.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/api/admin_scoring_routes.py)
+- [admin_opportunity_routes.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/api/admin_opportunity_routes.py)
+- [admin_market_board_routes.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/api/admin_market_board_routes.py)
+- [admin_model_support.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/api/admin_model_support.py)
+- [repository_factory.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/repository_factory.py)
 
 Tasks:
-- split the current admin mega-router into focused modules:
-  - `health`
-  - `analyst_opportunities`
-  - `analyst_patterns`
-  - `analyst_trends`
-  - `analyst_backtests`
-  - `admin_ingestion`
-  - `admin_features`
-  - `admin_models`
-  - `admin_backtests`
-  - `admin_maintenance`
-- create explicit `/api/v1/analyst/...` and `/api/v1/admin/...` namespaces
-- move demo and fixture flows out of stable runtime contracts into scripts, fixtures, tests, or dev-only routers
-- remove development toggles from stable GET endpoints
-- add typed request/response schemas for stable routes
-- enforce that analyst GET endpoints are read-only and side-effect-free
-
-Deliverables:
-- decomposed route package
-- stable analyst surface
-- explicit admin mutation surface
-- isolated dev/demo entry points
+- remove `api_repository_mode`
+- remove `use_postgres_stable_read_mode`
+- replace repository construction that branches on mode with persisted-only construction
+- delete runtime use of `_prepare_in_memory_*` helpers
+- remove `repository_mode` from response DTOs and payload shaping
+- unregister [admin_demo_routes.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/api/admin_demo_routes.py) from the runtime API
 
 Exit criteria:
-- stable analyst endpoints no longer accept demo-oriented mutation toggles
-- admin routes are smaller, responsibility-focused, and easier to test
-- ordinary reads do not trigger training, seeding, scoring, or materialization
+- no runtime route chooses `in_memory` vs `postgres`
+- no runtime API response exposes `repository_mode`
+- no admin workflow self-seeds in-memory state to satisfy a request
 
-### Phase 3: Persistence and Schema Ownership Cleanup
+### Workstream C: Task registry and policy registry
 Objective:
-- make production persistence Postgres-first, explicit, and migration-owned
+- make task support and ranking semantics explicit and extensible
+
+Primary files and areas:
+- new `services/task_registry.py`
+- [model_training_algorithms.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/model_training_algorithms.py)
+- [model_training_lifecycle.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/model_training_lifecycle.py)
+- [model_training_views.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/model_training_views.py)
+- [model_opportunities.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/model_opportunities.py)
+- [model_scoring_runs.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/model_scoring_runs.py)
+- [model_scoring_previews.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/model_scoring_previews.py)
+- [model_backtest_workflows.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/model_backtest_workflows.py)
 
 Tasks:
-- break up `repositories/ingestion.py` into:
-  - `contracts.py`
-  - `records.py`
-  - `postgres/*`
-  - `in_memory/*`
-  - `reporting_queries.py`
-  - `quality_helpers.py`
-- move any remaining runtime DDL helpers out of normal service/repository execution paths
-- make migrations and init SQL the only production schema owners
-- confine in-memory repositories to tests, fixtures, and controlled development flows
-- centralize repository construction behind clearer contracts/factories
-- tighten transaction boundaries for mutation workflows
-
-Deliverables:
-- decomposed repository layer
-- removal of runtime schema creation from production paths
-- clearer repository contract boundary
+- introduce a task registry contract for metadata, policy resolution, and enablement
+- introduce a model-family capability registry for allowed task/model combinations
+- generalize selection policy resolution beyond `validation_mae_candidate_v1`
+- keep `validation_mae_candidate_v1` as a temporary regression alias during migration
+- define task-aware scoring and opportunity policy lookup
+- enforce that active model selection, scoring, and materialization are task-compatible
 
 Exit criteria:
-- production services can assume schema existence
-- no normal production request path performs table creation or alteration
-- persistence code is organized by responsibility rather than by feature phase
+- `spread_error_regression` is no longer a hidden platform default
+- all Phase A tasks use the same lifecycle contracts with task-aware metadata
+- unsupported task/model/policy combinations fail validation early
 
-### Phase 4: Service and Job Decomposition
+### Workstream D: Modeling service decomposition
 Objective:
-- narrow service responsibilities and make heavy workflows explicit
+- shrink the dual-mode facade and separate workflow responsibilities
+
+Primary files and areas:
+- [models.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/models.py)
+- [model_market_board_orchestration.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/model_market_board_orchestration.py)
+- [model_backtest_runs.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/model_backtest_runs.py)
+- [model_market_board_views.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/model_market_board_views.py)
 
 Tasks:
-- split oversized analytics/service modules by responsibility:
-  - ingestion
-  - canonicalization
-  - metrics
-  - features
-  - patterns
-  - model registry/training/evaluation/selection/scoring
-  - opportunities
-  - backtesting
-  - diagnostics
-- consolidate orchestration logic into explicit job or service entry points
-- remove repeated demo branches from business logic
-- ensure scheduled and admin-triggered jobs follow the explicit dependency chain:
-  - ingestion
-  - canonicalization
-  - metrics
-  - features
-  - patterns
+- extract persisted-only orchestration into focused services:
+  - `model_training_service`
+  - `model_selection_service`
+  - `model_scoring_service`
+  - `model_opportunity_service`
+  - `model_backtest_service`
+  - `model_market_board_service`
+- move task registry and policy registry concerns out of the facade
+- keep pure algorithm modules separate from persistence and route concerns
+- leave classification hooks in place without enabling unsupported tasks in Phase A
+
+Exit criteria:
+- [models.py](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/backend/src/bookmaker_detector_api/services/models.py) is no longer the dual-mode control center
+- each major workflow has one persisted orchestration path
+
+### Workstream E: Frontend task-aware cutover
+Objective:
+- remove demo mode and make UI workflows capability-driven
+
+Primary files and areas:
+- [frontend/src/api/mode.ts](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend/src/api/mode.ts)
+- [frontend/src/api/modelAdmin.ts](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend/src/api/modelAdmin.ts)
+- [frontend/src/api/models.ts](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend/src/api/models.ts)
+- [frontend/src/modelAdminTypes.ts](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend/src/modelAdminTypes.ts)
+- [frontend/src/modelAdminPages.tsx](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend/src/modelAdminPages.tsx)
+- [frontend/src/modelAdminWorkspace.tsx](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend/src/modelAdminWorkspace.tsx)
+- [frontend/src/App.tsx](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend/src/App.tsx)
+
+Tasks:
+- replace [mode.ts](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend/src/api/mode.ts) with a simpler app-defaults module
+- remove `FrontendAppMode = "demo"` and `appendDemoScope(...)`
+- add capability loading from `GET /api/v1/admin/model-capabilities`
+- render target-task choices, labels, and compatible selection policies from backend data
+- remove implicit `spread_error_regression` defaults from list and mutation flows where the backend should accept `target_task = None`
+- stop reading or writing `repository_mode` in UI types, mocks, and tests
+
+Exit criteria:
+- the UI has no runtime demo/operator split
+- target-task options are loaded from backend capabilities rather than hidden constants
+- Phase A tasks are visible across training, selection, scoring, and backtest flows
+
+### Workstream F: Test and migration hardening
+Objective:
+- update the suite so it proves the new runtime truth rather than the old demo truth
+
+Primary files and areas:
+- backend route tests and service tests
+- [frontend/src/modelAdminWorkspace.test.tsx](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend/src/modelAdminWorkspace.test.tsx)
+- [frontend/src/modelAdminComponents.test.tsx](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend/src/modelAdminComponents.test.tsx)
+- [frontend/src/modelAdminActionValidation.test.ts](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend/src/modelAdminActionValidation.test.ts)
+- [frontend/src/App.opportunities.test.tsx](C:/Users/Ivica/Downloads/bookmakers-mistake-detector/frontend/src/App.opportunities.test.tsx)
+
+Tasks:
+- replace in-memory expectations with PostgreSQL-backed contracts
+- add contract coverage for the capability endpoint
+- add coverage for all four Phase A tasks across:
   - training
-  - scoring
-  - opportunities
-- preserve artifact traceability across features, models, scoring runs, opportunities, and backtests
-
-Deliverables:
-- smaller service modules
-- explicit job entry points
-- reduced branching between demo and production logic
+  - selection
+  - scoring preview
+  - backtest preview/materialization
+  - opportunity materialization
+- add rejection tests for disabled tasks and invalid task/model/policy combinations
+- update smoke flows so they use persisted fixtures rather than route-level self-seeding shortcuts
 
 Exit criteria:
-- heavy workflows are triggered only through jobs, scripts, or explicit admin mutations
-- services are understandable without phase-history context
+- the regression suite validates persisted-only behavior
+- acceptance is measured against Phase A end-to-end workflows rather than demo-mode convenience paths
 
-### Phase 5: Documentation and Repository Cleanup
+## 6. Execution Phases
+
+### Phase 0: Inventory and acceptance baseline
 Objective:
-- make the repository portable and release-oriented
+- lock scope and capture the exact removals and contract changes before code churn begins
 
 Tasks:
-- rewrite the root `README.md` into a concise entry point
-- move operational depth into `docs/operations`, `docs/release`, and `docs/architecture`
-- remove machine-local paths and stale phase narrative from production-facing docs
-- classify leftover scaffolding into:
-  - keep as production
-  - move to admin/internal
-  - move to scripts/tests/fixtures
-  - delete
-- remove dead imports, duplicate helpers, and obsolete development leftovers
+- inventory every runtime route that branches on storage mode or self-seeds state
+- inventory every response schema that returns `repository_mode`
+- inventory every frontend type and test that expects demo behavior or spread-only defaults
+- produce an acceptance checklist for the eight SDD acceptance criteria
 
 Deliverables:
-- concise README
-- cleaned supporting docs
-- reduced repository noise
+- runtime branch inventory
+- DTO contract inventory
+- acceptance checklist
 
-Exit criteria:
-- a new engineer can understand what the project is and how to run it without reading a long phase log
-- production-facing docs no longer depend on one developer's local environment
-
-### Phase 6: Regression, Acceptance, and Release Gate
+### Phase 1: Schema and capability foundation
 Objective:
-- prove that cleanup did not break the product and that the repository meets the clean baseline
+- make target-task support first-class before removing the old runtime shortcuts
 
 Tasks:
-- expand automated regression around:
-  - parser/canonicalization correctness
-  - feature time-safety
-  - model and backtest reproducibility
-  - analyst/admin route separation
-  - side-effect-free stable reads
-  - absence of runtime DDL in production flows
-- run backend tests, frontend validation, and release smoke checks
-- validate SRS acceptance criteria one by one
-- record residual risks and known issues
-- produce a final release checklist outcome
+- add the new capability tables and backfills
+- extend evaluation snapshot schema
+- create the backend task registry abstraction
+- define the initial model-family capability mapping
 
 Deliverables:
-- passing regression evidence
-- completed acceptance matrix
-- release recommendation with known gaps if any remain
+- migrations
+- task registry module
+- seeded Phase A task definitions
 
-Exit criteria:
-- the clean baseline in the SRS/SDD is demonstrably satisfied
-- remaining gaps, if any, are explicit and small enough for a controlled release decision
+Dependency note:
+- this phase must land before broad route validation changes so the backend has a source of truth to validate against
 
-## 6. Priority Backlog
+### Phase 2: Backend persisted-only cutover
+Objective:
+- remove the storage-mode split from the API and repository entry points
 
-### P0: Must Do First
-- split `admin_routes.py`
-- create `/analyst` and `/admin` route boundaries
-- remove demo mutation toggles from stable GET contracts
-- remove runtime DDL from production service paths
-- decompose the ingestion repository layer
-- rewrite the main README
-- add regression coverage for side-effect-free reads and route separation
+Tasks:
+- simplify configuration to one runtime storage assumption
+- replace repository factory branching
+- remove in-memory route helpers
+- remove demo route mounting
+- remove `repository_mode` from DTOs
 
-### P1: Should Do During Cleanup
-- decompose oversized service modules, especially modeling/orchestration paths
-- move demo flows into scripts/tests/fixtures or dev-only mounts
-- standardize schema models and response contracts
-- tighten job/service naming and package structure
-- improve transaction and failure handling around admin mutation workflows
+Deliverables:
+- persisted-only route layer
+- simplified configuration
+- updated admin schemas
 
-### P2: Follow-Up Hardening
-- refine worker/job orchestration boundaries
-- improve admin operational dashboards after cleanup settles
-- add more focused test utilities around separated repository contracts
+Dependency note:
+- this phase should finish before frontend cutover so the UI can be migrated against final backend contracts
 
-## 7. Suggested Order of Execution
-1. Freeze endpoint and module inventory.
-2. Refactor route composition and create analyst/admin/dev boundaries.
-3. Remove hidden side effects from stable reads.
-4. Eliminate runtime DDL from production paths.
-5. Decompose repository and service layers behind clear contracts.
-6. Clean documentation and remove repo leftovers.
-7. Run full regression and acceptance validation.
+### Phase 3: Task-aware modeling lifecycle refactor
+Objective:
+- make the train-select-score-materialize path task-aware without changing product intent
 
-## 8. Risks and Mitigations
+Tasks:
+- generalize training contracts and evaluation metadata
+- introduce selection policy registry logic
+- move opportunity interpretation behind task-aware policies
+- refactor persisted orchestration into smaller services
 
-### Risk: cleanup breaks current demo-driven flows
+Deliverables:
+- task-aware training and selection flow
+- smaller workflow services
+- legacy MAE alias support during migration
+
+Dependency note:
+- this phase can overlap partially with frontend capability work once the capability endpoint contract is stable
+
+### Phase 4: Frontend task-aware cutover
+Objective:
+- replace runtime demo behavior with backend-driven task capability UX
+
+Tasks:
+- replace `mode.ts`
+- load model capabilities on entry
+- update form defaults and filters
+- remove `repository_mode` fields from types and mocks
+- update all affected admin workspace tests
+
+Deliverables:
+- capability-driven UI
+- simplified API client layer
+- updated frontend contracts
+
+### Phase 5: Regression, migration, and release gate
+Objective:
+- prove the cutover works across the full Phase A workflow surface
+
+Tasks:
+- run backend tests
+- run frontend unit tests
+- run type checks and build validation
+- run PostgreSQL-backed workflow smoke checks for all Phase A tasks
+- validate each SDD acceptance criterion explicitly
+
+Deliverables:
+- regression evidence
+- acceptance checklist completion
+- residual risk log
+
+## 7. Priority Backlog
+
+### P0: Must complete first
+- add `target_task_definition` and `model_family_capability`
+- remove config and route storage-mode branching
+- remove `repository_mode` from backend DTOs and frontend types
+- unregister runtime demo routes
+- add the capability endpoint
+- replace frontend demo mode plumbing
+
+### P1: Required to finish the SDD cleanly
+- generalize selection metadata and policy resolution
+- refactor persisted modeling workflows out of the dual-mode facade
+- validate all four Phase A tasks end to end
+- update smoke and integration tests to use persisted fixtures only
+
+### P2: Follow-up hardening after the cutover
+- split additional large modeling modules beyond the minimum needed for Phase A
+- persist selection policy definitions if the team wants runtime-configurable policies
+- stage classification task enablement behind disabled registry entries
+
+## 8. Sequencing Rules
+Apply these rules while implementing:
+- do not start deleting frontend demo mode until the backend capability endpoint contract is stable
+- do not remove legacy selection aliases until persisted selection tests pass for all Phase A tasks
+- do not enable any Phase B task in the registry until trainer, scorer, and opportunity logic exist
+- do not merge route simplification without simultaneous schema and test updates for DTO changes
+
+## 9. Risks and Mitigations
+
+### Risk: in-memory code removal breaks developer workflows
 Mitigation:
-- preserve demo coverage in scripts/tests before removing route-level shortcuts
-- migrate behavior first, then delete old entry points
+- provide PostgreSQL-backed seed scripts and fixtures before deleting convenience helpers
+- keep test-specific fixtures separate from runtime routes
 
-### Risk: route splitting causes frontend/API drift
+### Risk: hidden spread-centric assumptions survive the refactor
 Mitigation:
-- add typed schemas and contract tests while splitting routes
-- migrate frontend calls behind stable analyst endpoints before deleting old ones
+- grep-driven inventory of `spread_error_regression` defaults before and after each phase
+- require capability-derived task options in the UI
 
-### Risk: runtime DDL removal exposes missing migration coverage
+### Risk: generalized selection changes ranking behavior unexpectedly
 Mitigation:
-- inventory all tables touched by `ensure_*` helpers
-- add missing SQL init or migration scripts before removing runtime creation logic
+- keep `validation_mae_candidate_v1` as a temporary regression alias
+- add snapshot-level ranking tests for all Phase A tasks before deleting legacy branches
 
-### Risk: large-file decomposition creates temporary duplication
+### Risk: DTO cleanup causes large frontend breakage
 Mitigation:
-- split by responsibility in small slices
-- keep regression coverage running after each extraction step
+- land backend contract changes and capability endpoint first
+- update frontend types and mocks immediately after backend DTO changes
 
-## 9. Definition of Done
-This execution plan is complete when the repository satisfies all of the following:
-- analyst, admin, and development concerns are clearly separated
-- stable read endpoints are side-effect-free
-- demo helpers no longer shape stable product contracts
-- runtime schema creation is not part of normal production execution
-- route and repository responsibilities are decomposed into maintainable modules
-- README and supporting docs are concise, portable, and clean
-- regression and acceptance evidence support the clean release claim
+## 10. Definition of Done
+This execution plan is complete when all of the following are true:
+- no runtime backend route branches on repository mode
+- no runtime frontend code exposes demo/operator mode
+- runtime demo routes are removed
+- `repository_mode` is gone from backend payloads and frontend types
+- enabled target-task capabilities come from one backend source of truth
+- the UI can train, select, score, backtest, and materialize opportunities for all four Phase A regression tasks
+- integration and smoke coverage use PostgreSQL-backed data only
 
-## 10. Recommended Immediate Next Steps
-1. Create a route inventory from `backend/src/bookmaker_detector_api/api/admin_routes.py` and classify each endpoint into keep/move/delete buckets.
-2. Identify every `seed_demo`, `auto_*`, and runtime materialization toggle that currently affects request behavior.
-3. Extract the first stable analyst router from the current admin surface, starting with opportunity and backtest reads.
-4. Replace runtime schema creation in modeling flows with migration-owned setup.
-5. Rewrite `README.md` after the new route and runtime boundaries are in place.
+## 11. Recommended Immediate Next Steps
+1. Add the schema and seed/backfill for `target_task_definition`, `model_family_capability`, and generalized evaluation snapshot fields.
+2. Implement `GET /api/v1/admin/model-capabilities` and wire it to a new backend task registry service.
+3. Remove `api_repository_mode`, `use_postgres_stable_read_mode`, and repository-mode branching from the backend entry points.
+4. Delete runtime in-memory prep paths and unregister `admin_demo_routes`.
+5. Replace the frontend demo mode module with app defaults plus capability loading.
+6. Run the full Phase A workflow matrix against PostgreSQL-backed fixtures and close any remaining spread-centric defaults.

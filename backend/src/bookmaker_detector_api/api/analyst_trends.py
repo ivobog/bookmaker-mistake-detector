@@ -5,46 +5,28 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from bookmaker_detector_api.api.schemas import AnalystTrendFilters, AnalystTrendResponse
-from bookmaker_detector_api.config import settings
 from bookmaker_detector_api.db.postgres import postgres_connection
 from bookmaker_detector_api.services.features import (
-    get_feature_snapshot_summary_in_memory,
     get_feature_snapshot_summary_postgres,
 )
-from bookmaker_detector_api.services.repository_factory import build_in_memory_feature_dataset_store
 
 router = APIRouter(prefix="/analyst", tags=["analyst"])
-
-
-def _use_postgres_analyst_mode() -> bool:
-    return settings.use_postgres_stable_read_mode
 
 
 @router.get("/trends/summary", response_model=AnalystTrendResponse)
 def feature_summary(
     filters: Annotated[AnalystTrendFilters, Depends()],
 ) -> AnalystTrendResponse:
-    if _use_postgres_analyst_mode():
-        with postgres_connection() as connection:
-            summary_result = get_feature_snapshot_summary_postgres(
-                connection,
-                feature_key=filters.feature_key,
-                team_code=filters.team_code,
-                season_label=filters.season_label,
-            )
-        repository_mode = "postgres"
-    else:
-        repository = build_in_memory_feature_dataset_store()
-        summary_result = get_feature_snapshot_summary_in_memory(
-            repository,
+    with postgres_connection() as connection:
+        summary_result = get_feature_snapshot_summary_postgres(
+            connection,
             feature_key=filters.feature_key,
             team_code=filters.team_code,
             season_label=filters.season_label,
         )
-        repository_mode = "in_memory"
 
     return AnalystTrendResponse(
-        repository_mode=repository_mode,
+        repository_mode="postgres",
         filters=filters,
         feature_version=summary_result.get("feature_version"),
         snapshot_count=int(summary_result.get("snapshot_count", 0)),

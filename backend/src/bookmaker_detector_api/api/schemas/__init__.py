@@ -9,6 +9,8 @@ from .admin import (
     AdminFutureGamePreviewResponse,
     AdminModelEvaluationsFilters,
     AdminModelEvaluationsResponse,
+    AdminModelCapabilitiesResponse,
+    AdminModelCapabilitiesUiDefaults,
     AdminModelHistoryFilters,
     AdminModelHistoryResponse,
     AdminModelRegistryEntry,
@@ -34,6 +36,7 @@ from .admin import (
     AdminSelectionHistoryFilters,
     AdminSelectionHistoryResponse,
     AdminSelectionSnapshot,
+    AdminTaskCapability,
 )
 from .analyst import (
     AnalystBacktestDetailResponse,
@@ -63,6 +66,8 @@ __all__ = [
     "AdminEvaluationHistoryResponse",
     "AdminModelEvaluationsFilters",
     "AdminModelEvaluationsResponse",
+    "AdminModelCapabilitiesResponse",
+    "AdminModelCapabilitiesUiDefaults",
     "AdminModelHistoryFilters",
     "AdminModelHistoryResponse",
     "AdminModelRegistryEntry",
@@ -87,6 +92,7 @@ __all__ = [
     "AdminScoringRunDetailResponse",
     "AdminScoringRunsResponse",
     "AdminSelectionSnapshot",
+    "AdminTaskCapability",
     "AdminSelectionDetailResponse",
     "AdminSelectionHistoryFilters",
     "AdminSelectionHistoryResponse",

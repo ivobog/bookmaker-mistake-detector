@@ -10,6 +10,7 @@ from bookmaker_detector_api.services.model_records import (
     ModelSelectionSnapshotRecord,
     ModelTrainingRunRecord,
 )
+from bookmaker_detector_api.services.task_registry import normalize_selection_policy_name
 
 
 def list_model_registry_in_memory(
@@ -231,10 +232,13 @@ def list_model_evaluation_snapshots_postgres(
             selected_feature,
             fallback_strategy,
             primary_metric_name,
+            primary_metric_direction,
             validation_metric_value,
             test_metric_value,
             validation_prediction_count,
             test_prediction_count,
+            selection_score,
+            selection_score_name,
             snapshot_json,
             created_at
         FROM model_evaluation_snapshot
@@ -262,12 +266,15 @@ def list_model_evaluation_snapshots_postgres(
             selected_feature=row[6],
             fallback_strategy=row[7],
             primary_metric_name=row[8],
-            validation_metric_value=_float_or_none(row[9]),
-            test_metric_value=_float_or_none(row[10]),
-            validation_prediction_count=int(row[11]),
-            test_prediction_count=int(row[12]),
-            snapshot=row[13],
-            created_at=row[14],
+            primary_metric_direction=row[9] or "lower_is_better",
+            validation_metric_value=_float_or_none(row[10]),
+            test_metric_value=_float_or_none(row[11]),
+            validation_prediction_count=int(row[12]),
+            test_prediction_count=int(row[13]),
+            selection_score=_float_or_none(row[14]),
+            selection_score_name=row[15],
+            snapshot=row[16],
+            created_at=row[17],
         )
         for row in rows
     ]
@@ -743,10 +750,13 @@ def _serialize_model_evaluation_snapshot(
         "selected_feature": snapshot.selected_feature,
         "fallback_strategy": snapshot.fallback_strategy,
         "primary_metric_name": snapshot.primary_metric_name,
+        "primary_metric_direction": snapshot.primary_metric_direction,
         "validation_metric_value": snapshot.validation_metric_value,
         "test_metric_value": snapshot.test_metric_value,
         "validation_prediction_count": snapshot.validation_prediction_count,
         "test_prediction_count": snapshot.test_prediction_count,
+        "selection_score": snapshot.selection_score,
+        "selection_score_name": snapshot.selection_score_name,
         "snapshot": snapshot.snapshot,
         "created_at": snapshot.created_at.isoformat() if snapshot.created_at else None,
     }
@@ -789,14 +799,15 @@ def _select_best_evaluation_snapshot(
     *,
     selection_policy_name: str,
 ) -> ModelEvaluationSnapshotRecord | None:
-    if selection_policy_name != "validation_mae_candidate_v1":
+    normalized_policy_name = normalize_selection_policy_name(selection_policy_name)
+    if normalized_policy_name != "validation_regression_candidate_v1":
         raise ValueError(f"Unsupported selection policy: {selection_policy_name}")
     if not snapshots:
         return None
     return min(
         snapshots,
         key=lambda snapshot: (
-            1 if snapshot.fallback_strategy is not None else 0,
+            _metric_value_or_inf(snapshot.selection_score),
             _metric_value_or_inf(snapshot.validation_metric_value),
             _metric_value_or_inf(snapshot.test_metric_value),
             -snapshot.validation_prediction_count,

@@ -10,27 +10,17 @@ from bookmaker_detector_api.api.schemas import (
     AnalystOpportunityListFilters,
     AnalystOpportunityListResponse,
 )
-from bookmaker_detector_api.config import settings
 from bookmaker_detector_api.db.postgres import postgres_connection
 from bookmaker_detector_api.services.model_market_board_views import (
     _serialize_model_opportunity,
 )
 from bookmaker_detector_api.services.model_records import ModelOpportunityRecord
 from bookmaker_detector_api.services.models import (
-    get_model_opportunity_detail_in_memory,
     get_model_opportunity_detail_postgres,
-    get_model_opportunity_queue_in_memory,
     get_model_opportunity_queue_postgres,
-)
-from bookmaker_detector_api.services.repository_factory import (
-    build_in_memory_phase_three_modeling_store,
 )
 
 router = APIRouter(prefix="/analyst", tags=["analyst"])
-
-
-def _use_postgres_analyst_mode() -> bool:
-    return settings.use_postgres_stable_read_mode
 
 
 def _serialize_opportunity(opportunity: ModelOpportunityRecord) -> AnalystOpportunity:
@@ -40,47 +30,26 @@ def _serialize_opportunity(opportunity: ModelOpportunityRecord) -> AnalystOpport
 def _load_opportunities(
     filters: AnalystOpportunityListFilters,
 ) -> tuple[str, dict[str, object]]:
-    if _use_postgres_analyst_mode():
-        with postgres_connection() as connection:
-            queue = get_model_opportunity_queue_postgres(
-                connection,
-                target_task=filters.target_task,
-                team_code=filters.team_code,
-                status=filters.status,
-                season_label=filters.season_label,
-                source_kind=filters.source_kind,
-                scenario_key=filters.scenario_key,
-            )
-        return "postgres", queue
-
-    repository = build_in_memory_phase_three_modeling_store()
-    queue = get_model_opportunity_queue_in_memory(
-        repository,
-        target_task=filters.target_task,
-        team_code=filters.team_code,
-        status=filters.status,
-        season_label=filters.season_label,
-        source_kind=filters.source_kind,
-        scenario_key=filters.scenario_key,
-    )
-    return "in_memory", queue
+    with postgres_connection() as connection:
+        queue = get_model_opportunity_queue_postgres(
+            connection,
+            target_task=filters.target_task,
+            team_code=filters.team_code,
+            status=filters.status,
+            season_label=filters.season_label,
+            source_kind=filters.source_kind,
+            scenario_key=filters.scenario_key,
+        )
+    return "postgres", queue
 
 
 def _load_opportunity_detail(opportunity_id: int) -> tuple[str, dict[str, object] | None]:
-    if _use_postgres_analyst_mode():
-        with postgres_connection() as connection:
-            opportunity = get_model_opportunity_detail_postgres(
-                connection,
-                opportunity_id=opportunity_id,
-            )
-        return "postgres", opportunity
-
-    repository = build_in_memory_phase_three_modeling_store()
-    opportunity = get_model_opportunity_detail_in_memory(
-        repository,
-        opportunity_id=opportunity_id,
-    )
-    return "in_memory", opportunity
+    with postgres_connection() as connection:
+        opportunity = get_model_opportunity_detail_postgres(
+            connection,
+            opportunity_id=opportunity_id,
+        )
+    return "postgres", opportunity
 
 
 @router.get("/opportunities", response_model=AnalystOpportunityListResponse)

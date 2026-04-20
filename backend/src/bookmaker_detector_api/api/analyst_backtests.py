@@ -10,24 +10,14 @@ from bookmaker_detector_api.api.schemas import (
     AnalystBacktestListResponse,
     AnalystBacktestRun,
 )
-from bookmaker_detector_api.config import settings
 from bookmaker_detector_api.db.postgres import postgres_connection
 from bookmaker_detector_api.services.model_records import ModelBacktestRunRecord
 from bookmaker_detector_api.services.models import (
-    get_model_backtest_detail_in_memory,
     get_model_backtest_detail_postgres,
-    list_model_backtest_runs_in_memory,
     list_model_backtest_runs_postgres,
-)
-from bookmaker_detector_api.services.repository_factory import (
-    build_in_memory_phase_three_modeling_store,
 )
 
 router = APIRouter(prefix="/analyst", tags=["analyst"])
-
-
-def _use_postgres_analyst_mode() -> bool:
-    return settings.use_postgres_stable_read_mode
 
 
 def _serialize_backtest_run(run: ModelBacktestRunRecord) -> AnalystBacktestRun:
@@ -54,41 +44,23 @@ def _serialize_backtest_run(run: ModelBacktestRunRecord) -> AnalystBacktestRun:
 def _load_backtest_runs(
     filters: AnalystBacktestListFilters,
 ) -> tuple[str, list[ModelBacktestRunRecord]]:
-    if _use_postgres_analyst_mode():
-        with postgres_connection() as connection:
-            runs = list_model_backtest_runs_postgres(
-                connection,
-                target_task=filters.target_task,
-                team_code=filters.team_code,
-                season_label=filters.season_label,
-            )
-        return "postgres", runs
-
-    repository = build_in_memory_phase_three_modeling_store()
-    runs = list_model_backtest_runs_in_memory(
-        repository,
-        target_task=filters.target_task,
-        team_code=filters.team_code,
-        season_label=filters.season_label,
-    )
-    return "in_memory", runs
+    with postgres_connection() as connection:
+        runs = list_model_backtest_runs_postgres(
+            connection,
+            target_task=filters.target_task,
+            team_code=filters.team_code,
+            season_label=filters.season_label,
+        )
+    return "postgres", runs
 
 
 def _load_backtest_detail(backtest_run_id: int) -> tuple[str, dict[str, object] | None]:
-    if _use_postgres_analyst_mode():
-        with postgres_connection() as connection:
-            backtest_run = get_model_backtest_detail_postgres(
-                connection,
-                backtest_run_id=backtest_run_id,
-            )
-        return "postgres", backtest_run
-
-    repository = build_in_memory_phase_three_modeling_store()
-    backtest_run = get_model_backtest_detail_in_memory(
-        repository,
-        backtest_run_id=backtest_run_id,
-    )
-    return "in_memory", backtest_run
+    with postgres_connection() as connection:
+        backtest_run = get_model_backtest_detail_postgres(
+            connection,
+            backtest_run_id=backtest_run_id,
+        )
+    return "postgres", backtest_run
 
 
 @router.get("/backtests", response_model=AnalystBacktestListResponse)

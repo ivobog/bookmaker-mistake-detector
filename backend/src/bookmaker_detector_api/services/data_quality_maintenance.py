@@ -1,17 +1,18 @@
 from __future__ import annotations
 
-from bookmaker_detector_api.services.repository_factory import build_ingestion_repository
+from bookmaker_detector_api.services.repository_factory import (
+    build_postgres_ingestion_repository,
+)
 
 
 def normalize_data_quality_taxonomy(
     *,
-    repository_mode: str,
     provider_name: str | None = None,
     team_code: str | None = None,
     season_label: str | None = None,
     dry_run: bool = True,
 ) -> dict[str, object]:
-    repository, repository_context = build_ingestion_repository(repository_mode)
+    repository, repository_context = build_postgres_ingestion_repository()
     try:
         normalization = repository.normalize_data_quality_issue_taxonomy(
             provider_name=provider_name,
@@ -30,7 +31,7 @@ def normalize_data_quality_taxonomy(
             season_label=season_label,
         )
         return {
-            "repository_mode": repository_mode,
+            "repository_mode": "postgres",
             "dry_run": dry_run,
             "filters": {
                 "provider_name": provider_name,

@@ -50,6 +50,35 @@ class ModelEvaluationSnapshotRecord:
     validation_prediction_count: int
     test_prediction_count: int
     snapshot: dict[str, Any]
+    primary_metric_direction: str = "lower_is_better"
+    selection_score: float | None = None
+    selection_score_name: str | None = None
+    created_at: datetime | None = None
+
+
+@dataclass(slots=True)
+class TargetTaskDefinitionRecord:
+    task_key: str
+    task_kind: str
+    label: str
+    description: str
+    market_type: str
+    primary_metric_name: str
+    metric_direction: str
+    opportunity_policy_name: str
+    is_enabled: bool
+    config: dict[str, Any]
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+@dataclass(slots=True)
+class ModelFamilyCapabilityRecord:
+    id: int | None
+    model_family: str
+    target_task: str
+    is_enabled: bool
+    config: dict[str, Any]
     created_at: datetime | None = None
 
 

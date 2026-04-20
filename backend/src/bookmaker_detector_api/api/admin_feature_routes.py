@@ -1,56 +1,22 @@
 from fastapi import APIRouter, Query
 
-from bookmaker_detector_api.config import settings
 from bookmaker_detector_api.db.postgres import postgres_connection
-from bookmaker_detector_api.demo import (
-    run_phase_two_feature_demo as run_phase_two_feature_demo_job,
-)
-from bookmaker_detector_api.demo import seed_phase_two_feature_in_memory
-from bookmaker_detector_api.repositories import FeatureDatasetStore
 from bookmaker_detector_api.services.features import (
-    get_feature_analysis_artifact_catalog_in_memory,
     get_feature_analysis_artifact_catalog_postgres,
-    get_feature_analysis_artifact_history_in_memory,
     get_feature_analysis_artifact_history_postgres,
-    get_feature_dataset_in_memory,
     get_feature_dataset_postgres,
-    get_feature_dataset_profile_in_memory,
     get_feature_dataset_profile_postgres,
-    get_feature_dataset_splits_in_memory,
     get_feature_dataset_splits_postgres,
-    get_feature_snapshot_catalog_in_memory,
     get_feature_snapshot_catalog_postgres,
-    get_feature_training_benchmark_in_memory,
     get_feature_training_benchmark_postgres,
-    get_feature_training_bundle_in_memory,
     get_feature_training_bundle_postgres,
-    get_feature_training_manifest_in_memory,
     get_feature_training_manifest_postgres,
-    get_feature_training_task_matrix_in_memory,
     get_feature_training_task_matrix_postgres,
-    get_feature_training_view_in_memory,
     get_feature_training_view_postgres,
-    materialize_feature_analysis_artifacts_in_memory,
     materialize_feature_analysis_artifacts_postgres,
 )
-from bookmaker_detector_api.services.repository_factory import build_in_memory_feature_dataset_store
 
 router = APIRouter(prefix="/admin", tags=["admin"])
-
-
-def _use_postgres_stable_read_mode() -> bool:
-    return settings.use_postgres_stable_read_mode
-
-
-def _prepare_in_memory_feature_repository() -> FeatureDatasetStore:
-    repository, _, _ = seed_phase_two_feature_in_memory()
-    return repository
-
-
-@router.get("/phase-2-feature-demo")
-def phase_two_feature_demo() -> dict[str, object]:
-    repository_mode = "postgres" if _use_postgres_stable_read_mode() else "in_memory"
-    return run_phase_two_feature_demo_job(repository_mode=repository_mode)
 
 
 @router.get("/features/snapshots")
@@ -61,31 +27,18 @@ def feature_snapshots(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ) -> dict[str, object]:
-    if _use_postgres_stable_read_mode():
-        with postgres_connection() as connection:
-            snapshot_result = get_feature_snapshot_catalog_postgres(
-                connection,
-                feature_key=feature_key,
-                team_code=team_code,
-                season_label=season_label,
-                limit=limit,
-                offset=offset,
-            )
-        repository_mode = "postgres"
-    else:
-        repository = build_in_memory_feature_dataset_store()
-        snapshot_result = get_feature_snapshot_catalog_in_memory(
-            repository,
+    with postgres_connection() as connection:
+        snapshot_result = get_feature_snapshot_catalog_postgres(
+            connection,
             feature_key=feature_key,
             team_code=team_code,
             season_label=season_label,
             limit=limit,
             offset=offset,
         )
-        repository_mode = "in_memory"
 
     return {
-        "repository_mode": repository_mode,
+        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "team_code": team_code,
@@ -105,31 +58,18 @@ def feature_dataset(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
 ) -> dict[str, object]:
-    if _use_postgres_stable_read_mode():
-        with postgres_connection() as connection:
-            dataset_result = get_feature_dataset_postgres(
-                connection,
-                feature_key=feature_key,
-                team_code=team_code,
-                season_label=season_label,
-                limit=limit,
-                offset=offset,
-            )
-        repository_mode = "postgres"
-    else:
-        repository = build_in_memory_feature_dataset_store()
-        dataset_result = get_feature_dataset_in_memory(
-            repository,
+    with postgres_connection() as connection:
+        dataset_result = get_feature_dataset_postgres(
+            connection,
             feature_key=feature_key,
             team_code=team_code,
             season_label=season_label,
             limit=limit,
             offset=offset,
         )
-        repository_mode = "in_memory"
 
     return {
-        "repository_mode": repository_mode,
+        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "team_code": team_code,
@@ -147,27 +87,16 @@ def feature_dataset_profile(
     team_code: str | None = Query(default=None),
     season_label: str | None = Query(default=None),
 ) -> dict[str, object]:
-    if _use_postgres_stable_read_mode():
-        with postgres_connection() as connection:
-            profile_result = get_feature_dataset_profile_postgres(
-                connection,
-                feature_key=feature_key,
-                team_code=team_code,
-                season_label=season_label,
-            )
-        repository_mode = "postgres"
-    else:
-        repository = build_in_memory_feature_dataset_store()
-        profile_result = get_feature_dataset_profile_in_memory(
-            repository,
+    with postgres_connection() as connection:
+        profile_result = get_feature_dataset_profile_postgres(
+            connection,
             feature_key=feature_key,
             team_code=team_code,
             season_label=season_label,
         )
-        repository_mode = "in_memory"
 
     return {
-        "repository_mode": repository_mode,
+        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "team_code": team_code,
@@ -201,29 +130,9 @@ def materialize_feature_analysis(
         if condition_values is not None
         else None
     )
-    if _use_postgres_stable_read_mode():
-        with postgres_connection() as connection:
-            materialize_result = materialize_feature_analysis_artifacts_postgres(
-                connection,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                dimensions=parsed_dimensions,
-                min_sample_size=min_sample_size,
-                canonical_game_id=canonical_game_id,
-                condition_values=parsed_condition_values,
-                pattern_key=pattern_key,
-                comparable_limit=comparable_limit,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-                drop_null_targets=drop_null_targets,
-            )
-        repository_mode = "postgres"
-    else:
-        repository = _prepare_in_memory_feature_repository()
-        materialize_result = materialize_feature_analysis_artifacts_in_memory(
-            repository,
+    with postgres_connection() as connection:
+        materialize_result = materialize_feature_analysis_artifacts_postgres(
+            connection,
             feature_key=feature_key,
             target_task=target_task,
             team_code=team_code,
@@ -238,10 +147,9 @@ def materialize_feature_analysis(
             validation_ratio=validation_ratio,
             drop_null_targets=drop_null_targets,
         )
-        repository_mode = "in_memory"
 
     return {
-        "repository_mode": repository_mode,
+        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "target_task": target_task,
@@ -290,23 +198,9 @@ def feature_analysis_artifacts(
         if condition_values is not None
         else None
     )
-    if _use_postgres_stable_read_mode():
-        with postgres_connection() as connection:
-            artifact_result = get_feature_analysis_artifact_catalog_postgres(
-                connection,
-                feature_key=feature_key,
-                artifact_type=artifact_type,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                limit=limit,
-                offset=offset,
-            )
-        repository_mode = "postgres"
-    else:
-        repository = build_in_memory_feature_dataset_store()
-        artifact_result = get_feature_analysis_artifact_catalog_in_memory(
-            repository,
+    with postgres_connection() as connection:
+        artifact_result = get_feature_analysis_artifact_catalog_postgres(
+            connection,
             feature_key=feature_key,
             artifact_type=artifact_type,
             target_task=target_task,
@@ -315,10 +209,9 @@ def feature_analysis_artifacts(
             limit=limit,
             offset=offset,
         )
-        repository_mode = "in_memory"
 
     return {
-        "repository_mode": repository_mode,
+        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "artifact_type": artifact_type,
@@ -369,22 +262,9 @@ def feature_analysis_history(
         if condition_values is not None
         else None
     )
-    if _use_postgres_stable_read_mode():
-        with postgres_connection() as connection:
-            history_result = get_feature_analysis_artifact_history_postgres(
-                connection,
-                feature_key=feature_key,
-                artifact_type=artifact_type,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                latest_limit=latest_limit,
-            )
-        repository_mode = "postgres"
-    else:
-        repository = build_in_memory_feature_dataset_store()
-        history_result = get_feature_analysis_artifact_history_in_memory(
-            repository,
+    with postgres_connection() as connection:
+        history_result = get_feature_analysis_artifact_history_postgres(
+            connection,
             feature_key=feature_key,
             artifact_type=artifact_type,
             target_task=target_task,
@@ -392,10 +272,9 @@ def feature_analysis_history(
             season_label=season_label,
             latest_limit=latest_limit,
         )
-        repository_mode = "in_memory"
 
     return {
-        "repository_mode": repository_mode,
+        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "artifact_type": artifact_type,
@@ -428,22 +307,9 @@ def feature_dataset_splits(
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
     preview_limit: int = Query(default=5, ge=1, le=20),
 ) -> dict[str, object]:
-    if _use_postgres_stable_read_mode():
-        with postgres_connection() as connection:
-            split_result = get_feature_dataset_splits_postgres(
-                connection,
-                feature_key=feature_key,
-                team_code=team_code,
-                season_label=season_label,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-                preview_limit=preview_limit,
-            )
-        repository_mode = "postgres"
-    else:
-        repository = build_in_memory_feature_dataset_store()
-        split_result = get_feature_dataset_splits_in_memory(
-            repository,
+    with postgres_connection() as connection:
+        split_result = get_feature_dataset_splits_postgres(
+            connection,
             feature_key=feature_key,
             team_code=team_code,
             season_label=season_label,
@@ -451,10 +317,9 @@ def feature_dataset_splits(
             validation_ratio=validation_ratio,
             preview_limit=preview_limit,
         )
-        repository_mode = "in_memory"
 
     return {
-        "repository_mode": repository_mode,
+        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "team_code": team_code,
@@ -477,23 +342,9 @@ def feature_dataset_training_view(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
 ) -> dict[str, object]:
-    if _use_postgres_stable_read_mode():
-        with postgres_connection() as connection:
-            training_view = get_feature_training_view_postgres(
-                connection,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                drop_null_targets=drop_null_targets,
-                limit=limit,
-                offset=offset,
-            )
-        repository_mode = "postgres"
-    else:
-        repository = build_in_memory_feature_dataset_store()
-        training_view = get_feature_training_view_in_memory(
-            repository,
+    with postgres_connection() as connection:
+        training_view = get_feature_training_view_postgres(
+            connection,
             feature_key=feature_key,
             target_task=target_task,
             team_code=team_code,
@@ -502,10 +353,9 @@ def feature_dataset_training_view(
             limit=limit,
             offset=offset,
         )
-        repository_mode = "in_memory"
 
     return {
-        "repository_mode": repository_mode,
+        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "target_task": target_task,
@@ -527,31 +377,18 @@ def feature_dataset_training_manifest(
     season_label: str | None = Query(default=None),
     drop_null_targets: bool = Query(default=True),
 ) -> dict[str, object]:
-    if _use_postgres_stable_read_mode():
-        with postgres_connection() as connection:
-            training_manifest = get_feature_training_manifest_postgres(
-                connection,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                drop_null_targets=drop_null_targets,
-            )
-        repository_mode = "postgres"
-    else:
-        repository = build_in_memory_feature_dataset_store()
-        training_manifest = get_feature_training_manifest_in_memory(
-            repository,
+    with postgres_connection() as connection:
+        training_manifest = get_feature_training_manifest_postgres(
+            connection,
             feature_key=feature_key,
             target_task=target_task,
             team_code=team_code,
             season_label=season_label,
             drop_null_targets=drop_null_targets,
         )
-        repository_mode = "in_memory"
 
     return {
-        "repository_mode": repository_mode,
+        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "target_task": target_task,
@@ -574,24 +411,9 @@ def feature_dataset_training_bundle(
     drop_null_targets: bool = Query(default=True),
     preview_limit: int = Query(default=5, ge=1, le=20),
 ) -> dict[str, object]:
-    if _use_postgres_stable_read_mode():
-        with postgres_connection() as connection:
-            training_bundle = get_feature_training_bundle_postgres(
-                connection,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-                drop_null_targets=drop_null_targets,
-                preview_limit=preview_limit,
-            )
-        repository_mode = "postgres"
-    else:
-        repository = build_in_memory_feature_dataset_store()
-        training_bundle = get_feature_training_bundle_in_memory(
-            repository,
+    with postgres_connection() as connection:
+        training_bundle = get_feature_training_bundle_postgres(
+            connection,
             feature_key=feature_key,
             target_task=target_task,
             team_code=team_code,
@@ -601,10 +423,9 @@ def feature_dataset_training_bundle(
             drop_null_targets=drop_null_targets,
             preview_limit=preview_limit,
         )
-        repository_mode = "in_memory"
 
     return {
-        "repository_mode": repository_mode,
+        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "target_task": target_task,
@@ -629,23 +450,9 @@ def feature_dataset_training_benchmark(
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
     drop_null_targets: bool = Query(default=True),
 ) -> dict[str, object]:
-    if _use_postgres_stable_read_mode():
-        with postgres_connection() as connection:
-            training_benchmark = get_feature_training_benchmark_postgres(
-                connection,
-                feature_key=feature_key,
-                target_task=target_task,
-                team_code=team_code,
-                season_label=season_label,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-                drop_null_targets=drop_null_targets,
-            )
-        repository_mode = "postgres"
-    else:
-        repository = build_in_memory_feature_dataset_store()
-        training_benchmark = get_feature_training_benchmark_in_memory(
-            repository,
+    with postgres_connection() as connection:
+        training_benchmark = get_feature_training_benchmark_postgres(
+            connection,
             feature_key=feature_key,
             target_task=target_task,
             team_code=team_code,
@@ -654,10 +461,9 @@ def feature_dataset_training_benchmark(
             validation_ratio=validation_ratio,
             drop_null_targets=drop_null_targets,
         )
-        repository_mode = "in_memory"
 
     return {
-        "repository_mode": repository_mode,
+        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "target_task": target_task,
@@ -680,22 +486,9 @@ def feature_dataset_training_task_matrix(
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
     drop_null_targets: bool = Query(default=True),
 ) -> dict[str, object]:
-    if _use_postgres_stable_read_mode():
-        with postgres_connection() as connection:
-            training_task_matrix = get_feature_training_task_matrix_postgres(
-                connection,
-                feature_key=feature_key,
-                team_code=team_code,
-                season_label=season_label,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-                drop_null_targets=drop_null_targets,
-            )
-        repository_mode = "postgres"
-    else:
-        repository = build_in_memory_feature_dataset_store()
-        training_task_matrix = get_feature_training_task_matrix_in_memory(
-            repository,
+    with postgres_connection() as connection:
+        training_task_matrix = get_feature_training_task_matrix_postgres(
+            connection,
             feature_key=feature_key,
             team_code=team_code,
             season_label=season_label,
@@ -703,10 +496,9 @@ def feature_dataset_training_task_matrix(
             validation_ratio=validation_ratio,
             drop_null_targets=drop_null_targets,
         )
-        repository_mode = "in_memory"
 
     return {
-        "repository_mode": repository_mode,
+        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "team_code": team_code,

@@ -15,32 +15,19 @@ from bookmaker_detector_api.api.schemas import (
 )
 from bookmaker_detector_api.db.postgres import postgres_connection
 from bookmaker_detector_api.services.models import (
-    get_model_future_game_preview_in_memory,
     get_model_future_game_preview_postgres,
-    get_model_future_slate_preview_in_memory,
     get_model_future_slate_preview_postgres,
-    get_model_scoring_history_in_memory,
     get_model_scoring_history_postgres,
-    get_model_scoring_preview_in_memory,
     get_model_scoring_preview_postgres,
-    get_model_scoring_run_detail_in_memory,
     get_model_scoring_run_detail_postgres,
-    list_model_scoring_runs_in_memory,
     list_model_scoring_runs_postgres,
-    materialize_model_future_game_preview_in_memory,
     materialize_model_future_game_preview_postgres,
-    materialize_model_future_slate_in_memory,
     materialize_model_future_slate_postgres,
-)
-from bookmaker_detector_api.services.repository_factory import (
-    build_in_memory_phase_three_modeling_store,
 )
 
 from .admin_model_support import (
     FutureSlateRequest,
-    _prepare_in_memory_future_game_scoring_repository,
-    _prepare_in_memory_future_slate_repository,
-    _use_postgres_stable_read_mode,
+    _validate_model_admin_inputs,
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -76,30 +63,15 @@ def phase_three_model_score_preview(
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> AdminScoringPreviewResponse:
+    _validate_model_admin_inputs(
+        target_task=filters.target_task,
+        workflow_name="scoring",
+    )
     dimensions = tuple(filters.dimensions or ["venue", "days_rest_bucket"])
     filters = filters.model_copy(update={"dimensions": list(dimensions)})
-    if _use_postgres_stable_read_mode():
-        with postgres_connection() as connection:
-            scoring_preview = get_model_scoring_preview_postgres(
-                connection,
-                feature_key=filters.feature_key,
-                target_task=filters.target_task,
-                team_code=filters.team_code,
-                season_label=filters.season_label,
-                canonical_game_id=filters.canonical_game_id,
-                limit=filters.limit,
-                include_evidence=filters.include_evidence,
-                evidence_dimensions=dimensions,
-                comparable_limit=filters.comparable_limit,
-                min_pattern_sample_size=filters.min_pattern_sample_size,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        repository_mode = "postgres"
-    else:
-        repository = build_in_memory_phase_three_modeling_store()
-        scoring_preview = get_model_scoring_preview_in_memory(
-            repository,
+    with postgres_connection() as connection:
+        scoring_preview = get_model_scoring_preview_postgres(
+            connection,
             feature_key=filters.feature_key,
             target_task=filters.target_task,
             team_code=filters.team_code,
@@ -113,10 +85,9 @@ def phase_three_model_score_preview(
             train_ratio=train_ratio,
             validation_ratio=validation_ratio,
         )
-        repository_mode = "in_memory"
 
     return AdminScoringPreviewResponse(
-        repository_mode=repository_mode,
+        repository_mode="postgres",
         filters=filters,
         **scoring_preview,
     )
@@ -129,36 +100,20 @@ def phase_three_model_future_game_preview(
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> AdminFutureGamePreviewResponse:
+    resolved_target_task = filters.target_task or "spread_error_regression"
+    _validate_model_admin_inputs(
+        target_task=resolved_target_task,
+        workflow_name="scoring",
+    )
     dimensions = tuple(filters.dimensions or ["venue", "days_rest_bucket"])
     filters = filters.model_copy(
         update={"dimensions": list(dimensions), "game_date": game_date.isoformat()}
     )
-    if _use_postgres_stable_read_mode():
-        with postgres_connection() as connection:
-            preview = get_model_future_game_preview_postgres(
-                connection,
-                feature_key=filters.feature_key,
-                target_task=filters.target_task or "spread_error_regression",
-                season_label=filters.season_label,
-                game_date=game_date,
-                home_team_code=filters.home_team_code,
-                away_team_code=filters.away_team_code,
-                home_spread_line=filters.home_spread_line,
-                total_line=filters.total_line,
-                include_evidence=filters.include_evidence,
-                evidence_dimensions=dimensions,
-                comparable_limit=filters.comparable_limit,
-                min_pattern_sample_size=filters.min_pattern_sample_size,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        repository_mode = "postgres"
-    else:
-        repository = build_in_memory_phase_three_modeling_store()
-        preview = get_model_future_game_preview_in_memory(
-            repository,
+    with postgres_connection() as connection:
+        preview = get_model_future_game_preview_postgres(
+            connection,
             feature_key=filters.feature_key,
-            target_task=filters.target_task or "spread_error_regression",
+            target_task=resolved_target_task,
             season_label=filters.season_label,
             game_date=game_date,
             home_team_code=filters.home_team_code,
@@ -172,10 +127,9 @@ def phase_three_model_future_game_preview(
             train_ratio=train_ratio,
             validation_ratio=validation_ratio,
         )
-        repository_mode = "in_memory"
 
     return AdminFutureGamePreviewResponse(
-        repository_mode=repository_mode,
+        repository_mode="postgres",
         filters=filters,
         **preview,
     )
@@ -198,45 +152,13 @@ def phase_three_model_future_game_preview_materialize(
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> dict[str, object]:
-    if _use_postgres_stable_read_mode():
-        with postgres_connection() as connection:
-            materialized = materialize_model_future_game_preview_postgres(
-                connection,
-                feature_key=feature_key,
-                target_task=target_task,
-                season_label=season_label,
-                game_date=game_date,
-                home_team_code=home_team_code,
-                away_team_code=away_team_code,
-                home_spread_line=home_spread_line,
-                total_line=total_line,
-                include_evidence=include_evidence,
-                evidence_dimensions=dimensions,
-                comparable_limit=comparable_limit,
-                min_pattern_sample_size=min_pattern_sample_size,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        repository_mode = "postgres"
-    else:
-        repository = _prepare_in_memory_future_game_scoring_repository(
-            feature_key=feature_key,
-            target_task=target_task,
-            season_label=season_label,
-            game_date=game_date,
-            home_team_code=home_team_code,
-            away_team_code=away_team_code,
-            home_spread_line=home_spread_line,
-            total_line=total_line,
-            include_evidence=include_evidence,
-            dimensions=dimensions,
-            comparable_limit=comparable_limit,
-            min_pattern_sample_size=min_pattern_sample_size,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-        )
-        materialized = materialize_model_future_game_preview_in_memory(
-            repository,
+    _validate_model_admin_inputs(
+        target_task=target_task,
+        workflow_name="scoring",
+    )
+    with postgres_connection() as connection:
+        materialized = materialize_model_future_game_preview_postgres(
+            connection,
             feature_key=feature_key,
             target_task=target_task,
             season_label=season_label,
@@ -252,10 +174,9 @@ def phase_three_model_future_game_preview_materialize(
             train_ratio=train_ratio,
             validation_ratio=validation_ratio,
         )
-        repository_mode = "in_memory"
 
     return {
-        "repository_mode": repository_mode,
+        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "target_task": target_task,
@@ -282,33 +203,26 @@ def phase_three_model_future_game_preview_runs(
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
     limit: int = Query(default=10, ge=1, le=100),
 ) -> AdminScoringRunsResponse:
+    _validate_model_admin_inputs(
+        target_task=filters.target_task,
+        workflow_name="scoring",
+    )
     filters = filters.model_copy(
         update={
             "dimensions": list(filters.dimensions or ["venue", "days_rest_bucket"]),
             "game_date": game_date.isoformat(),
         }
     )
-    if _use_postgres_stable_read_mode():
-        with postgres_connection() as connection:
-            scoring_runs = list_model_scoring_runs_postgres(
-                connection,
-                target_task=filters.target_task,
-                team_code=filters.team_code,
-                season_label=filters.season_label,
-            )
-        repository_mode = "postgres"
-    else:
-        repository = build_in_memory_phase_three_modeling_store()
-        scoring_runs = list_model_scoring_runs_in_memory(
-            repository,
+    with postgres_connection() as connection:
+        scoring_runs = list_model_scoring_runs_postgres(
+            connection,
             target_task=filters.target_task,
             team_code=filters.team_code,
             season_label=filters.season_label,
         )
-        repository_mode = "in_memory"
 
     return AdminScoringRunsResponse(
-        repository_mode=repository_mode,
+        repository_mode="postgres",
         filters=filters,
         scoring_run_count=len(scoring_runs),
         scoring_runs=[_serialize_scoring_run(scoring_run) for scoring_run in scoring_runs[:limit]],
@@ -323,29 +237,24 @@ def phase_three_model_future_game_preview_run_detail(
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> AdminScoringRunDetailResponse:
+    _validate_model_admin_inputs(
+        target_task=filters.target_task,
+        workflow_name="scoring",
+    )
     filters = filters.model_copy(
         update={
             "dimensions": list(filters.dimensions or ["venue", "days_rest_bucket"]),
             "game_date": game_date.isoformat(),
         }
     )
-    if _use_postgres_stable_read_mode():
-        with postgres_connection() as connection:
-            scoring_run = get_model_scoring_run_detail_postgres(
-                connection,
-                scoring_run_id=scoring_run_id,
-            )
-        repository_mode = "postgres"
-    else:
-        repository = build_in_memory_phase_three_modeling_store()
-        scoring_run = get_model_scoring_run_detail_in_memory(
-            repository,
+    with postgres_connection() as connection:
+        scoring_run = get_model_scoring_run_detail_postgres(
+            connection,
             scoring_run_id=scoring_run_id,
         )
-        repository_mode = "in_memory"
 
     return AdminScoringRunDetailResponse(
-        repository_mode=repository_mode,
+        repository_mode="postgres",
         filters=filters,
         scoring_run=scoring_run,
     )
@@ -359,6 +268,10 @@ def phase_three_model_future_game_preview_history(
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
     recent_limit: int = Query(default=10, ge=1, le=50),
 ) -> AdminScoringHistoryResponse:
+    _validate_model_admin_inputs(
+        target_task=filters.target_task,
+        workflow_name="scoring",
+    )
     filters = filters.model_copy(
         update={
             "dimensions": list(filters.dimensions or ["venue", "days_rest_bucket"]),
@@ -366,29 +279,17 @@ def phase_three_model_future_game_preview_history(
             "recent_limit": recent_limit,
         }
     )
-    if _use_postgres_stable_read_mode():
-        with postgres_connection() as connection:
-            history = get_model_scoring_history_postgres(
-                connection,
-                target_task=filters.target_task,
-                team_code=filters.team_code,
-                season_label=filters.season_label,
-                recent_limit=recent_limit,
-            )
-        repository_mode = "postgres"
-    else:
-        repository = build_in_memory_phase_three_modeling_store()
-        history = get_model_scoring_history_in_memory(
-            repository,
+    with postgres_connection() as connection:
+        history = get_model_scoring_history_postgres(
+            connection,
             target_task=filters.target_task,
             team_code=filters.team_code,
             season_label=filters.season_label,
             recent_limit=recent_limit,
         )
-        repository_mode = "in_memory"
 
     return AdminScoringHistoryResponse(
-        repository_mode=repository_mode,
+        repository_mode="postgres",
         filters=filters,
         model_scoring_history=history,
     )
@@ -406,38 +307,14 @@ def phase_three_model_future_slate_preview(
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> dict[str, object]:
+    _validate_model_admin_inputs(
+        target_task=target_task,
+        workflow_name="scoring",
+    )
     games = [game.model_dump() for game in request.games]
-    if _use_postgres_stable_read_mode():
-        with postgres_connection() as connection:
-            preview = get_model_future_slate_preview_postgres(
-                connection,
-                feature_key=feature_key,
-                target_task=target_task,
-                games=games,
-                slate_label=request.slate_label,
-                include_evidence=include_evidence,
-                evidence_dimensions=dimensions,
-                comparable_limit=comparable_limit,
-                min_pattern_sample_size=min_pattern_sample_size,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        repository_mode = "postgres"
-    else:
-        repository = _prepare_in_memory_future_slate_repository(
-            feature_key=feature_key,
-            target_task=target_task,
-            games=games,
-            slate_label=request.slate_label,
-            include_evidence=include_evidence,
-            dimensions=dimensions,
-            comparable_limit=comparable_limit,
-            min_pattern_sample_size=min_pattern_sample_size,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-        )
-        preview = get_model_future_slate_preview_in_memory(
-            repository,
+    with postgres_connection() as connection:
+        preview = get_model_future_slate_preview_postgres(
+            connection,
             feature_key=feature_key,
             target_task=target_task,
             games=games,
@@ -449,10 +326,9 @@ def phase_three_model_future_slate_preview(
             train_ratio=train_ratio,
             validation_ratio=validation_ratio,
         )
-        repository_mode = "in_memory"
 
     return {
-        "repository_mode": repository_mode,
+        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "target_task": target_task,
@@ -478,38 +354,14 @@ def phase_three_model_future_slate_materialize(
     train_ratio: float = Query(default=0.7, gt=0, lt=1),
     validation_ratio: float = Query(default=0.15, ge=0, lt=1),
 ) -> dict[str, object]:
+    _validate_model_admin_inputs(
+        target_task=target_task,
+        workflow_name="scoring",
+    )
     games = [game.model_dump() for game in request.games]
-    if _use_postgres_stable_read_mode():
-        with postgres_connection() as connection:
-            materialized = materialize_model_future_slate_postgres(
-                connection,
-                feature_key=feature_key,
-                target_task=target_task,
-                games=games,
-                slate_label=request.slate_label,
-                include_evidence=include_evidence,
-                evidence_dimensions=dimensions,
-                comparable_limit=comparable_limit,
-                min_pattern_sample_size=min_pattern_sample_size,
-                train_ratio=train_ratio,
-                validation_ratio=validation_ratio,
-            )
-        repository_mode = "postgres"
-    else:
-        repository = _prepare_in_memory_future_slate_repository(
-            feature_key=feature_key,
-            target_task=target_task,
-            games=games,
-            slate_label=request.slate_label,
-            include_evidence=include_evidence,
-            dimensions=dimensions,
-            comparable_limit=comparable_limit,
-            min_pattern_sample_size=min_pattern_sample_size,
-            train_ratio=train_ratio,
-            validation_ratio=validation_ratio,
-        )
-        materialized = materialize_model_future_slate_in_memory(
-            repository,
+    with postgres_connection() as connection:
+        materialized = materialize_model_future_slate_postgres(
+            connection,
             feature_key=feature_key,
             target_task=target_task,
             games=games,
@@ -521,10 +373,9 @@ def phase_three_model_future_slate_materialize(
             train_ratio=train_ratio,
             validation_ratio=validation_ratio,
         )
-        repository_mode = "in_memory"
 
     return {
-        "repository_mode": repository_mode,
+        "repository_mode": "postgres",
         "filters": {
             "feature_key": feature_key,
             "target_task": target_task,

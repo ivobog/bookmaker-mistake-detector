@@ -183,10 +183,13 @@ class AdminEvaluationSnapshot(BaseModel):
     selected_feature: str | None = None
     fallback_strategy: str | None = None
     primary_metric_name: str
+    primary_metric_direction: str = "lower_is_better"
     validation_metric_value: float | None = None
     test_metric_value: float | None = None
     validation_prediction_count: int
     test_prediction_count: int
+    selection_score: float | None = None
+    selection_score_name: str | None = None
     snapshot: dict[str, Any] = Field(default_factory=dict)
     created_at: str | None = None
 
@@ -388,3 +391,41 @@ class AdminOpportunityHistoryResponse(BaseModel):
     repository_mode: RepositoryMode
     filters: AdminOpportunityHistoryFilters
     model_opportunity_history: dict[str, Any] = Field(default_factory=dict)
+
+
+class AdminTaskCapability(BaseModel):
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+
+    task_key: str
+    task_kind: str
+    label: str
+    description: str
+    market_type: str
+    primary_metric_name: str
+    metric_direction: str
+    supported_model_families: list[str] = Field(default_factory=list)
+    default_selection_policy_name: str
+    valid_selection_policy_names: list[str] = Field(default_factory=list)
+    default_opportunity_policy_name: str
+    scoring_output_semantics: str | None = None
+    signal_strength_interpretation: str | None = None
+    workflow_support: dict[str, bool] = Field(default_factory=dict)
+    is_enabled: bool = True
+    config: dict[str, Any] = Field(default_factory=dict)
+
+
+class AdminModelCapabilitiesUiDefaults(BaseModel):
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+
+    default_feature_key: str
+    default_target_task: str | None = None
+    default_train_ratio: float
+    default_validation_ratio: float
+
+
+class AdminModelCapabilitiesResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+
+    task_count: int
+    target_tasks: list[AdminTaskCapability] = Field(default_factory=list)
+    ui_defaults: AdminModelCapabilitiesUiDefaults

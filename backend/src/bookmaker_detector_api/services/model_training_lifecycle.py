@@ -13,6 +13,9 @@ from bookmaker_detector_api.services.model_records import (
     ModelSelectionSnapshotRecord,
     ModelTrainingRunRecord,
 )
+from bookmaker_detector_api.services.task_registry import (
+    DEFAULT_REGRESSION_SELECTION_POLICY_NAME,
+)
 
 MODEL_FAMILY_CONFIGS = {
     "linear_feature": {
@@ -303,13 +306,16 @@ def save_model_evaluation_snapshot_postgres(
                 selected_feature,
                 fallback_strategy,
                 primary_metric_name,
+                primary_metric_direction,
                 validation_metric_value,
                 test_metric_value,
                 validation_prediction_count,
                 test_prediction_count,
+                selection_score,
+                selection_score_name,
                 snapshot_json
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
             ON CONFLICT (model_training_run_id)
             DO UPDATE SET
                 model_registry_id = EXCLUDED.model_registry_id,
@@ -319,10 +325,13 @@ def save_model_evaluation_snapshot_postgres(
                 selected_feature = EXCLUDED.selected_feature,
                 fallback_strategy = EXCLUDED.fallback_strategy,
                 primary_metric_name = EXCLUDED.primary_metric_name,
+                primary_metric_direction = EXCLUDED.primary_metric_direction,
                 validation_metric_value = EXCLUDED.validation_metric_value,
                 test_metric_value = EXCLUDED.test_metric_value,
                 validation_prediction_count = EXCLUDED.validation_prediction_count,
                 test_prediction_count = EXCLUDED.test_prediction_count,
+                selection_score = EXCLUDED.selection_score,
+                selection_score_name = EXCLUDED.selection_score_name,
                 snapshot_json = EXCLUDED.snapshot_json
             RETURNING id, created_at
             """,
@@ -335,10 +344,13 @@ def save_model_evaluation_snapshot_postgres(
                 payload["selected_feature"],
                 payload["fallback_strategy"],
                 payload["primary_metric_name"],
+                payload["primary_metric_direction"],
                 payload["validation_metric_value"],
                 payload["test_metric_value"],
                 payload["validation_prediction_count"],
                 payload["test_prediction_count"],
+                payload["selection_score"],
+                payload["selection_score_name"],
                 _json_dumps(payload["snapshot"]),
             ),
         )
@@ -371,8 +383,11 @@ def save_model_selection_snapshot_in_memory(
         "selection_policy_name": selection_policy_name,
         "rationale": {
             "primary_metric_name": snapshot.primary_metric_name,
+            "primary_metric_direction": snapshot.primary_metric_direction,
             "validation_metric_value": snapshot.validation_metric_value,
             "fallback_strategy": snapshot.fallback_strategy,
+            "selection_score": snapshot.selection_score,
+            "selection_score_name": snapshot.selection_score_name,
         },
         "is_active": True,
         "created_at": datetime.now(timezone.utc),
@@ -389,8 +404,11 @@ def save_model_selection_snapshot_postgres(
 ) -> ModelSelectionSnapshotRecord:
     rationale = {
         "primary_metric_name": snapshot.primary_metric_name,
+        "primary_metric_direction": snapshot.primary_metric_direction,
         "validation_metric_value": snapshot.validation_metric_value,
         "fallback_strategy": snapshot.fallback_strategy,
+        "selection_score": snapshot.selection_score,
+        "selection_score_name": snapshot.selection_score_name,
     }
     with connection.cursor() as cursor:
         cursor.execute(
@@ -451,6 +469,7 @@ def _build_model_evaluation_snapshot_payload(run: ModelTrainingRunRecord) -> dic
         "selected_feature": run.artifact.get("selected_feature"),
         "fallback_strategy": run.artifact.get("fallback_strategy"),
         "primary_metric_name": "mae",
+        "primary_metric_direction": "lower_is_better",
         "validation_metric_value": model_training_views._float_or_none(
             run.metrics.get("validation", {}).get("mae")
         ),
@@ -461,6 +480,8 @@ def _build_model_evaluation_snapshot_payload(run: ModelTrainingRunRecord) -> dic
             run.metrics.get("validation", {}).get("prediction_count", 0)
         ),
         "test_prediction_count": int(run.metrics.get("test", {}).get("prediction_count", 0)),
+        "selection_score": _build_selection_score(run),
+        "selection_score_name": DEFAULT_REGRESSION_SELECTION_POLICY_NAME,
         "snapshot": {
             "artifact": run.artifact,
             "metrics": run.metrics,
@@ -481,3 +502,11 @@ def _build_model_key(
 ) -> str:
     scope = team_code.lower() if team_code is not None else "global"
     return f"{target_task}_{model_family}_{scope}_v1"
+
+
+def _build_selection_score(run: ModelTrainingRunRecord) -> float | None:
+    validation_mae = model_training_views._float_or_none(run.metrics.get("validation", {}).get("mae"))
+    if validation_mae is None:
+        return None
+    fallback_penalty = 1000.0 if run.artifact.get("fallback_strategy") is not None else 0.0
+    return float(validation_mae) + fallback_penalty
