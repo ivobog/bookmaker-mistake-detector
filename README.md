@@ -18,6 +18,7 @@ Phase 0, Phase 1, and Phase 2 are complete. Phase 3 is complete for the backend 
 
 ## Quick Start
 1. Copy `.env.example` to `.env`.
+   See `docs/configuration.md` for the full parameter list and defaults.
 2. Run `docker compose up --build`.
    This initializes Postgres from `infra/postgres/init/` on first boot of a fresh volume.
 3. Open the frontend at `http://localhost:5173`.

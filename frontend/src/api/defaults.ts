@@ -16,7 +16,7 @@ export const sharedTrainingDefaults = {
 
 export const sharedBacktestDefaults = {
   minimumTrainGames: (import.meta.env.VITE_DEFAULT_MINIMUM_TRAIN_GAMES ?? "2000") as NumericString,
-  testWindowGames: (import.meta.env.VITE_DEFAULT_TEST_WINDOW_GAMES ?? "750") as NumericString
+  testWindowGames: (import.meta.env.VITE_DEFAULT_TEST_WINDOW_GAMES ?? "200") as NumericString
 };
 
 const scenarioDefaults = {
