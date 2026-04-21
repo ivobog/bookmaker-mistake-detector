@@ -1,11 +1,13 @@
 FROM node:22-alpine
 
-WORKDIR /app
+WORKDIR /app/frontend-redesign
 
-COPY package.json ./
+COPY frontend-redesign/package.json ./
+COPY frontend-redesign/package-lock.json ./
 RUN npm install
 
-COPY . .
+COPY frontend-redesign ./
+COPY shared ../shared
 
 EXPOSE 5174
 

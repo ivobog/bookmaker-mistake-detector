@@ -1,13 +1,14 @@
 FROM node:22-alpine
 
-WORKDIR /app
+WORKDIR /app/frontend
 
-COPY package.json ./
+COPY frontend/package.json ./
+COPY frontend/package-lock.json ./
 RUN npm install
 
-COPY . .
+COPY frontend ./
+COPY shared ../shared
 
 EXPOSE 5173
 
 CMD ["npm", "run", "dev"]
-

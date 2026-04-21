@@ -1,0 +1,13 @@
+.git
+.github
+.ruff_cache
+artifacts
+admin-diagnostics-seed-*
+frontend/node_modules
+frontend/dist
+frontend/playwright-report
+frontend/test-results
+frontend-redesign/node_modules
+frontend-redesign/dist
+**/*.tsbuildinfo
+**/npm-debug.log*

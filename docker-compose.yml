@@ -72,7 +72,8 @@ services:
 
   frontend:
     build:
-      context: ./frontend
+      context: .
+      dockerfile: ./frontend/Dockerfile
     container_name: bookmaker-frontend
     environment:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL}
@@ -84,7 +85,8 @@ services:
 
   frontend-redesign:
     build:
-      context: ./frontend-redesign
+      context: .
+      dockerfile: ./frontend-redesign/Dockerfile
     container_name: bookmaker-frontend-redesign
     environment:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL}
