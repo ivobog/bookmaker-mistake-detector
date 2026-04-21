@@ -22,6 +22,7 @@ Phase 0, Phase 1, and Phase 2 are complete. Phase 3 is complete for the backend 
 2. Run `docker compose up --build`.
    This initializes Postgres from `infra/postgres/init/` on first boot of a fresh volume.
 3. Open the frontend at `http://localhost:5173`.
+   Open the redesign frontend at `http://localhost:5174` when you want the parallel workflow-desk shell directly.
 4. Check the API health route at `http://localhost:8000/api/v1/health`.
 5. Run the Phase 5 regression pass from the repo root with `powershell -ExecutionPolicy Bypass -File .\scripts\run_phase5_regression.ps1`.
 6. If you are pointing at an existing Postgres database or persistent Docker volume, verify the schema from `infra/postgres/init/` is already applied before continuing.
