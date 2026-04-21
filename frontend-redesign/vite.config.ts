@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { URL, fileURLToPath } from "node:url";
 
@@ -8,13 +8,13 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: "0.0.0.0",
-    port: 5173,
+    port: 5174,
     fs: {
       allow: [workspaceRoot]
     }
   },
-  test: {
-    environment: "node",
-    include: ["src/**/*.test.ts", "src/**/*.test.tsx"]
+  preview: {
+    host: "0.0.0.0",
+    port: 4174
   }
 });

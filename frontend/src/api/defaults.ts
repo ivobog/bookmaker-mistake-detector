@@ -1,5 +1,11 @@
 import type { ModelAdminCapabilitiesResponse } from "../modelAdminTypes";
 import { apiGet } from "./client";
+import {
+  buildBacktestQuery as buildSharedBacktestQuery,
+  buildModelArtifactQuery as buildSharedModelArtifactQuery,
+  buildOpportunityQuery as buildSharedOpportunityQuery,
+  buildTrainingQuery as buildSharedTrainingUrlQuery
+} from "../../../shared/frontend/query";
 
 type NumericString = `${number}`;
 
@@ -15,7 +21,7 @@ export const sharedTrainingDefaults = {
 };
 
 export const sharedBacktestDefaults = {
-  minimumTrainGames: (import.meta.env.VITE_DEFAULT_MINIMUM_TRAIN_GAMES ?? "2000") as NumericString,
+  minimumTrainGames: (import.meta.env.VITE_DEFAULT_MINIMUM_TRAIN_GAMES ?? "3000") as NumericString,
   testWindowGames: (import.meta.env.VITE_DEFAULT_TEST_WINDOW_GAMES ?? "200") as NumericString
 };
 
@@ -53,43 +59,52 @@ export async function resolveDefaultTargetTask(): Promise<string | null> {
 
 export async function buildSharedTrainingQuery(): Promise<URLSearchParams> {
   const targetTask = await resolveDefaultTargetTask();
-  const query = new URLSearchParams({
-    train_ratio: sharedTrainingDefaults.trainRatio,
-    validation_ratio: sharedTrainingDefaults.validationRatio
+  return buildSharedTrainingUrlQuery({
+    targetTask,
+    trainRatio: sharedTrainingDefaults.trainRatio,
+    validationRatio: sharedTrainingDefaults.validationRatio
   });
-  if (targetTask) {
-    query.set("target_task", targetTask);
-  }
-  return query;
 }
 
 export async function buildBacktestQuery(): Promise<URLSearchParams> {
-  const query = await buildSharedTrainingQuery();
-  query.set("minimum_train_games", sharedBacktestDefaults.minimumTrainGames);
-  query.set("test_window_games", sharedBacktestDefaults.testWindowGames);
-  return query;
+  const targetTask = await resolveDefaultTargetTask();
+  return buildSharedBacktestQuery({
+    targetTask,
+    trainRatio: sharedTrainingDefaults.trainRatio,
+    validationRatio: sharedTrainingDefaults.validationRatio,
+    minimumTrainGames: sharedBacktestDefaults.minimumTrainGames,
+    testWindowGames: sharedBacktestDefaults.testWindowGames
+  });
 }
 
 export async function buildOpportunityQuery(options?: {
   includeLimit?: boolean;
   recentLimit?: number;
 }): Promise<URLSearchParams> {
-  const query = await buildSharedTrainingQuery();
-  if (options?.includeLimit) {
-    query.set("limit", "25");
-  }
-  if (options?.recentLimit !== undefined) {
-    query.set("recent_limit", String(options.recentLimit));
-  }
-  return query;
+  const targetTask = await resolveDefaultTargetTask();
+  return buildSharedOpportunityQuery(
+    {
+      targetTask,
+      trainRatio: sharedTrainingDefaults.trainRatio,
+      validationRatio: sharedTrainingDefaults.validationRatio
+    },
+    {
+      limit: options?.includeLimit ? 25 : null,
+      recentLimit: options?.recentLimit
+    }
+  );
 }
 
 export async function buildModelArtifactQuery(recentLimit?: number): Promise<URLSearchParams> {
-  const query = await buildSharedTrainingQuery();
-  if (recentLimit !== undefined) {
-    query.set("recent_limit", String(recentLimit));
-  }
-  return query;
+  const targetTask = await resolveDefaultTargetTask();
+  return buildSharedModelArtifactQuery(
+    {
+      targetTask,
+      trainRatio: sharedTrainingDefaults.trainRatio,
+      validationRatio: sharedTrainingDefaults.validationRatio
+    },
+    recentLimit
+  );
 }
 
 export function resolveScenarioDefaults(): {

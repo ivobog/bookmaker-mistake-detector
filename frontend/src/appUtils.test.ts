@@ -11,6 +11,8 @@ const roundTripRoutes: AppRoute[] = [
   { name: "backtest-fold-evaluation", runId: 101, foldIndex: 0, evaluationId: 401 },
   { name: "artifact-compare", runId: 101, foldIndex: 0, opportunityId: 7 },
   { name: "models" },
+  { name: "workflow-desk" },
+  { name: "workflow-desk", deskPath: "training-lab?task=spread_error_regression&candidate=Run-413" },
   { name: "model-registry" },
   { name: "model-runs" },
   { name: "model-run-detail", runId: 301 },
@@ -39,6 +41,10 @@ describe("parseRouteFromHash", () => {
 
   it("parses the full model admin route family", () => {
     expect(parseRouteFromHash("#/models")).toEqual({ name: "models" });
+    expect(parseRouteFromHash("#/workflow-desk/training-lab?task=spread_error_regression")).toEqual({
+      name: "workflow-desk",
+      deskPath: "training-lab?task=spread_error_regression"
+    });
     expect(parseRouteFromHash("#/models/registry")).toEqual({ name: "model-registry" });
     expect(parseRouteFromHash("#/models/runs/301")).toEqual({
       name: "model-run-detail",
@@ -58,6 +64,10 @@ describe("parseRouteFromHash", () => {
 describe("routeHash", () => {
   it("serializes the full model admin route family", () => {
     expect(routeHash({ name: "models" })).toBe("#/models");
+    expect(routeHash({ name: "workflow-desk" })).toBe("#/workflow-desk");
+    expect(routeHash({ name: "workflow-desk", deskPath: "training-lab?task=spread_error_regression" })).toBe(
+      "#/workflow-desk/training-lab?task=spread_error_regression"
+    );
     expect(routeHash({ name: "model-registry" })).toBe("#/models/registry");
     expect(routeHash({ name: "model-runs" })).toBe("#/models/runs");
     expect(routeHash({ name: "model-run-detail", runId: 301 })).toBe("#/models/runs/301");

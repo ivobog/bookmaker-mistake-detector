@@ -81,6 +81,13 @@ export function parseRouteFromHash(hash: string): AppRoute {
   if (!normalized || normalized === "backtests") {
     return { name: "backtests" };
   }
+  const workflowDeskMatch = /^workflow-desk(?:\/(.*))?$/.exec(normalized);
+  if (workflowDeskMatch) {
+    return {
+      name: "workflow-desk",
+      deskPath: workflowDeskMatch[1] || undefined
+    };
+  }
   if (normalized === "models") {
     return { name: "models" };
   }
@@ -220,6 +227,10 @@ export function parseRouteFromHash(hash: string): AppRoute {
 export function routeHash(route: AppRoute): string {
   if (route.name === "backtests") {
     return "#/backtests";
+  }
+  if (route.name === "workflow-desk") {
+    const deskPath = route.deskPath?.replace(/^\/+/, "");
+    return deskPath ? `#/workflow-desk/${deskPath}` : "#/workflow-desk";
   }
   if (route.name === "models") {
     return "#/models";

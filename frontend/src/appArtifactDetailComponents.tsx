@@ -19,20 +19,13 @@ import {
   readNested,
   routeHash
 } from "./appUtils";
-
-function formatSelectionRationaleValue(rationale: SelectionSnapshot["rationale"]): string {
-  if (rationale === null) {
-    return "n/a";
-  }
-  if (typeof rationale === "string") {
-    return rationale;
-  }
-  const reason = readNested(rationale, "reason");
-  if (reason !== undefined && reason !== null) {
-    return String(reason);
-  }
-  return JSON.stringify(rationale);
-}
+import {
+  getModelFamilyLabel,
+  getModelRunLabel,
+  getOpportunityMatchupLabel,
+  getSelectedFeatureLabel
+} from "../../shared/frontend/domain";
+import { formatStoredRationaleValue } from "../../shared/frontend/detailFormatting";
 
 export function ModelRunArtifactDetail({
   modelRun,
@@ -64,10 +57,10 @@ export function ModelRunArtifactDetail({
       <div className="section-heading">
         <div>
           <p className="eyebrow">Training run detail</p>
-          <h2>Run #{modelRun.id}</h2>
+          <h2>{getModelRunLabel(modelRun.id)}</h2>
         </div>
         <div className="pill-row">
-          <span className="pill">{String(readNested(modelRun.artifact, "model_family") ?? "n/a")}</span>
+          <span className="pill">{getModelFamilyLabel(modelRun)}</span>
           <span className="pill">{modelRun.status}</span>
         </div>
       </div>
@@ -85,7 +78,7 @@ export function ModelRunArtifactDetail({
           <div className="detail-list compact-list">
             <div className="detail-list-item">
               <span>Selected feature</span>
-              <strong>{String(readNested(modelRun.artifact, "selected_feature") ?? "n/a")}</strong>
+              <strong>{getSelectedFeatureLabel(modelRun)}</strong>
             </div>
             <div className="detail-list-item">
               <span>Fallback strategy</span>
@@ -150,7 +143,7 @@ export function SelectionArtifactDetail({
           <h2>Selection #{selection.id}</h2>
         </div>
         <div className="pill-row">
-          <span className="pill">{selection.model_family}</span>
+          <span className="pill">{getModelFamilyLabel(selection)}</span>
           <span className="pill">{selection.is_active ? "active" : "inactive"}</span>
         </div>
       </div>
@@ -167,7 +160,7 @@ export function SelectionArtifactDetail({
         <p className="sub-panel-meta">
           {selection.rationale === null
             ? "No rationale was stored for this snapshot."
-            : formatSelectionRationaleValue(selection.rationale)}
+            : formatStoredRationaleValue(selection.rationale)}
         </p>
       </section>
     </article>
@@ -204,13 +197,13 @@ export function EvaluationArtifactDetail({
           <h2>Evaluation #{evaluation.id}</h2>
         </div>
         <div className="pill-row">
-          <span className="pill">{evaluation.model_family}</span>
+          <span className="pill">{getModelFamilyLabel(evaluation)}</span>
           <span className="pill">{evaluation.primary_metric_name ?? "n/a"}</span>
         </div>
       </div>
 
       <div className="mini-grid">
-        <StatTile label="Selected feature" value={evaluation.selected_feature ?? "n/a"} />
+        <StatTile label="Selected feature" value={getSelectedFeatureLabel(evaluation)} />
         <StatTile label="Fallback" value={evaluation.fallback_strategy ?? "n/a"} />
         <StatTile label="Validation" value={formatCompactNumber(evaluation.validation_metric_value, 4)} />
         <StatTile label="Test" value={formatCompactNumber(evaluation.test_metric_value, 4)} />
@@ -370,16 +363,20 @@ export function ArtifactCompareView({
   const foldTest = foldEvaluation?.test_metric_value ?? fold.selected_model.test_metric_value;
   const opportunityValidation = opportunityEvaluation?.validation_metric_value ?? null;
   const opportunityTest = opportunityEvaluation?.test_metric_value ?? null;
+  const foldModelFamily = getModelFamilyLabel(fold.selected_model);
+  const opportunityModelFamily = getModelFamilyLabel(opportunityEvaluation ?? selection ?? {});
+  const selectionModelFamily = getModelFamilyLabel(selection ?? {});
+  const foldSelectedFeature = getSelectedFeatureLabel(fold.selected_model, "fallback");
+  const opportunitySelectedFeature = getSelectedFeatureLabel(opportunityEvaluation ?? {}, "n/a");
   const familyAligned =
     opportunityEvaluation?.model_family !== undefined
-      ? fold.selected_model.model_family === opportunityEvaluation.model_family
+      ? foldModelFamily === opportunityModelFamily
       : selection?.model_family !== undefined
-        ? fold.selected_model.model_family === selection.model_family
+        ? foldModelFamily === selectionModelFamily
         : null;
   const featureAligned =
     opportunityEvaluation?.selected_feature !== undefined
-      ? (fold.selected_model.selected_feature ?? "fallback") ===
-        (opportunityEvaluation.selected_feature ?? "fallback")
+      ? foldSelectedFeature === getSelectedFeatureLabel(opportunityEvaluation, "fallback")
       : null;
   const selectionEvaluationLinked =
     selection?.model_evaluation_snapshot_id !== undefined &&
@@ -393,10 +390,10 @@ export function ArtifactCompareView({
   const testDeltaAbs = testDelta === null ? null : Math.abs(testDelta);
   const mismatchMessages = [
     familyAligned === false
-      ? `Backtest fold selected ${fold.selected_model.model_family}, but the opportunity evaluation is using ${opportunityEvaluation?.model_family ?? "a different model context"}.`
+      ? `Backtest fold selected ${foldModelFamily}, but the opportunity evaluation is using ${opportunityModelFamily || "a different model context"}.`
       : null,
     featureAligned === false
-      ? `Selected feature drifted from ${fold.selected_model.selected_feature ?? "fallback"} to ${opportunityEvaluation?.selected_feature ?? "fallback"}.`
+      ? `Selected feature drifted from ${foldSelectedFeature} to ${getSelectedFeatureLabel(opportunityEvaluation ?? {}, "fallback")}.`
       : null,
     selectionEvaluationLinked === false
       ? `The promoted selection points to evaluation #${selection?.model_evaluation_snapshot_id}, while the active opportunity is using evaluation #${opportunityEvaluation?.id}.`
@@ -415,16 +412,14 @@ export function ArtifactCompareView({
       tone: getAlignmentTone(familyAligned),
       detail:
         opportunityEvaluation?.model_family !== undefined
-          ? `${fold.selected_model.model_family} vs ${opportunityEvaluation.model_family}`
-          : selection?.model_family ?? "No opportunity model family"
+          ? `${foldModelFamily} vs ${opportunityModelFamily}`
+          : selectionModelFamily || "No opportunity model family"
     },
     {
       label: "Selected feature",
       value: getAlignmentLabel(featureAligned),
       tone: getAlignmentTone(featureAligned),
-      detail: `${fold.selected_model.selected_feature ?? "fallback"} vs ${
-        opportunityEvaluation?.selected_feature ?? "n/a"
-      }`
+      detail: `${foldSelectedFeature} vs ${opportunitySelectedFeature}`
     },
     {
       label: "Selection link",
@@ -555,7 +550,7 @@ export function ArtifactCompareView({
         </div>
         <div className="pill-row">
           <span className="pill">Fold {fold.fold_index}</span>
-          <span className="pill">{opportunity.team_code} vs {opportunity.opponent_code}</span>
+          <span className="pill">{getOpportunityMatchupLabel(opportunity)}</span>
         </div>
       </div>
 
@@ -662,11 +657,11 @@ export function ArtifactCompareView({
           <div className="detail-list compact-list">
             <div className="detail-list-item">
               <span>Model family</span>
-              <strong>{fold.selected_model.model_family}</strong>
+              <strong>{foldModelFamily}</strong>
             </div>
             <div className="detail-list-item">
               <span>Selected feature</span>
-              <strong>{fold.selected_model.selected_feature ?? "fallback"}</strong>
+              <strong>{foldSelectedFeature}</strong>
             </div>
             <div className="detail-list-item">
               <span>Validation metric</span>
@@ -688,11 +683,11 @@ export function ArtifactCompareView({
           <div className="detail-list compact-list">
             <div className="detail-list-item">
               <span>Model family</span>
-              <strong>{opportunityEvaluation?.model_family ?? "n/a"}</strong>
+              <strong>{opportunityModelFamily}</strong>
             </div>
             <div className="detail-list-item">
               <span>Selected feature</span>
-              <strong>{opportunityEvaluation?.selected_feature ?? "n/a"}</strong>
+              <strong>{opportunitySelectedFeature}</strong>
             </div>
             <div className="detail-list-item">
               <span>Validation metric</span>
@@ -714,7 +709,7 @@ export function ArtifactCompareView({
           <div className="detail-list compact-list">
             <div className="detail-list-item">
               <span>Model family</span>
-              <strong>{selection?.model_family ?? "n/a"}</strong>
+              <strong>{selectionModelFamily}</strong>
             </div>
             <div className="detail-list-item">
               <span>Selection policy</span>
@@ -732,7 +727,7 @@ export function ArtifactCompareView({
             </div>
             <div className="detail-list-item">
               <span>Rationale</span>
-              <strong>{selection ? formatSelectionRationaleValue(selection.rationale) : "n/a"}</strong>
+              <strong>{selection ? formatStoredRationaleValue(selection.rationale) : "n/a"}</strong>
             </div>
           </div>
         </section>

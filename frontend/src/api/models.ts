@@ -13,6 +13,7 @@ import {
   resolveDefaultTargetTask,
   resolveScenarioDefaults,
 } from "./defaults";
+import { applyScenarioQuery } from "../../../shared/frontend/query";
 
 function requireScenarioValue(
   scenario: Record<string, unknown>,
@@ -70,31 +71,15 @@ export async function fetchScoringRunDetail(
   const query = await buildSharedTrainingQuery();
   const defaultTargetTask = await resolveDefaultTargetTask();
   const resolvedTargetTask = readNested(scenario, "target_task") ?? defaultTargetTask;
-  if (resolvedTargetTask !== undefined && resolvedTargetTask !== null && String(resolvedTargetTask).trim()) {
-    query.set("target_task", String(resolvedTargetTask));
-  }
-  query.set(
-    "season_label",
-    requireScenarioValue(scenario, "season_label", scenarioDefaults.seasonLabel, "season label")
-  );
-  query.set("game_date", requireScenarioValue(scenario, "game_date", scenarioDefaults.gameDate, "game date"));
-  query.set(
-    "home_team_code",
-    requireScenarioValue(scenario, "home_team_code", scenarioDefaults.homeTeamCode, "home team code")
-  );
-  query.set(
-    "away_team_code",
-    requireScenarioValue(scenario, "away_team_code", scenarioDefaults.awayTeamCode, "away team code")
-  );
-
-  const homeSpreadLine = readNested(scenario, "home_spread_line");
-  const totalLine = readNested(scenario, "total_line");
-  if (homeSpreadLine !== undefined && homeSpreadLine !== null) {
-    query.set("home_spread_line", String(homeSpreadLine));
-  }
-  if (totalLine !== undefined && totalLine !== null) {
-    query.set("total_line", String(totalLine));
-  }
+  applyScenarioQuery(query, {
+    targetTask: resolvedTargetTask === undefined ? null : String(resolvedTargetTask),
+    seasonLabel: requireScenarioValue(scenario, "season_label", scenarioDefaults.seasonLabel, "season label"),
+    gameDate: requireScenarioValue(scenario, "game_date", scenarioDefaults.gameDate, "game date"),
+    homeTeamCode: requireScenarioValue(scenario, "home_team_code", scenarioDefaults.homeTeamCode, "home team code"),
+    awayTeamCode: requireScenarioValue(scenario, "away_team_code", scenarioDefaults.awayTeamCode, "away team code"),
+    homeSpreadLine: readNested(scenario, "home_spread_line") as string | number | null | undefined,
+    totalLine: readNested(scenario, "total_line") as string | number | null | undefined
+  });
 
   return apiGet<ScoringRunDetailResponse>(
     `/api/v1/admin/models/future-game-preview/runs/${scoringRunId}`,

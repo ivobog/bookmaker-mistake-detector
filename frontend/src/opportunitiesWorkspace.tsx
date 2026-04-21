@@ -7,6 +7,11 @@ import type {
   OpportunityRecord
 } from "./appTypes";
 import { formatCompactNumber, formatLabel, formatTimestamp } from "./appUtils";
+import {
+  getEvidenceLabel,
+  getOpportunityMatchupLabel,
+  getSourceKindLabel
+} from "../../shared/frontend/domain";
 
 function OpportunityListItem({
   opportunity,
@@ -26,10 +31,8 @@ function OpportunityListItem({
     >
       <div className="section-heading compact-heading">
         <div>
-          <p className="eyebrow">{formatLabel(opportunity.source_kind)}</p>
-          <h3>
-            {opportunity.team_code} vs {opportunity.opponent_code}
-          </h3>
+          <p className="eyebrow">{getSourceKindLabel(opportunity.source_kind)}</p>
+          <h3>{getOpportunityMatchupLabel(opportunity)}</h3>
         </div>
         <div className="pill-row">
           <span className="pill">{formatLabel(opportunity.status)}</span>
@@ -47,7 +50,7 @@ function OpportunityListItem({
         </div>
         <div>
           <p className="sub-panel-title">Evidence</p>
-          <p className="sub-panel-stat">{formatLabel(opportunity.evidence_rating)}</p>
+          <p className="sub-panel-stat">{getEvidenceLabel(opportunity.evidence_rating)}</p>
         </div>
       </div>
 

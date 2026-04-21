@@ -7,13 +7,21 @@ import type {
   ModelAdminSelectionSnapshot
 } from "./modelAdminTypes";
 import { formatCompactNumber, formatLabel, formatTimestamp, readNested, routeHash } from "./appUtils";
+import {
+  getModelFamilyLabel,
+  getModelRunLabel,
+  getModelScopeLabel,
+  getSelectedFeatureLabel
+} from "../../shared/frontend/domain";
+import { formatJsonLikeValue } from "../../shared/frontend/detailFormatting";
 
-function JsonBlock({ value }: { value: Record<string, unknown> | null | undefined }) {
-  if (!value || Object.keys(value).length === 0) {
+function JsonBlock({ value }: { value: unknown }) {
+  const formattedValue = formatJsonLikeValue(value);
+  if (!formattedValue) {
     return <p className="sub-panel-meta">No payload was stored for this section.</p>;
   }
 
-  return <pre className="json-block">{JSON.stringify(value, null, 2)}</pre>;
+  return <pre className="json-block">{formattedValue}</pre>;
 }
 
 function SummaryChips({
@@ -141,9 +149,9 @@ export function ModelAdminRunDetailCard({
     <article className="panel focus-panel" data-testid="run-detail-card">
       <ProvenanceRibbon
         items={[
-          { label: "Run", value: `#${run.id}` },
+          { label: "Run", value: getModelRunLabel(run.id) },
           { label: "Task", value: formatLabel(run.target_task) },
-          { label: "Family", value: String(readNested(run.artifact, "model_family") ?? "n/a") }
+          { label: "Family", value: getModelFamilyLabel(run) }
         ]}
         title="Training artifact"
       />
@@ -151,17 +159,17 @@ export function ModelAdminRunDetailCard({
       <div className="section-heading">
         <div>
           <p className="eyebrow">Training run detail</p>
-          <h2>Run #{run.id}</h2>
+          <h2>{getModelRunLabel(run.id)}</h2>
         </div>
         <div className="pill-row">
-          <span className="pill">{String(readNested(run.artifact, "model_family") ?? "n/a")}</span>
+          <span className="pill">{getModelFamilyLabel(run)}</span>
           <span className="pill">{run.status}</span>
         </div>
       </div>
 
       <div className="mini-grid">
         <StatTile label="Target task" value={formatLabel(run.target_task)} />
-        <StatTile label="Team scope" value={run.team_code ?? "global"} />
+        <StatTile label="Team scope" value={getModelScopeLabel(run)} />
         <StatTile label="Season" value={run.season_label ?? "all seasons"} />
         <StatTile label="Completed" value={formatTimestamp(run.completed_at ?? run.created_at)} />
       </div>
@@ -172,7 +180,7 @@ export function ModelAdminRunDetailCard({
           <div className="detail-list compact-list">
             <div className="detail-list-item">
               <span>Selected feature</span>
-              <strong>{String(readNested(run.artifact, "selected_feature") ?? "n/a")}</strong>
+              <strong>{getSelectedFeatureLabel(run)}</strong>
             </div>
             <div className="detail-list-item">
               <span>Fallback strategy</span>
@@ -283,7 +291,7 @@ export function ModelAdminEvaluationDetailCard({
       <ProvenanceRibbon
         items={[
           { label: "Evaluation", value: `#${evaluation.id}` },
-          { label: "Family", value: evaluation.model_family },
+          { label: "Family", value: getModelFamilyLabel(evaluation) },
           { label: "Task", value: formatLabel(evaluation.target_task) }
         ]}
         title="Evaluation artifact"
@@ -295,13 +303,13 @@ export function ModelAdminEvaluationDetailCard({
           <h2>Evaluation #{evaluation.id}</h2>
         </div>
         <div className="pill-row">
-          <span className="pill">{evaluation.model_family}</span>
+          <span className="pill">{getModelFamilyLabel(evaluation)}</span>
           <span className="pill">{evaluation.primary_metric_name ?? "metric n/a"}</span>
         </div>
       </div>
 
       <div className="mini-grid">
-        <StatTile label="Selected feature" value={evaluation.selected_feature ?? "n/a"} />
+        <StatTile label="Selected feature" value={getSelectedFeatureLabel(evaluation)} />
         <StatTile label="Fallback" value={evaluation.fallback_strategy ?? "primary fit"} />
         <StatTile label="Validation" value={formatCompactNumber(evaluation.validation_metric_value, 4)} />
         <StatTile label="Test" value={formatCompactNumber(evaluation.test_metric_value, 4)} />
@@ -327,7 +335,7 @@ export function ModelAdminEvaluationDetailCard({
           <SummaryChips
             entries={[
               { label: "Primary metric", value: evaluation.primary_metric_name },
-              { label: "Selected feature", value: evaluation.selected_feature },
+              { label: "Selected feature", value: getSelectedFeatureLabel(evaluation) },
               { label: "Fallback strategy", value: evaluation.fallback_strategy }
             ]}
           />
@@ -377,7 +385,7 @@ export function ModelAdminSelectionDetailCard({
       <ProvenanceRibbon
         items={[
           { label: "Selection", value: `#${selection.id}` },
-          { label: "Family", value: selection.model_family },
+          { label: "Family", value: getModelFamilyLabel(selection) },
           { label: "Policy", value: selection.selection_policy_name }
         ]}
         title="Promotion artifact"
@@ -389,7 +397,7 @@ export function ModelAdminSelectionDetailCard({
           <h2>Selection #{selection.id}</h2>
         </div>
         <div className="pill-row">
-          <span className="pill">{selection.model_family}</span>
+          <span className="pill">{getModelFamilyLabel(selection)}</span>
           <span className="pill">{selection.is_active ? "active" : "historical"}</span>
         </div>
       </div>

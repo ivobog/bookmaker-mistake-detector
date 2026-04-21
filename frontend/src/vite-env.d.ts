@@ -2,6 +2,7 @@
 
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL?: string;
+  readonly VITE_ENABLE_WORKFLOW_DESK?: string;
   readonly VITE_DEFAULT_TARGET_TASK?: string;
   readonly VITE_DEFAULT_TRAIN_RATIO?: string;
   readonly VITE_DEFAULT_VALIDATION_RATIO?: string;

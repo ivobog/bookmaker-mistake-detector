@@ -1,6 +1,13 @@
 import { ProvenanceInspector, ProvenanceRibbon, StatTile } from "./appSharedComponents";
 import type { OpportunityRecord, ProvenanceInspectorData, ProvenanceItem } from "./appTypes";
 import { asArray, asRecord, formatCompactNumber, formatLabel, formatTimestamp, readNested } from "./appUtils";
+import {
+  getEvidenceLabel,
+  getModelFamilyLabel,
+  getOpportunityMatchupLabel,
+  getRecommendationLabel,
+  getSelectedFeatureLabel
+} from "../../shared/frontend/domain";
 
 export function OpportunityDetailCard({
   opportunity,
@@ -66,13 +73,11 @@ export function OpportunityDetailCard({
       <div className="section-heading">
         <div>
           <p className="eyebrow">Opportunity detail</p>
-          <h2 data-testid="opportunity-detail-matchup">
-            {opportunity.team_code} vs {opportunity.opponent_code}
-          </h2>
+          <h2 data-testid="opportunity-detail-matchup">{getOpportunityMatchupLabel(opportunity)}</h2>
         </div>
         <div className="pill-row">
           <span className="pill">{formatLabel(opportunity.status)}</span>
-          <span className="pill">{formatLabel(opportunity.recommendation_status)}</span>
+          <span className="pill">{getRecommendationLabel(opportunity.recommendation_status)}</span>
         </div>
       </div>
 
@@ -90,7 +95,7 @@ export function OpportunityDetailCard({
         <StatTile
           label="Evidence rating"
           testId="opportunity-detail-evidence-rating"
-          value={formatLabel(opportunity.evidence_rating)}
+          value={getEvidenceLabel(opportunity.evidence_rating)}
         />
         <StatTile
           detail={opportunity.season_label}
@@ -112,7 +117,7 @@ export function OpportunityDetailCard({
         <div className="sub-panel" data-testid="opportunity-detail-recommendation">
           <p className="sub-panel-title">Recommendation</p>
           <p className="sub-panel-stat">
-            {String(readNested(recommendation, "headline") ?? formatLabel(opportunity.recommendation_status))}
+            {String(readNested(recommendation, "headline") ?? getRecommendationLabel(opportunity.recommendation_status))}
           </p>
           <p className="sub-panel-meta">
             {String(readNested(recommendation, "recommended_action") ?? "Inspect manually")}
@@ -122,7 +127,7 @@ export function OpportunityDetailCard({
         <div className="sub-panel" data-testid="opportunity-detail-evidence-strength">
           <p className="sub-panel-title">Evidence strength</p>
           <p className="sub-panel-stat">
-            {formatLabel(String(readNested(strength, "rating") ?? opportunity.evidence_rating ?? "n/a"))}
+            {getEvidenceLabel(String(readNested(strength, "rating") ?? opportunity.evidence_rating ?? "n/a"), "n/a")}
           </p>
           <p className="sub-panel-meta">
             Overall score {formatCompactNumber(Number(readNested(strength, "overall_score") ?? null), 3)}
@@ -155,11 +160,11 @@ export function OpportunityDetailCard({
         </div>
         <div className="detail-list-item" data-testid="opportunity-detail-model-family">
           <span>Model family</span>
-          <strong>{String(readNested(modelContext, "model_family") ?? "n/a")}</strong>
+          <strong>{getModelFamilyLabel(modelContext ?? {})}</strong>
         </div>
         <div className="detail-list-item" data-testid="opportunity-detail-selected-feature">
           <span>Selected feature</span>
-          <strong>{String(readNested(modelContext, "selected_feature") ?? "n/a")}</strong>
+          <strong>{getSelectedFeatureLabel(modelContext ?? {})}</strong>
         </div>
         <div className="detail-list-item" data-testid="opportunity-detail-scenario-key">
           <span>Scenario key</span>
@@ -364,7 +369,7 @@ export function OpportunityDetailCard({
             <div className="detail-list compact-list">
               <div className="detail-list-item">
                 <span>Family</span>
-                <strong>{String(readNested(activeSelection, "model_family") ?? "n/a")}</strong>
+                <strong>{getModelFamilyLabel(activeSelection ?? {})}</strong>
               </div>
               <div className="detail-list-item">
                 <span>Policy</span>

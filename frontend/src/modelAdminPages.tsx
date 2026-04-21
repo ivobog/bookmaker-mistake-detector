@@ -12,7 +12,8 @@ import type {
   ModelAdminSummary,
   ModelAdminTrainingHistory
 } from "./modelAdminTypes";
-import { formatCompactNumber, formatLabel, formatTimestamp, readNested } from "./appUtils";
+import { formatCompactNumber, formatLabel, formatTimestamp } from "./appUtils";
+import { getModelFamilyLabel, getModelRunLabel, getModelScopeLabel } from "../../shared/frontend/domain";
 
 type SharedFiltersProps = {
   actions?: ReactNode;
@@ -263,19 +264,17 @@ export function ModelAdminDashboardPage({
           <div className="mini-grid family-grid">
             <div className="sub-panel">
               <p className="sub-panel-title">Latest run</p>
-              <p className="sub-panel-stat">{latestRun ? `Run #${latestRun.id}` : "n/a"}</p>
+              <p className="sub-panel-stat">{latestRun ? getModelRunLabel(latestRun.id) : "n/a"}</p>
               <p className="sub-panel-meta">
                 {latestRun
-                  ? `${String(readNested(latestRun.artifact, "model_family") ?? "n/a")} | ${formatTimestamp(
-                      latestRun.completed_at ?? latestRun.created_at
-                    )}`
+                  ? `${getModelFamilyLabel(latestRun)} | ${formatTimestamp(latestRun.completed_at ?? latestRun.created_at)}`
                   : "No run recorded"}
               </p>
             </div>
             <div className="sub-panel">
               <p className="sub-panel-title">Best overall</p>
               <p className="sub-panel-stat">
-                {bestOverall ? String(readNested(bestOverall.artifact, "model_family") ?? "n/a") : "n/a"}
+                {bestOverall ? getModelFamilyLabel(bestOverall) : "n/a"}
               </p>
               <p className="sub-panel-meta">
                 {bestOverall ? formatLabel(bestOverall.target_task) : "No best model recorded"}
@@ -387,7 +386,7 @@ export function ModelAdminDashboardPage({
                     type="button"
                   >
                     <p className="sub-panel-title">
-                      Run #{run.id} | {String(readNested(run.artifact, "model_family") ?? "n/a")}
+                      {getModelRunLabel(run.id)} | {getModelFamilyLabel(run)}
                     </p>
                     <p className="sub-panel-meta">
                       {formatTimestamp(run.completed_at ?? run.created_at)} | {formatLabel(run.target_task)}
@@ -553,9 +552,9 @@ export function ModelRunsPage({
                     onClick={() => onNavigate({ name: "model-run-detail", runId: run.id })}
                   >
                     <td>#{run.id}</td>
-                    <td>{String(readNested(run.artifact, "model_family") ?? "n/a")}</td>
+                    <td>{getModelFamilyLabel(run)}</td>
                     <td>{run.status}</td>
-                    <td>{run.team_code ?? run.season_label ?? "global"}</td>
+                    <td>{getModelScopeLabel(run)}</td>
                     <td>{formatTimestamp(run.completed_at ?? run.created_at)}</td>
                   </tr>
                 ))

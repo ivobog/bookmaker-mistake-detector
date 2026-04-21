@@ -55,8 +55,10 @@ import {
 import { BacktestsWorkspace } from "./backtestsWorkspace";
 import { ModelAdminWorkspace } from "./modelAdminWorkspace";
 import { OpportunitiesWorkspace } from "./opportunitiesWorkspace";
+import { WorkflowDeskBridge } from "./workflowDeskBridge";
 
 export default function App() {
+  const workflowDeskEnabled = import.meta.env.VITE_ENABLE_WORKFLOW_DESK === "true";
   const [history, setHistory] = useState<BacktestHistoryResponse | null>(null);
   const [opportunityHistory, setOpportunityHistory] = useState<OpportunityHistoryResponse | null>(null);
   const [opportunityList, setOpportunityList] = useState<OpportunityListResponse | null>(null);
@@ -114,6 +116,13 @@ export default function App() {
       try {
         setLoading(true);
         setError(null);
+        if (route.name === "workflow-desk") {
+          if (!cancelled) {
+            setLoading(false);
+            setError(null);
+          }
+          return;
+        }
         const [
           nextHistory,
           nextOpportunityHistory,
@@ -455,6 +464,7 @@ export default function App() {
   const inModelEvaluationDetailRoute = route.name === "model-evaluation-detail";
   const inModelSelections = route.name === "model-selections";
   const inModelSelectionDetailRoute = route.name === "model-selection-detail";
+  const inWorkflowDesk = route.name === "workflow-desk";
   const inModelAdmin =
     inModelAdminDashboard ||
     inModelRegistry ||
@@ -465,7 +475,9 @@ export default function App() {
     inModelSelections ||
     inModelSelectionDetailRoute;
   const viewMode =
-    inModelAdmin
+    inWorkflowDesk
+      ? "workflow"
+      : inModelAdmin
       ? "models"
       : route.name === "backtests" ||
           route.name === "backtest-run" ||
@@ -493,7 +505,11 @@ export default function App() {
   const inOpportunityContextDetail =
     inOpportunityDetail || inComparableCase || inOpportunityArtifactDetail;
   const heroTitle =
-    route.name === "models"
+    inWorkflowDesk
+      ? workflowDeskEnabled
+        ? "Workflow Desk preview is mounted in the current shell."
+        : "Workflow Desk preview route is reserved."
+      : route.name === "models"
       ? "Model admin workspace shell is online."
       : inModelRegistry
         ? "Model registry route shell is online."
@@ -535,7 +551,11 @@ export default function App() {
         ? "Opportunity investigation is open."
         : "Analyst opportunity desk is online.";
   const heroLead =
-    route.name === "models"
+    inWorkflowDesk
+      ? workflowDeskEnabled
+        ? "This feature-flagged route mounts the clean-room redesign inside the existing frontend shell, so we can validate navigation, live data, and operator flow without replacing the current app."
+        : "This route is wired for the redesign bridge, but it stays gated until VITE_ENABLE_WORKFLOW_DESK is enabled in the current frontend environment."
+      : route.name === "models"
       ? "This workspace is the dedicated shell for model lifecycle administration. Phase 1 locks the route family and component ownership so the training console can grow without adding more workspace logic to the main app shell."
       : inModelRegistry
         ? "This route reserves the model registry workspace surface. The next phase will add filtering, inline registry inspection, and reusable admin artifact cards."
@@ -577,7 +597,9 @@ export default function App() {
         ? "This route is the analyst deep-dive for one materialized opportunity. It keeps the evidence bundle, comparables, benchmark context, and model provenance in one inspectable workspace."
         : "This view turns the Phase 3 scoring pipeline into an analyst workflow. It surfaces recent opportunities, keeps the evidence bundle attached, and lets you inspect why a case is only reviewable or strong enough to escalate.";
   const activeServicePath =
-    viewMode === "models"
+    viewMode === "workflow"
+      ? "Feature-flagged redesign bridge to shared model and opportunity APIs"
+      : viewMode === "models"
       ? `${apiBaseUrl}/api/v1/admin/models`
       : viewMode === "backtests"
       ? `${apiBaseUrl}/api/v1/analyst/backtests`
@@ -796,9 +818,28 @@ export default function App() {
             >
               Model Admin
             </button>
+            {workflowDeskEnabled ? (
+              <button
+                data-testid="nav-workflow-desk"
+                className={`mode-button${viewMode === "workflow" ? " mode-button-active" : ""}`}
+                onClick={() => navigate({ name: "workflow-desk" })}
+                type="button"
+              >
+                Workflow Desk
+              </button>
+            ) : null}
           </div>
 
-          {viewMode === "backtests" ? (
+          {viewMode === "workflow" ? (
+            <button
+              className="primary-button"
+              data-testid="open-workflow-desk-button"
+              onClick={() => navigate({ name: "workflow-desk", deskPath: "home" })}
+              type="button"
+            >
+              {workflowDeskEnabled ? "Open workflow desk home" : "Workflow desk is gated"}
+            </button>
+          ) : viewMode === "backtests" ? (
             <button
               className="primary-button"
               data-testid="run-backtest-button"
@@ -926,6 +967,14 @@ export default function App() {
 
       {error ? <section className="banner banner-error">{error}</section> : null}
       {loading ? <section className="banner">Loading the Phase 4 analyst workspace...</section> : null}
+
+      {!loading && inWorkflowDesk ? (
+        <WorkflowDeskBridge
+          deskPath={route.deskPath}
+          enabled={workflowDeskEnabled}
+          onNavigateDeskPath={(nextDeskPath) => navigate({ name: "workflow-desk", deskPath: nextDeskPath })}
+        />
+      ) : null}
 
       {!loading && viewMode === "backtests" && history && overview ? (
         <BacktestsWorkspace

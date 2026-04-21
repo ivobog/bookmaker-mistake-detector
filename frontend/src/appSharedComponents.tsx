@@ -1,5 +1,11 @@
 import type { ProvenanceInspectorData, ProvenanceItem } from "./appTypes";
-import { formatCompactNumber, readNested } from "./appUtils";
+import { formatCompactNumber } from "./appUtils";
+import {
+  getModelFamilyLabel,
+  getModelMetricValue,
+  getModelRunLabel,
+  getSelectedFeatureLabel
+} from "../../shared/frontend/domain";
 
 export function StatTile({
   label,
@@ -58,12 +64,8 @@ export function ProvenanceInspector({
 }: {
   data: ProvenanceInspectorData;
 }) {
-  const modelRunValidationMetricValue = data.modelRun
-    ? readNested(data.modelRun.artifact, "selection_metrics", "validation", "metric_value")
-    : null;
-  const modelRunSelectedFeatureValue = data.modelRun
-    ? readNested(data.modelRun.artifact, "selected_feature")
-    : null;
+  const modelRunValidationMetricValue = data.modelRun ? getModelMetricValue(data.modelRun) : null;
+  const modelRunSelectedFeatureValue = data.modelRun ? getSelectedFeatureLabel(data.modelRun) : null;
 
   if (!data.selection && !data.evaluation && !data.scoringRun && !data.modelHistory && !data.modelRun) {
     return null;
@@ -94,13 +96,13 @@ export function ProvenanceInspector({
               <div className="detail-list-item">
                 <span>Latest family</span>
                 <strong>
-                  {String(readNested(data.modelHistory.overview.latest_run, "artifact", "model_family") ?? "n/a")}
+                  {getModelFamilyLabel(data.modelHistory.overview.latest_run ?? {})}
                 </strong>
               </div>
               <div className="detail-list-item">
                 <span>Best family</span>
                 <strong>
-                  {String(readNested(data.modelHistory.overview.best_overall, "artifact", "model_family") ?? "n/a")}
+                  {getModelFamilyLabel(data.modelHistory.overview.best_overall ?? {})}
                 </strong>
               </div>
             </div>
@@ -113,15 +115,15 @@ export function ProvenanceInspector({
             <div className="detail-list compact-list">
               <div className="detail-list-item">
                 <span>ID</span>
-                <strong>Run #{data.modelRun.id}</strong>
+                <strong>{getModelRunLabel(data.modelRun.id)}</strong>
               </div>
               <div className="detail-list-item">
                 <span>Model family</span>
-                <strong>{String(readNested(data.modelRun.artifact, "model_family") ?? "n/a")}</strong>
+                <strong>{getModelFamilyLabel(data.modelRun)}</strong>
               </div>
               <div className="detail-list-item">
                 <span>Selected feature</span>
-                <strong>{String(modelRunSelectedFeatureValue ?? "n/a")}</strong>
+                <strong>{modelRunSelectedFeatureValue}</strong>
               </div>
               <div className="detail-list-item">
                 <span>Validation metric</span>
@@ -145,7 +147,7 @@ export function ProvenanceInspector({
               </div>
               <div className="detail-list-item">
                 <span>Model family</span>
-                <strong>{data.selection.model_family}</strong>
+                <strong>{getModelFamilyLabel(data.selection)}</strong>
               </div>
               <div className="detail-list-item">
                 <span>Policy</span>
@@ -169,7 +171,7 @@ export function ProvenanceInspector({
               </div>
               <div className="detail-list-item">
                 <span>Model family</span>
-                <strong>{data.evaluation.model_family}</strong>
+                <strong>{getModelFamilyLabel(data.evaluation)}</strong>
               </div>
               <div className="detail-list-item">
                 <span>Primary metric</span>
